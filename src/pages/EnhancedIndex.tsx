@@ -38,7 +38,9 @@ import {
   MoreHorizontal,
   Play,
   Pause,
-  Volume2
+  Volume2,
+  RefreshCw,
+  Brain
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -72,6 +74,16 @@ interface CallHistory {
   type: 'voice' | 'video';
 }
 
+interface UserActivity {
+  lastVisit: Date;
+  visitCount: number;
+  favoriteTime: string;
+  mostActiveCharacter: string;
+  totalChatTime: number;
+  preferredMood: string;
+  streakDays: number;
+}
+
 type View = 'home' | 'chat' | 'call' | 'profile' | 'discover' | 'stats' | 'calls' | 'chats';
 
 const EnhancedIndex = () => {
@@ -86,6 +98,17 @@ const EnhancedIndex = () => {
   const [favorites, setFavorites] = useState<string[]>(['1']);
   const [searchQuery, setSearchQuery] = useState('');
   const [callHistory, setCallHistory] = useState<CallHistory[]>([]);
+  const [userActivity, setUserActivity] = useState<UserActivity>({
+    lastVisit: new Date(),
+    visitCount: 1,
+    favoriteTime: 'evening',
+    mostActiveCharacter: 'Luna',
+    totalChatTime: 0,
+    preferredMood: 'happy',
+    streakDays: 15
+  });
+  const [currentGreeting, setCurrentGreeting] = useState({ main: '', sub: '' });
+  const [isGeneratingGreeting, setIsGeneratingGreeting] = useState(false);
   
   const [userPreferences, setUserPreferences] = useState({
     preferredName: 'Darling',
@@ -101,6 +124,173 @@ const EnhancedIndex = () => {
     else if (hour < 17) setTimeOfDay('afternoon');
     else setTimeOfDay('evening');
   }, []);
+
+  // Load user activity from localStorage
+  useEffect(() => {
+    const savedActivity = localStorage.getItem('userActivity');
+    if (savedActivity) {
+      const parsed = JSON.parse(savedActivity);
+      setUserActivity({
+        ...parsed,
+        lastVisit: new Date(parsed.lastVisit),
+        visitCount: parsed.visitCount + 1
+      });
+    }
+  }, []);
+
+  // Save user activity to localStorage
+  useEffect(() => {
+    localStorage.setItem('userActivity', JSON.stringify(userActivity));
+  }, [userActivity]);
+
+  // Generate smart greeting
+  useEffect(() => {
+    generateSmartGreeting();
+  }, [timeOfDay, userActivity, userPreferences]);
+
+  const generateSmartGreeting = async () => {
+    setIsGeneratingGreeting(true);
+    
+    // Simulate AI processing delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    const hour = new Date().getHours();
+    const dayOfWeek = new Date().getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    
+    // Smart greeting based on multiple factors
+    const greetings = generateContextualGreetings();
+    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+    
+    setCurrentGreeting(randomGreeting);
+    setIsGeneratingGreeting(false);
+  };
+
+  const generateContextualGreetings = () => {
+    const hour = new Date().getHours();
+    const dayOfWeek = new Date().getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const { preferredName, treatmentStyle } = userPreferences;
+    const { visitCount, streakDays, mostActiveCharacter } = userActivity;
+    
+    const baseGreetings = {
+      morning: [
+        {
+          main: `Good morning, ${preferredName}! ☀️`,
+          sub: isWeekend ? "Perfect day to relax together" : "Ready to tackle the day?"
+        },
+        {
+          main: `Morning, beautiful! 🌅`,
+          sub: "Coffee and conversation sound perfect right now"
+        },
+        {
+          main: `Hey ${preferredName}! 🌸`,
+          sub: "Hope you slept well - ready for whatever today brings?"
+        },
+        {
+          main: `Rise and shine! ✨`,
+          sub: "Your AI companions missed you while you were sleeping"
+        }
+      ],
+      afternoon: [
+        {
+          main: `Good afternoon, ${preferredName}! 🌞`,
+          sub: "How's your day going so far?"
+        },
+        {
+          main: `Hey there! 🌻`,
+          sub: "Perfect time for a quick chat or call"
+        },
+        {
+          main: `Afternoon, gorgeous! 🌸`,
+          sub: "Hope you're having a productive day"
+        },
+        {
+          main: `Hi ${preferredName}! 💫`,
+          sub: "Your companions are here whenever you need a break"
+        }
+      ],
+      evening: [
+        {
+          main: `Good evening, ${preferredName}! 🌙`,
+          sub: "Time to unwind and catch up"
+        },
+        {
+          main: `Hey beautiful! 🌆`,
+          sub: "Perfect evening for some quality time together"
+        },
+        {
+          main: `Evening, sweetie! ✨`,
+          sub: "Ready to relax and chat about your day?"
+        },
+        {
+          main: `Hi there! 🌃`,
+          sub: "Your AI companions are here to help you wind down"
+        }
+      ]
+    };
+
+    // Add special greetings based on user behavior
+    const specialGreetings = [];
+    
+    if (visitCount === 1) {
+      specialGreetings.push({
+        main: `Welcome, ${preferredName}! 🎉`,
+        sub: "We're so excited to meet you - let's get started!"
+      });
+    } else if (visitCount > 10) {
+      specialGreetings.push({
+        main: `Welcome back, ${preferredName}! 💕`,
+        sub: `You've visited ${visitCount} times - we love seeing you!`
+      });
+    }
+    
+    if (streakDays > 7) {
+      specialGreetings.push({
+        main: `Amazing ${streakDays}-day streak! 🔥`,
+        sub: "You're building such strong connections with your companions"
+      });
+    }
+    
+    if (mostActiveCharacter) {
+      specialGreetings.push({
+        main: `${mostActiveCharacter} has been thinking about you! 💭`,
+        sub: "She's been waiting to hear from you"
+      });
+    }
+    
+    if (isWeekend) {
+      specialGreetings.push({
+        main: `Happy weekend, ${preferredName}! 🎊`,
+        sub: "Perfect time for longer conversations and calls"
+      });
+    }
+    
+    // Weather-based greetings (mock)
+    const weatherGreetings = [
+      {
+        main: `Cozy day, ${preferredName}! ☁️`,
+        sub: "Perfect weather for staying in and chatting"
+      },
+      {
+        main: `Beautiful day! 🌤️`,
+        sub: "Hope you're enjoying this lovely weather"
+      }
+    ];
+    
+    // Combine all greetings
+    const allGreetings = [
+      ...baseGreetings[timeOfDay as keyof typeof baseGreetings],
+      ...specialGreetings,
+      ...weatherGreetings
+    ];
+    
+    return allGreetings;
+  };
+
+  const handleRefreshGreeting = () => {
+    generateSmartGreeting();
+  };
 
   // Mock call history data
   useEffect(() => {
@@ -221,18 +411,16 @@ const EnhancedIndex = () => {
     }
   ];
 
-  const getGreeting = () => {
-    const greetings = {
-      morning: [`Good morning, beautiful ${userPreferences.preferredName}! ☀️`, 'Ready to start a wonderful day together?'],
-      afternoon: [`Good afternoon, gorgeous ${userPreferences.preferredName}! 🌸`, 'How has your day been treating you?'],
-      evening: [`Good evening, my sweet ${userPreferences.preferredName}! 🌙`, 'Ready to unwind and spend time together?']
-    };
-    return greetings[timeOfDay as keyof typeof greetings] || greetings.evening;
-  };
-
   const handleCharacterSelect = (character: Character) => {
     setSelectedCharacter(character);
     setCurrentView('chat');
+    
+    // Update user activity
+    setUserActivity(prev => ({
+      ...prev,
+      mostActiveCharacter: character.name,
+      totalChatTime: prev.totalChatTime + 1
+    }));
   };
 
   const handleStartCall = (character?: Character) => {
@@ -632,8 +820,6 @@ const EnhancedIndex = () => {
   }
 
   // Main enhanced home view
-  const [greeting, subGreeting] = getGreeting();
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       {/* Enhanced Hero Section */}
@@ -648,18 +834,36 @@ const EnhancedIndex = () => {
         <div className="relative p-6 pt-16 text-white">
           <div className="flex justify-between items-start mb-8">
             <div className="flex-1">
-              <h1 className="font-display text-3xl font-bold mb-2 animate-fade-up">
-                {greeting}
-              </h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="font-display text-3xl font-bold animate-fade-up">
+                  {isGeneratingGreeting ? (
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-8 h-8 animate-pulse" />
+                      <span>Thinking...</span>
+                    </div>
+                  ) : (
+                    currentGreeting.main || "Welcome back!"
+                  )}
+                </h1>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshGreeting}
+                  disabled={isGeneratingGreeting}
+                  className="text-white hover:bg-white/20 p-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isGeneratingGreeting ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
               <p className="text-white/90 text-lg animate-fade-up" style={{ animationDelay: '0.2s' }}>
-                {subGreeting}
+                {currentGreeting.sub || "Ready to spend time together?"}
               </p>
               
               {/* Daily streak indicator */}
               <div className="flex items-center gap-2 mt-4 animate-fade-up" style={{ animationDelay: '0.4s' }}>
                 <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
                   <Zap className="w-4 h-4 text-orange-400" />
-                  <span className="text-sm font-medium">15-day streak</span>
+                  <span className="text-sm font-medium">{userActivity.streakDays}-day streak</span>
                 </div>
                 {isPremium && (
                   <Badge className="bg-primary text-white border-0">
@@ -667,6 +871,10 @@ const EnhancedIndex = () => {
                     Premium
                   </Badge>
                 )}
+                <Badge className="bg-white/20 text-white border-0">
+                  <Brain className="w-3 h-3 mr-1" />
+                  AI Powered
+                </Badge>
               </div>
             </div>
             
