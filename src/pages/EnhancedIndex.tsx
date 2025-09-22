@@ -28,7 +28,8 @@ import {
   Globe,
   Filter,
   SlidersHorizontal,
-  ArrowLeft
+  ArrowLeft,
+  Library
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -450,6 +451,15 @@ const EnhancedIndex = () => {
             Your AI Companions
           </h2>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/library')}
+              className="animate-bounce-in hover:scale-105 transition-all"
+            >
+              <Library className="w-4 h-4 mr-2" />
+              Library
+            </Button>
             <Button 
               variant="outline" 
               size="sm"
