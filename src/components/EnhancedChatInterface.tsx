@@ -17,12 +17,16 @@ import {
   Gift,
   Star,
   Zap,
-  Loader2
+  Loader2,
+  Lock,
+  Crown
 } from "lucide-react";
 import { speakText } from "@/lib/voice";
 import { buildSystemPrompt } from "@/lib/ai";
 import { useToast } from "@/hooks/use-toast";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 
 interface Message {
   id: string;
@@ -50,451 +54,336 @@ interface Character {
 interface EnhancedChatInterfaceProps {
   character: Character;
   onBack: () => void;
-  onStartCall: () => void;
-  userPreferences: {
-    preferredName: string;
-    treatmentStyle: string;
-  };
+  onCall?: () => void;
 }
 
 export const EnhancedChatInterface = ({ 
   character, 
   onBack, 
-  onStartCall, 
-  userPreferences 
+  onCall 
 }: EnhancedChatInterfaceProps) => {
-  const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState("");
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      content: `Hey there! I'm ${character.name}. ${character.bio} I'm so excited to chat with you! What's on your mind? 💕`,
+      sender: 'ai',
+      timestamp: new Date(),
+      mood: 'happy'
+    }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [isAiTyping, setIsAiTyping] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [relationshipXP, setRelationshipXP] = useState(240);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePromptType, setUpgradePromptType] = useState<'messages' | 'voiceCalls'>('messages');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const defaultVoiceId = (import.meta as any).env?.VITE_ELEVENLABS_VOICE_ID as string | undefined;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  
+  const { toast } = useToast();
+  const { 
+    currentPlan, 
+    incrementMessages, 
+    incrementVoiceCalls, 
+    canSendMessage, 
+    canMakeVoiceCall, 
+    remainingMessages, 
+    remainingVoiceCalls 
+  } = useUsageTracking();
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue(transcript);
+        setIsTranscribing(false);
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsTranscribing(false);
+        setIsRecording(false);
+        toast({
+          title: "Voice input failed",
+          description: "Could not process your voice. Please try again.",
+          variant: "destructive"
+        });
+      };
+    }
+  }, [toast]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Initialize speech recognition
-  useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
-      
-      recognitionRef.current.onstart = () => {
-        setIsRecording(true);
-        setIsTranscribing(true);
-        toast({
-          title: "Listening...",
-          description: "Speak now, I'm listening to you",
-        });
-      };
-      
-      recognitionRef.current.onresult = (event) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-        
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-        
-        // Update input with interim results for real-time feedback
-        if (interimTranscript) {
-          setInputValue(prev => prev + interimTranscript);
-        }
-        
-        // If we have final results, use them
-        if (finalTranscript) {
-          setInputValue(finalTranscript.trim());
-          setIsTranscribing(false);
-          toast({
-            title: "Transcription complete",
-            description: "Ready to send your message",
-          });
-        }
-      };
-      
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setIsRecording(false);
-        setIsTranscribing(false);
-        
-        let errorMessage = "Speech recognition failed";
-        switch (event.error) {
-          case 'no-speech':
-            errorMessage = "No speech detected. Please try again.";
-            break;
-          case 'audio-capture':
-            errorMessage = "Microphone not accessible. Please check permissions.";
-            break;
-          case 'not-allowed':
-            errorMessage = "Microphone access denied. Please allow microphone access.";
-            break;
-          case 'network':
-            errorMessage = "Network error. Please check your connection.";
-            break;
-        }
-        
-        toast({
-          title: "Voice input failed",
-          description: errorMessage,
-          variant: "destructive"
-        });
-      };
-      
-      recognitionRef.current.onend = () => {
-        setIsRecording(false);
-        setIsTranscribing(false);
-      };
-    } else {
-      console.warn('Speech recognition not supported in this browser');
+  const handleVoiceInput = () => {
+    if (!canMakeVoiceCall) {
+      setUpgradePromptType('voiceCalls');
+      setShowUpgradePrompt(true);
+      return;
     }
-    
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, [toast]);
 
-  useEffect(() => {
-    const greet = async () => {
-      setIsAiTyping(true);
-      try {
-        const system = buildSystemPrompt({
-          character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
-          userPreferences
-        });
-        const res = await fetch('/api/openai-chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: `Greet me with a flirty, warm one-liner.` }
-            ],
-            temperature: 0.95,
-            max_tokens: 160
-          })
-        });
-        const data = await res.json();
-        const content = data?.message || `Hey ${userPreferences.preferredName}, it's ${character.name}.`;
-        const aiMsg: Message = { id: Date.now().toString(), content, sender: 'ai', timestamp: new Date(), mood: 'loving' };
-        setMessages([aiMsg]);
-        try { await speakText(aiMsg.content, character.voiceId || defaultVoiceId); } catch {}
-      } catch {
-        const fallbackMsg: Message = { id: Date.now().toString(), content: `Hey there ${userPreferences.preferredName}! It's ${character.name}. 💕`, sender: 'ai', timestamp: new Date(), mood: 'loving' };
-        setMessages([fallbackMsg]);
-        try { await speakText(fallbackMsg.content, character.voiceId || defaultVoiceId); } catch {}
-      } finally {
-        setIsAiTyping(false);
-      }
-    };
-    greet();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character.id]);
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      setIsTranscribing(true);
+    } else {
+      recognitionRef.current?.start();
+      setIsRecording(true);
+    }
+  };
 
-  const sendMessage = async () => {
-    if (!inputValue.trim()) return;
+  const handleEmojiSelect = (emoji: string) => {
+    setInputValue(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isLoading) return;
+
+    // Check message limit
+    if (!canSendMessage) {
+      setUpgradePromptType('messages');
+      setShowUpgradePrompt(true);
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue,
+      content: inputValue.trim(),
       sender: 'user',
-      timestamp: new Date()
+      timestamp: new Date(),
+      type: 'text'
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputValue("");
-    setIsAiTyping(true);
-    setRelationshipXP(prev => prev + 5);
+    setInputValue('');
+    setIsLoading(true);
+
+    // Increment message usage
+    incrementMessages();
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
-      const system = buildSystemPrompt({
-        character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
-        userPreferences
-      });
-      const res = await fetch('/api/openai-chat', {
+      const systemPrompt = buildSystemPrompt(character);
+      
+      const response = await fetch('/api/openai-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: system },
-            ...messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.content })),
+            { role: 'system', content: systemPrompt },
+            ...messages.map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.content
+            })),
             { role: 'user', content: userMessage.content }
           ],
-          temperature: 0.95,
-          max_tokens: 240
+          character: character.name
         }),
-        signal: controller.signal
       });
-      clearTimeout(timeout);
 
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      const content = (data && data.message) ? data.message : `Mmm, ${userPreferences.preferredName}, I adore how you think… tell me more 💕`;
+      if (!response.ok) {
+        throw new Error('Failed to get response');
+      }
 
+      const data = await response.json();
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content,
+        content: data.message,
         sender: 'ai',
         timestamp: new Date(),
-        mood: ['happy', 'excited', 'loving', 'playful'][Math.floor(Math.random() * 4)] as any
+        mood: 'happy'
       };
+
       setMessages(prev => [...prev, aiMessage]);
-      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
-    } catch (err) {
-      const responses = [
-        `Mmm, ${userPreferences.preferredName}, you always know just what to say to make my heart skip a beat! 💖 Tell me more, beautiful...`,
-        `That's so sweet of you, ${userPreferences.preferredName}! I love how you think... it makes me feel so close to you 🥰`,
-        `*blushes* You're making me feel all fluttery inside, ${userPreferences.preferredName}! What else is on your mind today? 💕`
-      ];
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: responses[Math.floor(Math.random() * responses.length)],
-        sender: 'ai',
-        timestamp: new Date(),
-        mood: ['happy', 'excited', 'loving', 'playful'][Math.floor(Math.random() * 4)] as any
-      };
-      setMessages(prev => [...prev, aiMessage]);
-      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
     } finally {
-      setIsAiTyping(false);
+      setIsLoading(false);
     }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleCall = () => {
+    if (!canMakeVoiceCall) {
+      setUpgradePromptType('voiceCalls');
+      setShowUpgradePrompt(true);
+      return;
+    }
+
+    incrementVoiceCalls();
+    onCall?.();
   };
 
   const getMoodEmoji = (mood?: string) => {
     switch (mood) {
       case 'happy': return '😊';
       case 'excited': return '🤩';
-      case 'loving': return '😍';
-      case 'playful': return '😏';
-      default: return '💕';
+      case 'loving': return '🥰';
+      case 'playful': return '😜';
+      default: return '😊';
     }
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-  };
-
-  const handleVoiceInput = () => {
-    if (!recognitionRef.current) {
-      toast({
-        title: "Voice input not supported",
-        description: "Your browser doesn't support speech recognition",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (isRecording) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-      setIsTranscribing(false);
-    } else {
-      setInputValue(""); // Clear input before starting new recording
-      recognitionRef.current.start();
+  const getMoodColor = (mood?: string) => {
+    switch (mood) {
+      case 'happy': return 'text-green-500';
+      case 'excited': return 'text-yellow-500';
+      case 'loving': return 'text-pink-500';
+      case 'playful': return 'text-blue-500';
+      default: return 'text-green-500';
     }
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10">
-      {/* Enhanced Header */}
-      <Card className="flex items-center justify-between p-4 rounded-none border-0 border-b bg-card/95 backdrop-blur-xl shadow-lg">
+    <div className="flex flex-col h-full bg-gradient-to-br from-background via-primary/5 to-accent/10">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onBack}
-            className="p-2 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
-          >
-            <ArrowLeft className="w-5 h-5" />
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
           </Button>
-          
-          <div className="relative">
-            <Avatar className="w-12 h-12 ring-2 ring-primary/20 animate-pulse-glow">
-              <AvatarImage src={character.avatar} alt={character.name} />
-              <AvatarFallback>{character.name[0]}</AvatarFallback>
-            </Avatar>
-            <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background ${
-              character.isOnline ? 'bg-green-400 animate-pulse' : 'bg-muted-foreground'
-            }`} />
-          </div>
-          
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={character.avatar} alt={character.name} />
+            <AvatarFallback>{character.name[0]}</AvatarFallback>
+          </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-display font-semibold text-lg">{character.name}</h3>
-              {character.mood && (
-                <span className="text-lg animate-bounce">{getMoodEmoji(character.mood)}</span>
+              <h2 className="font-semibold">{character.name}</h2>
+              <div className={`text-lg ${getMoodColor(character.mood)}`}>
+                {getMoodEmoji(character.mood)}
+              </div>
+              {character.isOnline && (
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               )}
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{character.isOnline ? 'Active now' : 'Last seen recently'}</span>
-              {character.relationshipLevel && (
-                <>
-                  <span>•</span>
-                  <div className="flex items-center gap-1">
-                    <Heart className="w-3 h-3 text-red-400 fill-current" />
-                    <span>Level {character.relationshipLevel}</span>
-                  </div>
-                </>
-              )}
-            </div>
+            <p className="text-sm text-muted-foreground">{character.bio}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
+          {/* Usage indicators */}
+          {currentPlan !== 'pro' && (
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              {remainingMessages !== -1 && (
+                <div className="flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3" />
+                  <span>{remainingMessages} left</span>
+                </div>
+              )}
+              {remainingVoiceCalls !== -1 && (
+                <div className="flex items-center gap-1">
+                  <Phone className="w-3 h-3" />
+                  <span>{remainingVoiceCalls} left</span>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <Button
+            variant="ghost"
             size="sm"
-            onClick={onStartCall}
-            className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110 group"
+            onClick={handleCall}
+            disabled={!canMakeVoiceCall}
+            className="flex items-center gap-2"
           >
-            <Phone className="w-5 h-5 text-primary group-hover:animate-wiggle" />
+            {!canMakeVoiceCall ? (
+              <>
+                <Lock className="w-4 h-4" />
+                <Phone className="w-4 h-4" />
+              </>
+            ) : (
+              <Phone className="w-4 h-4" />
+            )}
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
-          >
-            <Gift className="w-5 h-5 text-accent" />
+          
+          <Button variant="ghost" size="sm">
+            <MoreVertical className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="p-3">
-            <MoreVertical className="w-5 h-5" />
-          </Button>
-        </div>
-      </Card>
-
-      {/* Relationship Progress Bar */}
-      <div className="px-4 py-2 bg-gradient-to-r from-primary/10 to-accent/10">
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-muted-foreground">Relationship XP</span>
-              <span className="text-primary font-medium">{relationshipXP}/500</span>
-            </div>
-            <div className="w-full bg-muted/50 rounded-full h-1.5">
-              <div 
-                className="bg-gradient-to-r from-primary to-primary-glow h-1.5 rounded-full transition-all duration-1000 animate-pulse-glow"
-                style={{ width: `${(relationshipXP / 500) * 100}%` }}
-              />
-            </div>
-          </div>
-          <Badge variant="secondary" className="text-xs">
-            <Star className="w-3 h-3 mr-1" />
-            Intimate
-          </Badge>
         </div>
       </div>
 
-      {/* Enhanced Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {messages.map((message, index) => (
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-up`}
-            style={{ animationDelay: `${index * 0.1}s` }}
+            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div className="flex items-end gap-3 max-w-[85%]">
-              {message.sender === 'ai' && (
-                <div className="relative">
-                  <Avatar className="w-10 h-10 ring-2 ring-primary/20">
-                    <AvatarImage src={character.avatar} alt={character.name} />
-                    <AvatarFallback>{character.name[0]}</AvatarFallback>
-                  </Avatar>
-                  {message.mood && (
-                    <div className="absolute -top-2 -right-2 text-lg animate-float">
-                      {getMoodEmoji(message.mood)}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <div className="space-y-1">
-                <div
-                  className={`p-4 rounded-2xl shadow-soft transition-all duration-300 hover:shadow-glow relative overflow-hidden ${
-                    message.sender === 'user'
-                      ? 'bg-gradient-to-r from-primary to-primary-glow text-white rounded-br-md'
-                      : 'bg-gradient-to-r from-card to-accent/10 text-foreground rounded-bl-md border'
-                  }`}
-                >
-                  {message.sender === 'ai' && (
-                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary to-transparent" />
-                  )}
-                  
-                  <p className="text-sm leading-relaxed font-medium">
-                    {message.content}
-                  </p>
-                  
-                  <div className="flex items-center justify-between mt-2">
-                    <p className={`text-xs ${
-                      message.sender === 'user' ? 'text-white/70' : 'text-muted-foreground'
-                    }`}>
+            <div
+              className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                message.sender === 'user'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                {message.sender === 'ai' && (
+                  <div className={`text-lg ${getMoodColor(message.mood)}`}>
+                    {getMoodEmoji(message.mood)}
+                  </div>
+                )}
+                <div className="flex-1">
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs opacity-70">
                       {message.timestamp.toLocaleTimeString([], { 
                         hour: '2-digit', 
                         minute: '2-digit' 
                       })}
-                    </p>
-                    
-                    {message.sender === 'ai' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 opacity-0 hover:opacity-100 transition-opacity"
-                      >
-                        <Heart className="w-3 h-3" />
-                      </Button>
+                    </span>
+                    {message.type === 'voice' && (
+                      <Badge variant="secondary" className="text-xs">
+                        Voice
+                      </Badge>
                     )}
                   </div>
                 </div>
-                
-                {message.sender === 'ai' && message.mood && (
-                  <Badge variant="outline" className="text-xs ml-2 animate-fade-in">
-                    Feeling {message.mood}
-                  </Badge>
-                )}
               </div>
             </div>
           </div>
         ))}
         
-        {isAiTyping && (
-          <div className="flex justify-start animate-bounce-in">
-            <div className="flex items-end gap-3">
-              <Avatar className="w-10 h-10 ring-2 ring-primary/20">
-                <AvatarImage src={character.avatar} alt={character.name} />
-                <AvatarFallback>{character.name[0]}</AvatarFallback>
-              </Avatar>
-              <div className="bg-gradient-to-r from-card to-accent/10 p-4 rounded-2xl rounded-bl-md border">
-                <div className="flex items-center space-x-2">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                  </div>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    {character.name} is typing...
-                  </span>
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-muted rounded-2xl px-4 py-3">
+              <div className="flex items-center gap-2">
+                <div className={`text-lg ${getMoodColor(character.mood)}`}>
+                  {getMoodEmoji(character.mood)}
                 </div>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">
+                  {character.name} is typing...
+                </span>
               </div>
             </div>
           </div>
@@ -503,130 +392,88 @@ export const EnhancedChatInterface = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Enhanced Input */}
-      <Card className="p-4 rounded-none border-0 border-t bg-card/95 backdrop-blur-xl shadow-xl">
-        <div className="flex items-end gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleVoiceInput}
-            disabled={isTranscribing}
-            className={`p-3 rounded-full transition-all duration-300 ${
-              isRecording 
-                ? 'bg-red-500 hover:bg-red-600 text-white shadow-glow animate-pulse' 
-                : 'hover:bg-primary/10 hover:scale-110'
-            } ${isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {isTranscribing ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : isRecording ? (
-              <MicOff className="w-5 h-5" />
-            ) : (
-              <Mic className="w-5 h-5" />
-            )}
-          </Button>
-          
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
-            >
-              <Smile className="w-5 h-5" />
-            </Button>
-            
-            {showEmojiPicker && (
-              <EmojiPicker
-                onEmojiSelect={handleEmojiSelect}
-                onClose={() => setShowEmojiPicker(false)}
-              />
-            )}
-          </div>
-          
+      {/* Input Area */}
+      <div className="p-4 border-t bg-background/95 backdrop-blur-sm">
+        <div className="flex items-center gap-2">
           <div className="flex-1 relative">
             <Input
+              ref={inputRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder={
-                isRecording 
-                  ? "Listening... Speak now" 
-                  : isTranscribing 
-                    ? "Transcribing your speech..." 
-                    : `Message ${character.name}... 💕`
-              }
-              className={`border-0 bg-muted/30 focus:bg-background transition-all duration-300 rounded-full px-6 py-3 text-sm shadow-inner ${
-                isRecording ? 'ring-2 ring-red-500/50' : ''
-              }`}
+              onKeyPress={handleKeyPress}
+              placeholder={`Message ${character.name}...`}
+              disabled={isLoading || !canSendMessage}
+              className="pr-20"
             />
-            
-            {isRecording && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              </div>
-            )}
-            
-            {relationshipXP > 100 && !isRecording && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Zap className="w-4 h-4 text-primary animate-pulse" />
-              </div>
-            )}
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="h-8 w-8 p-0"
+              >
+                <Smile className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleVoiceInput}
+                disabled={!canMakeVoiceCall}
+                className={`h-8 w-8 p-0 ${
+                  isRecording ? 'text-red-500' : ''
+                }`}
+              >
+                {isRecording ? (
+                  <MicOff className="w-4 h-4" />
+                ) : isTranscribing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
           </div>
           
           <Button
-            variant="ghost"
-            size="sm"
-            className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
+            onClick={handleSendMessage}
+            disabled={!inputValue.trim() || isLoading || !canSendMessage}
+            className="bg-gradient-to-r from-primary to-primary-glow"
           >
-            <ImageIcon className="w-5 h-5" />
-          </Button>
-          
-          <Button
-            onClick={sendMessage}
-            disabled={!inputValue.trim()}
-            variant="romance"
-            className="p-3 rounded-full disabled:opacity-50 transition-all duration-300 hover:scale-105 shadow-glow"
-          >
-            <Send className="w-5 h-5" />
+            {!canSendMessage ? (
+              <>
+                <Lock className="w-4 h-4 mr-2" />
+                Upgrade
+              </>
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </div>
         
-        {/* Voice input status */}
-        {isRecording && (
-          <div className="mt-2 text-center">
-            <Badge variant="destructive" className="animate-pulse">
-              <Mic className="w-3 h-3 mr-1" />
-              Recording... Speak now
-            </Badge>
+        {/* Usage warning */}
+        {!canSendMessage && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2 text-sm text-yellow-800">
+            <Crown className="w-4 h-4" />
+            <span>You've reached your daily message limit. Upgrade to continue chatting!</span>
           </div>
         )}
         
-        {isTranscribing && (
-          <div className="mt-2 text-center">
-            <Badge variant="secondary" className="animate-pulse">
-              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-              Transcribing your speech...
-            </Badge>
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-20 left-4 z-10">
+            <EmojiPicker onEmojiSelect={handleEmojiSelect} />
           </div>
         )}
-        
-        {/* Quick replies */}
-        <div className="flex gap-2 mt-3 overflow-x-auto">
-          {['I missed you 💕', '❤️', 'Tell me about your day', 'You look beautiful'].map((reply, index) => (
-            <Button
-              key={reply}
-              variant="outline"
-              size="sm"
-              onClick={() => setInputValue(reply)}
-              className="whitespace-nowrap text-xs bg-muted/20 hover:bg-primary/10 border-primary/20 animate-fade-in"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              {reply}
-            </Button>
-          ))}
-        </div>
-      </Card>
+      </div>
+
+      {/* Upgrade Prompt */}
+      <UpgradePrompt
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        limitType={upgradePromptType}
+        currentPlan={currentPlan}
+        remaining={upgradePromptType === 'messages' ? remainingMessages : remainingVoiceCalls}
+      />
     </div>
   );
 };

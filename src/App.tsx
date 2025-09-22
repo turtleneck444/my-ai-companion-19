@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { UserProfile } from "@/components/UserProfile";
+import { LandingPage } from "@/pages/LandingPage";
+import { PricingPage } from "@/pages/PricingPage";
 import Index from "./pages/EnhancedIndex";
 import NotFound from "./pages/NotFound";
 import Create from "./pages/Create";
@@ -22,7 +24,13 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={
+            {/* Public routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/home" element={<LandingPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            
+            {/* Protected app routes */}
+            <Route path="/app" element={
               <ProtectedRoute>
                 <Index />
               </ProtectedRoute>
@@ -47,7 +55,15 @@ const App = () => (
                 <UserProfile />
               </ProtectedRoute>
             } />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            
+            {/* Legacy routes for backward compatibility */}
+            <Route path="/auth" element={
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            } />
+            
+            {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
