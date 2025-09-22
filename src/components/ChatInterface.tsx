@@ -12,6 +12,8 @@ import {
   MicOff,
   Heart
 } from "lucide-react";
+import { speakText } from "@/lib/voice";
+import { buildSystemPrompt } from "@/lib/ai";
 
 interface Message {
   id: string;
@@ -29,6 +31,7 @@ interface Character {
   personality: string[];
   voice: string;
   isOnline: boolean;
+  voiceId?: string;
 }
 
 interface ChatInterfaceProps {
@@ -42,18 +45,12 @@ interface ChatInterfaceProps {
 }
 
 export const ChatInterface = ({ character, onBack, onStartCall, userPreferences }: ChatInterfaceProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: `Hey ${userPreferences.preferredName}! I'm ${character.name}. I'm really excited to chat with you! How are you feeling today? 💕`,
-      sender: 'ai',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const defaultVoiceId = (import.meta as any).env?.VITE_ELEVENLABS_VOICE_ID as string | undefined;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,7 +60,44 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = () => {
+  useEffect(() => {
+    const greet = async () => {
+      setIsAiTyping(true);
+      try {
+        const system = buildSystemPrompt({
+          character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
+          userPreferences
+        });
+        const res = await fetch('/api/openai-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: `Greet me in a single short message.` }
+            ],
+            temperature: 0.85,
+            max_tokens: 160
+          })
+        });
+        const data = await res.json();
+        const content = data?.message || `Hey ${userPreferences.preferredName}, it's ${character.name}.`;
+        const aiMsg: Message = { id: Date.now().toString(), content, sender: 'ai', timestamp: new Date() };
+        setMessages([aiMsg]);
+        try { await speakText(aiMsg.content, character.voiceId || defaultVoiceId); } catch {}
+      } catch {
+        const fallbackMsg: Message = { id: Date.now().toString(), content: `Hey ${userPreferences.preferredName}! I'm ${character.name}. 💕`, sender: 'ai', timestamp: new Date() };
+        setMessages([fallbackMsg]);
+        try { await speakText(fallbackMsg.content, character.voiceId || defaultVoiceId); } catch {}
+      } finally {
+        setIsAiTyping(false);
+      }
+    };
+    greet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [character.id]);
+
+  const sendMessage = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -77,8 +111,42 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
     setInputValue("");
     setIsAiTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      const system = buildSystemPrompt({
+        character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
+        userPreferences
+      });
+      const res = await fetch('/api/openai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: system },
+            ...messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.content })),
+            { role: 'user', content: userMessage.content }
+          ],
+          temperature: 0.9,
+          max_tokens: 220
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const content = (data && data.message) ? data.message : `That's really interesting, ${userPreferences.preferredName}! Tell me more 💭`;
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content,
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
+    } catch (err) {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: `That's really interesting, ${userPreferences.preferredName}! I love hearing your thoughts. Tell me more about what's on your mind today? 💭`,
@@ -86,8 +154,10 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
         timestamp: new Date()
       };
       setMessages(prev => [...prev, aiMessage]);
+      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
+    } finally {
       setIsAiTyping(false);
-    }, 2000);
+    }
   };
 
   const toggleRecording = () => {
@@ -156,11 +226,18 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
                 }`}
               >
                 <p className="text-sm leading-relaxed">{message.content}</p>
-                <p className={`text-xs mt-1 ${
-                  message.sender === 'user' ? 'text-white/70' : 'text-muted-foreground'
-                }`}>
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className={`text-xs ${
+                    message.sender === 'user' ? 'text-white/70' : 'text-muted-foreground'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {message.sender === 'ai' && (
+                    <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => speakText(message.content)}>
+                      Speak
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

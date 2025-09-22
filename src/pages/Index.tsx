@@ -18,6 +18,7 @@ import {
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 // Import avatar images
 import lunaAvatar from "@/assets/avatar-luna.jpg";
@@ -204,7 +205,7 @@ const Index = () => {
       </div>
 
       {/* Backend Integration Notification */}
-      {showBackendNotification && (
+      {showBackendNotification && !isSupabaseConfigured && (
         <BackendNotification onDismiss={() => setShowBackendNotification(false)} />
       )}
 

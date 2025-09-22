@@ -18,6 +18,8 @@ import {
   Star,
   Zap
 } from "lucide-react";
+import { speakText } from "@/lib/voice";
+import { buildSystemPrompt } from "@/lib/ai";
 
 interface Message {
   id: string;
@@ -39,6 +41,7 @@ interface Character {
   isOnline: boolean;
   mood?: string;
   relationshipLevel?: number;
+  voiceId?: string;
 }
 
 interface EnhancedChatInterfaceProps {
@@ -57,21 +60,14 @@ export const EnhancedChatInterface = ({
   onStartCall, 
   userPreferences 
 }: EnhancedChatInterfaceProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: `Hey there gorgeous ${userPreferences.preferredName}! ✨ I've been thinking about you all day. How are you feeling right now? 💕`,
-      sender: 'ai',
-      timestamp: new Date(),
-      mood: 'loving'
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [relationshipXP, setRelationshipXP] = useState(240);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const defaultVoiceId = (import.meta as any).env?.VITE_ELEVENLABS_VOICE_ID as string | undefined;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -81,7 +77,44 @@ export const EnhancedChatInterface = ({
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = () => {
+  useEffect(() => {
+    const greet = async () => {
+      setIsAiTyping(true);
+      try {
+        const system = buildSystemPrompt({
+          character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
+          userPreferences
+        });
+        const res = await fetch('/api/openai-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: `Greet me with a flirty, warm one-liner.` }
+            ],
+            temperature: 0.95,
+            max_tokens: 160
+          })
+        });
+        const data = await res.json();
+        const content = data?.message || `Hey ${userPreferences.preferredName}, it's ${character.name}.`;
+        const aiMsg: Message = { id: Date.now().toString(), content, sender: 'ai', timestamp: new Date(), mood: 'loving' };
+        setMessages([aiMsg]);
+        try { await speakText(aiMsg.content, character.voiceId || defaultVoiceId); } catch {}
+      } catch {
+        const fallbackMsg: Message = { id: Date.now().toString(), content: `Hey there ${userPreferences.preferredName}! It's ${character.name}. 💕`, sender: 'ai', timestamp: new Date(), mood: 'loving' };
+        setMessages([fallbackMsg]);
+        try { await speakText(fallbackMsg.content, character.voiceId || defaultVoiceId); } catch {}
+      } finally {
+        setIsAiTyping(false);
+      }
+    };
+    greet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [character.id]);
+
+  const sendMessage = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -96,14 +129,48 @@ export const EnhancedChatInterface = ({
     setIsAiTyping(true);
     setRelationshipXP(prev => prev + 5);
 
-    // Simulate AI response with personality
-    setTimeout(() => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      const system = buildSystemPrompt({
+        character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
+        userPreferences
+      });
+      const res = await fetch('/api/openai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: system },
+            ...messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.content })),
+            { role: 'user', content: userMessage.content }
+          ],
+          temperature: 0.95,
+          max_tokens: 240
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const content = (data && data.message) ? data.message : `Mmm, ${userPreferences.preferredName}, I adore how you think… tell me more 💕`;
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content,
+        sender: 'ai',
+        timestamp: new Date(),
+        mood: ['happy', 'excited', 'loving', 'playful'][Math.floor(Math.random() * 4)] as any
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
+    } catch (err) {
       const responses = [
         `Mmm, ${userPreferences.preferredName}, you always know just what to say to make my heart skip a beat! 💖 Tell me more, beautiful...`,
         `That's so sweet of you, ${userPreferences.preferredName}! I love how you think... it makes me feel so close to you 🥰`,
         `*blushes* You're making me feel all fluttery inside, ${userPreferences.preferredName}! What else is on your mind today? 💕`
       ];
-      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: responses[Math.floor(Math.random() * responses.length)],
@@ -112,8 +179,10 @@ export const EnhancedChatInterface = ({
         mood: ['happy', 'excited', 'loving', 'playful'][Math.floor(Math.random() * 4)] as any
       };
       setMessages(prev => [...prev, aiMessage]);
+      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
+    } finally {
       setIsAiTyping(false);
-    }, 2500);
+    }
   };
 
   const getMoodEmoji = (mood?: string) => {

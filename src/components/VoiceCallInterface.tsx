@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -12,6 +12,7 @@ import {
   Heart,
   Minimize2
 } from "lucide-react";
+import { speakText } from "@/lib/voice";
 
 interface Character {
   id: string;
@@ -39,26 +40,77 @@ export const VoiceCallInterface = ({
   onMinimize, 
   userPreferences 
 }: VoiceCallInterfaceProps) => {
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCallDuration(prev => prev + 1);
     }, 1000);
-
-    // Simulate AI speaking patterns
-    const speakingTimer = setInterval(() => {
-      setIsAiSpeaking(prev => !prev);
-    }, 3000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(speakingTimer);
-    };
+    return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const SpeechRecognitionImpl = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (SpeechRecognitionImpl) {
+      const recognition = new SpeechRecognitionImpl();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.onresult = async (event: any) => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (!transcript || isMuted) return;
+        await handleUserUtterance(transcript);
+      };
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => setIsListening(false);
+      recognitionRef.current = recognition;
+    }
+  }, [isMuted]);
+
+  const handleUserUtterance = async (text: string) => {
+    try {
+      setIsAiSpeaking(true);
+      const res = await fetch('/api/openai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: `You are ${character.name}. ${character.bio}. Personality: ${character.personality.join(', ')}. Speak concisely in a warm, affectionate tone. Always address the user as ${userPreferences.preferredName}.` },
+            { role: 'user', content: text }
+          ]
+        })
+      });
+      const data = await res.json();
+      const reply = data?.message || `I love hearing you, ${userPreferences.preferredName}.`;
+      if (isSpeakerOn) {
+        await speakText(reply);
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setIsAiSpeaking(false);
+    }
+  };
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) return;
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch {
+        setIsListening(false);
+      }
+    }
+  };
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -98,45 +150,30 @@ export const VoiceCallInterface = ({
             <AvatarImage src={character.avatar} alt={character.name} />
             <AvatarFallback className="text-4xl">{character.name[0]}</AvatarFallback>
           </Avatar>
-          
-          {/* Speaking indicator */}
-          {isAiSpeaking && (
-            <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-              <div className="flex space-x-1">
-                <div className="w-2 h-6 bg-primary rounded-full animate-pulse-soft"></div>
-                <div className="w-2 h-8 bg-primary rounded-full animate-pulse-soft" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-6 bg-primary rounded-full animate-pulse-soft" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-8 bg-primary rounded-full animate-pulse-soft" style={{ animationDelay: '0.3s' }}></div>
-                <div className="w-2 h-6 bg-primary rounded-full animate-pulse-soft" style={{ animationDelay: '0.4s' }}></div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Controls */}
       <div className="p-8 space-y-6">
-        {/* Current status */}
         <Card className="p-4 bg-card/80 backdrop-blur-sm border-0 shadow-soft text-center">
           <p className="text-sm text-muted-foreground">
-            {isAiSpeaking ? `${character.name} is speaking...` : 'Listening...'}
+            {isAiSpeaking ? `${character.name} is speaking...` : (isListening ? 'Listening… speak now' : 'Tap mic to talk')}
           </p>
         </Card>
 
-        {/* Call controls */}
         <div className="flex justify-center items-center gap-6">
-          {/* Mute */}
+          {/* Mic (listening) */}
           <Button
             variant="outline"
             size="lg"
-            onClick={() => setIsMuted(!isMuted)}
+            onClick={toggleListening}
             className={`w-16 h-16 rounded-full border-2 transition-all ${
-              isMuted 
-                ? 'bg-red-500 hover:bg-red-600 text-white border-red-500' 
+              isListening 
+                ? 'bg-green-500 hover:bg-green-600 text-white border-green-500' 
                 : 'border-white/20 hover:bg-white/10 text-foreground'
             }`}
           >
-            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
           </Button>
 
           {/* End call */}
@@ -162,7 +199,6 @@ export const VoiceCallInterface = ({
           </Button>
         </div>
 
-        {/* Additional actions */}
         <div className="flex justify-center gap-4">
           <Button
             variant="ghost"

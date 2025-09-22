@@ -31,6 +31,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 // Import avatar images
 import lunaAvatar from "@/assets/avatar-luna.jpg";
@@ -371,7 +372,7 @@ const EnhancedIndex = () => {
       </div>
 
       {/* Backend Integration Notification */}
-      {showBackendNotification && (
+      {showBackendNotification && !isSupabaseConfigured && (
         <div className="animate-slide-in-right">
           <BackendNotification onDismiss={() => setShowBackendNotification(false)} />
         </div>
