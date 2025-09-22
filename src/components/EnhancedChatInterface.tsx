@@ -22,6 +22,7 @@ import {
 import { speakText } from "@/lib/voice";
 import { buildSystemPrompt } from "@/lib/ai";
 import { useToast } from "@/hooks/use-toast";
+import { EmojiPicker } from "@/components/EmojiPicker";
 
 interface Message {
   id: string;
@@ -291,7 +292,11 @@ export const EnhancedChatInterface = ({
     }
   };
 
-  const toggleRecording = () => {
+  const handleEmojiSelect = (emoji: string) => {
+    setInputValue(prev => prev + emoji);
+  };
+
+  const handleVoiceInput = () => {
     if (!recognitionRef.current) {
       toast({
         title: "Voice input not supported",
@@ -311,41 +316,11 @@ export const EnhancedChatInterface = ({
     }
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-  };
-
-  const handleEmojiSelect = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-  };
-
-  const handleVoiceInput = () => {
-    if (isRecording) {
-      // Stop recording
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    } else {
-      // Start recording
-      if (recognitionRef.current) {
-        setInputValue(""); // Clear input before starting
-        recognitionRef.current.start();
-      } else {
-        toast({
-          title: "Voice input not available",
-          description: "Speech recognition is not supported in your browser",
-          variant: "destructive"
-        });
-      }
-    }
-  };
-
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10">
       {/* Enhanced Header */}
       <Card className="flex items-center justify-between p-4 rounded-none border-0 border-b bg-card/95 backdrop-blur-xl shadow-lg">
         <div className="flex items-center gap-3">
-
           <Button 
             variant="ghost" 
             size="sm" 
@@ -355,7 +330,7 @@ export const EnhancedChatInterface = ({
             <ArrowLeft className="w-5 h-5" />
           </Button>
           
-
+          <div className="relative">
             <Avatar className="w-12 h-12 ring-2 ring-primary/20 animate-pulse-glow">
               <AvatarImage src={character.avatar} alt={character.name} />
               <AvatarFallback>{character.name[0]}</AvatarFallback>
@@ -388,7 +363,6 @@ export const EnhancedChatInterface = ({
         </div>
         
         <div className="flex items-center gap-2">
-
           <Button 
             variant="ghost" 
             size="sm"
@@ -397,7 +371,6 @@ export const EnhancedChatInterface = ({
           >
             <Phone className="w-5 h-5 text-primary group-hover:animate-wiggle" />
           </Button>
-
           <Button 
             variant="ghost" 
             size="sm" 
@@ -405,7 +378,6 @@ export const EnhancedChatInterface = ({
           >
             <Gift className="w-5 h-5 text-accent" />
           </Button>
-
           <Button variant="ghost" size="sm" className="p-3">
             <MoreVertical className="w-5 h-5" />
           </Button>
@@ -444,7 +416,7 @@ export const EnhancedChatInterface = ({
           >
             <div className="flex items-end gap-3 max-w-[85%]">
               {message.sender === 'ai' && (
-      
+                <div className="relative">
                   <Avatar className="w-10 h-10 ring-2 ring-primary/20">
                     <AvatarImage src={character.avatar} alt={character.name} />
                     <AvatarFallback>{character.name[0]}</AvatarFallback>
@@ -484,8 +456,7 @@ export const EnhancedChatInterface = ({
                     </p>
                     
                     {message.sender === 'ai' && (
-            
-          <Button
+                      <Button
                         variant="ghost"
                         size="sm"
                         className="p-1 opacity-0 hover:opacity-100 transition-opacity"
@@ -535,7 +506,6 @@ export const EnhancedChatInterface = ({
       {/* Enhanced Input */}
       <Card className="p-4 rounded-none border-0 border-t bg-card/95 backdrop-blur-xl shadow-xl">
         <div className="flex items-end gap-3">
-
           <Button
             variant="ghost"
             size="sm"
@@ -556,9 +526,8 @@ export const EnhancedChatInterface = ({
             )}
           </Button>
           
-
-  
-          <Button
+          <div className="relative">
+            <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -605,7 +574,6 @@ export const EnhancedChatInterface = ({
             )}
           </div>
           
-
           <Button
             variant="ghost"
             size="sm"
@@ -614,7 +582,6 @@ export const EnhancedChatInterface = ({
             <ImageIcon className="w-5 h-5" />
           </Button>
           
-
           <Button
             onClick={sendMessage}
             disabled={!inputValue.trim()}
@@ -647,8 +614,7 @@ export const EnhancedChatInterface = ({
         {/* Quick replies */}
         <div className="flex gap-2 mt-3 overflow-x-auto">
           {['I missed you 💕', '❤️', 'Tell me about your day', 'You look beautiful'].map((reply, index) => (
-  
-          <Button
+            <Button
               key={reply}
               variant="outline"
               size="sm"
