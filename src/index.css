@@ -106,12 +106,23 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* Respect iOS safe areas */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
   
   /* Smooth scrolling for mobile */
   html {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
+    /* Fix mobile 100vh issues */
+    height: -webkit-fill-available;
+  }
+
+  /* Full-height app root accounting for safe areas */
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 }
 

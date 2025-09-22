@@ -22,6 +22,7 @@ interface Character {
   personality: string[];
   voice: string;
   isOnline: boolean;
+  voiceId?: string;
 }
 
 interface VoiceCallInterfaceProps {
@@ -46,6 +47,7 @@ export const VoiceCallInterface = ({
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [isListening, setIsListening] = useState(false);
+  const defaultVoiceId = (import.meta as any).env?.VITE_ELEVENLABS_VOICE_ID as string | undefined;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -63,17 +65,23 @@ export const VoiceCallInterface = ({
       recognition.continuous = false;
       recognition.onresult = async (event: any) => {
         const transcript = event.results?.[0]?.[0]?.transcript;
-        if (!transcript || isMuted) return;
+        if (!transcript) return;
         await handleUserUtterance(transcript);
       };
       recognition.onend = () => setIsListening(false);
       recognition.onerror = () => setIsListening(false);
       recognitionRef.current = recognition;
+    } else {
+      recognitionRef.current = null;
     }
-  }, [isMuted]);
+  }, []);
 
   const handleUserUtterance = async (text: string) => {
     try {
+      // Pause listening during TTS flow
+      if (recognitionRef.current && isListening) {
+        try { recognitionRef.current.stop(); } catch {}
+      }
       setIsAiSpeaking(true);
       const res = await fetch('/api/openai-chat', {
         method: 'POST',
@@ -82,33 +90,34 @@ export const VoiceCallInterface = ({
           messages: [
             { role: 'system', content: `You are ${character.name}. ${character.bio}. Personality: ${character.personality.join(', ')}. Speak concisely in a warm, affectionate tone. Always address the user as ${userPreferences.preferredName}.` },
             { role: 'user', content: text }
-          ]
+          ],
+          temperature: 0.9,
+          max_tokens: 180
         })
       });
       const data = await res.json();
       const reply = data?.message || `I love hearing you, ${userPreferences.preferredName}.`;
       if (isSpeakerOn) {
-        await speakText(reply);
+        await speakText(reply, character.voiceId || defaultVoiceId);
       }
     } catch (e) {
       // ignore
     } finally {
       setIsAiSpeaking(false);
+      // Auto-restart listening after speaking
+      if (recognitionRef.current) {
+        try { recognitionRef.current.start(); setIsListening(true); } catch {}
+      }
     }
   };
 
   const toggleListening = () => {
     if (!recognitionRef.current) return;
     if (isListening) {
-      recognitionRef.current.stop();
+      try { recognitionRef.current.stop(); } catch {}
       setIsListening(false);
     } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch {
-        setIsListening(false);
-      }
+      try { recognitionRef.current.start(); setIsListening(true); } catch { setIsListening(false); }
     }
   };
 
@@ -157,7 +166,7 @@ export const VoiceCallInterface = ({
       <div className="p-8 space-y-6">
         <Card className="p-4 bg-card/80 backdrop-blur-sm border-0 shadow-soft text-center">
           <p className="text-sm text-muted-foreground">
-            {isAiSpeaking ? `${character.name} is speaking...` : (isListening ? 'Listening… speak now' : 'Tap mic to talk')}
+            {recognitionRef.current ? (isAiSpeaking ? `${character.name} is speaking...` : (isListening ? 'Listening… speak now' : 'Tap mic to talk')) : 'Voice input not supported in this browser'}
           </p>
         </Card>
 

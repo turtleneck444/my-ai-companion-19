@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 // Import avatar images
 import lunaAvatar from "@/assets/avatar-luna.jpg";
@@ -57,6 +58,7 @@ type View = 'home' | 'chat' | 'call' | 'profile' | 'discover' | 'stats';
 
 const EnhancedIndex = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
@@ -117,6 +119,30 @@ const EnhancedIndex = () => {
       mood: 'thoughtful',
       lastMessage: "I read something fascinating today that reminded me of our conversation...",
       relationshipLevel: 3.1
+    },
+    {
+      id: '4',
+      name: 'Natalie',
+      avatar: '/natalie.png',
+      bio: 'Confident and caring with a modern vibe. Natalie loves morning coffee chats, cozy playlists, and genuine connection.',
+      personality: ['Confident', 'Affectionate', 'Witty', 'Supportive', 'Playful'],
+      voice: 'Smooth & Modern',
+      isOnline: true,
+      mood: 'happy',
+      lastMessage: 'I saved you a seat next to me ☕️💫',
+      relationshipLevel: 4.5
+    },
+    {
+      id: '5',
+      name: 'Heather',
+      avatar: '/heather.png',
+      bio: 'Grounded and adventurous. Heather loves sunrise hikes, matcha, and conversations that flow from playful to meaningful.',
+      personality: ['Adventurous', 'Warm', 'Down‑to‑earth', 'Playful', 'Empathetic'],
+      voice: 'Calm & Warm',
+      isOnline: true,
+      mood: 'excited',
+      lastMessage: "I found a trail you'd love—want to plan it together? 🌄",
+      relationshipLevel: 4.0
     }
   ];
 
@@ -435,7 +461,7 @@ const EnhancedIndex = () => {
             <Button 
               variant="romance" 
               size="sm"
-              onClick={handleShowProfile}
+              onClick={() => navigate('/create')}
               className="animate-bounce-in hover:scale-105 transition-all"
               style={{ animationDelay: '0.1s' }}
             >

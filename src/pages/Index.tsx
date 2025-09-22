@@ -78,6 +78,24 @@ const Index = () => {
       personality: ['Intelligent', 'Elegant', 'Sophisticated', 'Cultured', 'Confident'],
       voice: 'Warm & Confident',
       isOnline: false
+    },
+    {
+      id: '4',
+      name: 'Natalie',
+      avatar: '/natalie.png',
+      bio: 'Confident and caring with a modern vibe. Natalie loves morning coffee chats, music, and real connection.',
+      personality: ['Confident', 'Affectionate', 'Witty', 'Supportive', 'Playful'],
+      voice: 'Smooth & Modern',
+      isOnline: true
+    },
+    {
+      id: '5',
+      name: 'Heather',
+      avatar: '/heather.png',
+      bio: 'Grounded and adventurous. Heather loves sunrise hikes, matcha, and thoughtful conversations that go from silly to deep quickly.',
+      personality: ['Adventurous', 'Warm', 'Down‑to‑earth', 'Playful', 'Empathetic'],
+      voice: 'Calm & Warm',
+      isOnline: true
     }
   ];
 
