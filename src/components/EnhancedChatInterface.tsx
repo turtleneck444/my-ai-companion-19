@@ -401,8 +401,7 @@ export const EnhancedChatInterface = ({
           >
             <Gift className="w-5 h-5 text-accent" />
           </Button>
-          <div className="relative">
-            <Button variant="ghost" size="sm" className="p-3">
+          <Button variant="ghost" size="sm" className="p-3">
             <MoreVertical className="w-5 h-5" />
           </Button>
         </div>
