@@ -16,10 +16,12 @@ import {
   Image as ImageIcon,
   Gift,
   Star,
-  Zap
+  Zap,
+  Loader2
 } from "lucide-react";
 import { speakText } from "@/lib/voice";
 import { buildSystemPrompt } from "@/lib/ai";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
@@ -60,13 +62,16 @@ export const EnhancedChatInterface = ({
   onStartCall, 
   userPreferences 
 }: EnhancedChatInterfaceProps) => {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [relationshipXP, setRelationshipXP] = useState(240);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const defaultVoiceId = (import.meta as any).env?.VITE_ELEVENLABS_VOICE_ID as string | undefined;
 
   const scrollToBottom = () => {
@@ -76,6 +81,97 @@ export const EnhancedChatInterface = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+      
+      recognitionRef.current.onstart = () => {
+        setIsRecording(true);
+        setIsTranscribing(true);
+        toast({
+          title: "Listening...",
+          description: "Speak now, I'm listening to you",
+        });
+      };
+      
+      recognitionRef.current.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        // Update input with interim results for real-time feedback
+        if (interimTranscript) {
+          setInputValue(prev => prev + interimTranscript);
+        }
+        
+        // If we have final results, use them
+        if (finalTranscript) {
+          setInputValue(finalTranscript.trim());
+          setIsTranscribing(false);
+          toast({
+            title: "Transcription complete",
+            description: "Ready to send your message",
+          });
+        }
+      };
+      
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+        setIsTranscribing(false);
+        
+        let errorMessage = "Speech recognition failed";
+        switch (event.error) {
+          case 'no-speech':
+            errorMessage = "No speech detected. Please try again.";
+            break;
+          case 'audio-capture':
+            errorMessage = "Microphone not accessible. Please check permissions.";
+            break;
+          case 'not-allowed':
+            errorMessage = "Microphone access denied. Please allow microphone access.";
+            break;
+          case 'network':
+            errorMessage = "Network error. Please check your connection.";
+            break;
+        }
+        
+        toast({
+          title: "Voice input failed",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      };
+      
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+        setIsTranscribing(false);
+      };
+    } else {
+      console.warn('Speech recognition not supported in this browser');
+    }
+    
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [toast]);
 
   useEffect(() => {
     const greet = async () => {
@@ -196,7 +292,44 @@ export const EnhancedChatInterface = ({
   };
 
   const toggleRecording = () => {
-    setIsRecording(!isRecording);
+    if (!recognitionRef.current) {
+      toast({
+        title: "Voice input not supported",
+        description: "Your browser doesn't support speech recognition",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      setIsTranscribing(false);
+    } else {
+      setInputValue(""); // Clear input before starting new recording
+      recognitionRef.current.start();
+    }
+  };
+
+  const handleVoiceInput = () => {
+    if (isRecording) {
+      // Stop recording
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    } else {
+      // Start recording
+      if (recognitionRef.current) {
+        setInputValue(""); // Clear input before starting
+        recognitionRef.current.start();
+      } else {
+        toast({
+          title: "Voice input not available",
+          description: "Speech recognition is not supported in your browser",
+          variant: "destructive"
+        });
+      }
+    }
   };
 
   return (
@@ -392,14 +525,21 @@ export const EnhancedChatInterface = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={toggleRecording}
+            onClick={handleVoiceInput}
+            disabled={isTranscribing}
             className={`p-3 rounded-full transition-all duration-300 ${
               isRecording 
                 ? 'bg-red-500 hover:bg-red-600 text-white shadow-glow animate-pulse' 
                 : 'hover:bg-primary/10 hover:scale-110'
-            }`}
+            } ${isTranscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {isTranscribing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isRecording ? (
+              <MicOff className="w-5 h-5" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
           </Button>
           
           <Button
@@ -416,11 +556,25 @@ export const EnhancedChatInterface = ({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder={`Message ${character.name}... 💕`}
-              className="border-0 bg-muted/30 focus:bg-background transition-all duration-300 rounded-full px-6 py-3 text-sm shadow-inner"
+              placeholder={
+                isRecording 
+                  ? "Listening... Speak now" 
+                  : isTranscribing 
+                    ? "Transcribing your speech..." 
+                    : `Message ${character.name}... 💕`
+              }
+              className={`border-0 bg-muted/30 focus:bg-background transition-all duration-300 rounded-full px-6 py-3 text-sm shadow-inner ${
+                isRecording ? 'ring-2 ring-red-500/50' : ''
+              }`}
             />
             
-            {relationshipXP > 100 && (
+            {isRecording && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              </div>
+            )}
+            
+            {relationshipXP > 100 && !isRecording && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
                 <Zap className="w-4 h-4 text-primary animate-pulse" />
               </div>
@@ -444,6 +598,25 @@ export const EnhancedChatInterface = ({
             <Send className="w-5 h-5" />
           </Button>
         </div>
+        
+        {/* Voice input status */}
+        {isRecording && (
+          <div className="mt-2 text-center">
+            <Badge variant="destructive" className="animate-pulse">
+              <Mic className="w-3 h-3 mr-1" />
+              Recording... Speak now
+            </Badge>
+          </div>
+        )}
+        
+        {isTranscribing && (
+          <div className="mt-2 text-center">
+            <Badge variant="secondary" className="animate-pulse">
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              Transcribing your speech...
+            </Badge>
+          </div>
+        )}
         
         {/* Quick replies */}
         <div className="flex gap-2 mt-3 overflow-x-auto">
