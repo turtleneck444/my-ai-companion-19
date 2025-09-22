@@ -970,7 +970,6 @@ const EnhancedIndex = () => {
               <User className="w-5 h-5" />
               <span>Profile</span>
             </Button>
-            </Button>
           </div>
         </Card>
       </div>
