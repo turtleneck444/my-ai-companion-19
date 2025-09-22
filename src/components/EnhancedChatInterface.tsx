@@ -315,10 +315,6 @@ export const EnhancedChatInterface = ({
     setInputValue(prev => prev + emoji);
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-  };
-
   const handleVoiceInput = () => {
     if (isRecording) {
       // Stop recording
