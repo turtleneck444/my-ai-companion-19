@@ -562,15 +562,6 @@ export const EnhancedChatInterface = ({
             <Smile className="w-5 h-5" />
           </Button>
           
-          {showEmojiPicker && (
-            <EmojiPicker
-              onEmojiSelect={handleEmojiSelect}
-              onClose={() => setShowEmojiPicker(false)}
-            />
-          )}
-          </div>
-          
-          
           <div className="flex-1 relative">
             <Input
               value={inputValue}
