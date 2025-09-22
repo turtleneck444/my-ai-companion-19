@@ -315,10 +315,6 @@ export const EnhancedChatInterface = ({
     setInputValue(prev => prev + emoji);
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-  };
-
   const handleVoiceInput = () => {
     if (isRecording) {
       // Stop recording
@@ -345,8 +341,8 @@ export const EnhancedChatInterface = ({
       {/* Enhanced Header */}
       <Card className="flex items-center justify-between p-4 rounded-none border-0 border-b bg-card/95 backdrop-blur-xl shadow-lg">
         <div className="flex items-center gap-3">
-
-          <Button 
+          <div className="relative">
+            <Button 
             variant="ghost" 
             size="sm" 
             onClick={onBack}
@@ -355,7 +351,7 @@ export const EnhancedChatInterface = ({
             <ArrowLeft className="w-5 h-5" />
           </Button>
           
-
+          <div className="relative">
             <Avatar className="w-12 h-12 ring-2 ring-primary/20 animate-pulse-glow">
               <AvatarImage src={character.avatar} alt={character.name} />
               <AvatarFallback>{character.name[0]}</AvatarFallback>
@@ -388,8 +384,8 @@ export const EnhancedChatInterface = ({
         </div>
         
         <div className="flex items-center gap-2">
-
-          <Button 
+          <div className="relative">
+            <Button 
             variant="ghost" 
             size="sm"
             onClick={onStartCall}
@@ -397,15 +393,14 @@ export const EnhancedChatInterface = ({
           >
             <Phone className="w-5 h-5 text-primary group-hover:animate-wiggle" />
           </Button>
-
-          <Button 
+          <div className="relative">
+            <Button 
             variant="ghost" 
             size="sm" 
             className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
           >
             <Gift className="w-5 h-5 text-accent" />
           </Button>
-
           <Button variant="ghost" size="sm" className="p-3">
             <MoreVertical className="w-5 h-5" />
           </Button>
@@ -444,7 +439,7 @@ export const EnhancedChatInterface = ({
           >
             <div className="flex items-end gap-3 max-w-[85%]">
               {message.sender === 'ai' && (
-      
+                <div className="relative">
                   <Avatar className="w-10 h-10 ring-2 ring-primary/20">
                     <AvatarImage src={character.avatar} alt={character.name} />
                     <AvatarFallback>{character.name[0]}</AvatarFallback>
@@ -484,8 +479,8 @@ export const EnhancedChatInterface = ({
                     </p>
                     
                     {message.sender === 'ai' && (
-            
-          <Button
+                      <div className="relative">
+            <Button
                         variant="ghost"
                         size="sm"
                         className="p-1 opacity-0 hover:opacity-100 transition-opacity"
@@ -535,8 +530,8 @@ export const EnhancedChatInterface = ({
       {/* Enhanced Input */}
       <Card className="p-4 rounded-none border-0 border-t bg-card/95 backdrop-blur-xl shadow-xl">
         <div className="flex items-end gap-3">
-
-          <Button
+          <div className="relative">
+            <Button
             variant="ghost"
             size="sm"
             onClick={handleVoiceInput}
@@ -556,24 +551,24 @@ export const EnhancedChatInterface = ({
             )}
           </Button>
           
-
-  
-          <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
-            >
-              <Smile className="w-5 h-5" />
-            </Button>
-            
-            {showEmojiPicker && (
-              <EmojiPicker
-                onEmojiSelect={handleEmojiSelect}
-                onClose={() => setShowEmojiPicker(false)}
-              />
-            )}
+          <div className="relative">
+            <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
+          >
+            <Smile className="w-5 h-5" />
+          </Button>
+          
+          {showEmojiPicker && (
+            <EmojiPicker
+              onEmojiSelect={handleEmojiSelect}
+              onClose={() => setShowEmojiPicker(false)}
+            />
+          )}
           </div>
+          
           
           <div className="flex-1 relative">
             <Input
@@ -605,8 +600,8 @@ export const EnhancedChatInterface = ({
             )}
           </div>
           
-
-          <Button
+          <div className="relative">
+            <Button
             variant="ghost"
             size="sm"
             className="p-3 hover:bg-primary/10 transition-all duration-300 hover:scale-110"
@@ -614,8 +609,8 @@ export const EnhancedChatInterface = ({
             <ImageIcon className="w-5 h-5" />
           </Button>
           
-
-          <Button
+          <div className="relative">
+            <Button
             onClick={sendMessage}
             disabled={!inputValue.trim()}
             variant="romance"
@@ -647,8 +642,8 @@ export const EnhancedChatInterface = ({
         {/* Quick replies */}
         <div className="flex gap-2 mt-3 overflow-x-auto">
           {['I missed you 💕', '❤️', 'Tell me about your day', 'You look beautiful'].map((reply, index) => (
-  
-          <Button
+            <div className="relative">
+            <Button
               key={reply}
               variant="outline"
               size="sm"
