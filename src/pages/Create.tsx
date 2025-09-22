@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Stepper } from "@/components/ui/stepper";
+import { VoiceSelector } from "@/components/VoiceSelector";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { speakText } from "@/lib/voice";
@@ -21,21 +22,37 @@ import {
   Sparkles,
   ArrowLeft,
   ArrowRight,
-  Check
+  Check,
+  Mic
 } from "lucide-react";
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  category: string;
+  description: string;
+  labels: Record<string, string>;
+  preview_url: string;
+  suggestedPersonality: string[];
+  characteristics: {
+    warmth: number;
+    energy: number;
+    clarity: number;
+    depth: number;
+  };
+}
 
 interface NewCharacter {
   name: string;
   bio: string;
   personality: string[];
   personalityTraits: Record<string, number>;
-  voice: string;
-  voiceId?: string;
+  voice: Voice | null;
   avatarFile?: File | null;
   avatarUrl?: string;
 }
 
-const steps = ["Basics", "Personality", "Avatar", "Voice", "Review"] as const;
+const steps = ["Basics", "Personality", "Voice", "Avatar", "Review"] as const;
 type Step = typeof steps[number];
 
 const personalityOptions = [
@@ -70,7 +87,7 @@ const Create = () => {
       romance: 50,
       intelligence: 50
     },
-    voice: "Smooth & Modern",
+    voice: null,
   });
 
   const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
@@ -96,7 +113,12 @@ const Create = () => {
     try {
       setSaving(true);
       const uploaded = await handleUpload();
-      const payload = { ...character, avatarUrl: uploaded || character.avatarUrl };
+      const payload = { 
+        ...character, 
+        avatarUrl: uploaded || character.avatarUrl,
+        voice: character.voice?.name || "Default",
+        voiceId: character.voice?.voice_id
+      };
       if (isSupabaseConfigured) {
         await supabase.from("characters").insert({
           name: payload.name,
@@ -161,15 +183,26 @@ const Create = () => {
     }
   };
 
-  const previewVoice = async () => {
-    if (!character.voiceId) {
-      toast({ title: "No voice ID", description: "Please enter an ElevenLabs voice ID to preview." });
+  const handleVoiceSelect = (voice: Voice) => {
+    setCharacter(prev => ({ ...prev, voice }));
+  };
+
+  const handlePersonalitySuggest = (traits: string[]) => {
+    setCharacter(prev => ({
+      ...prev,
+      personality: [...new Set([...prev.personality, ...traits])]
+    }));
+  };
+
+  const previewSelectedVoice = async () => {
+    if (!character.voice) {
+      toast({ title: "No voice selected", description: "Please select a voice first." });
       return;
     }
     
     setIsPlayingVoice(true);
     try {
-      await speakText(`Hello! I'm ${character.name || 'your AI companion'}. ${character.bio || 'Nice to meet you!'}`, character.voiceId);
+      await speakText(`Hello! I'm ${character.name || 'your AI companion'}. ${character.bio || 'Nice to meet you!'}`, character.voice.voice_id);
     } catch (error) {
       toast({ title: "Voice preview failed", description: "Could not play voice preview." });
     } finally {
@@ -206,7 +239,7 @@ const Create = () => {
             {character.name || "Your AI Companion"}
           </h3>
           <p className="text-white/80 text-sm">
-            {character.voice} voice
+            {character.voice?.name || "Select a voice"} voice
           </p>
         </div>
       </div>
@@ -228,6 +261,30 @@ const Create = () => {
             </Badge>
           )}
         </div>
+
+        {character.voice && (
+          <div className="pt-2 border-t">
+            <Button
+              onClick={previewSelectedVoice}
+              disabled={isPlayingVoice}
+              size="sm"
+              variant="outline"
+              className="w-full"
+            >
+              {isPlayingVoice ? (
+                <>
+                  <Pause className="w-3 h-3 mr-2" />
+                  Playing...
+                </>
+              ) : (
+                <>
+                  <Mic className="w-3 h-3 mr-2" />
+                  Preview Voice
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -236,7 +293,7 @@ const Create = () => {
     <div className="min-h-screen bg-gradient-soft">
       {/* Header with Stepper */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b">
-        <div className="max-w-4xl mx-auto p-4">
+        <div className="max-w-6xl mx-auto p-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-semibold flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-primary" />
@@ -251,7 +308,7 @@ const Create = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-4 pb-24">
+      <div className="max-w-6xl mx-auto p-4 pb-24">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Main Content */}
           <div className="space-y-6">
@@ -329,6 +386,14 @@ const Create = () => {
                         </Card>
                       )}
 
+                      {stepName === "Voice" && (
+                        <VoiceSelector
+                          selectedVoice={character.voice}
+                          onVoiceSelect={handleVoiceSelect}
+                          onPersonalitySuggest={handlePersonalitySuggest}
+                        />
+                      )}
+
                       {stepName === "Avatar" && (
                         <Card className="p-6">
                           <Label className="text-base font-medium mb-4 block">Avatar Image</Label>
@@ -394,48 +459,6 @@ const Create = () => {
                         </Card>
                       )}
 
-                      {stepName === "Voice" && (
-                        <Card className="p-6 space-y-4">
-                          <div>
-                            <Label htmlFor="voice" className="text-base font-medium">Voice Style</Label>
-                            <Input 
-                              id="voice" 
-                              value={character.voice} 
-                              onChange={(e) => setCharacter({ ...character, voice: e.target.value })} 
-                              placeholder="e.g., Calm & Warm, Energetic & Playful..." 
-                              className="mt-2"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="voiceId" className="text-base font-medium">ElevenLabs Voice ID</Label>
-                            <div className="flex gap-2 mt-2">
-                              <Input 
-                                id="voiceId" 
-                                value={character.voiceId || ""} 
-                                onChange={(e) => setCharacter({ ...character, voiceId: e.target.value })} 
-                                placeholder="Enter ElevenLabs voice ID" 
-                                className="flex-1"
-                              />
-                              <Button
-                                variant="outline"
-                                onClick={previewVoice}
-                                disabled={isPlayingVoice || !character.voiceId}
-                                className="px-4"
-                              >
-                                {isPlayingVoice ? (
-                                  <Pause className="w-4 h-4" />
-                                ) : (
-                                  <Play className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Get your voice ID from ElevenLabs to enable voice preview
-                            </p>
-                          </div>
-                        </Card>
-                      )}
-
                       {stepName === "Review" && (
                         <Card className="p-6 space-y-4">
                           <div className="text-center space-y-2">
@@ -456,7 +479,7 @@ const Create = () => {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Voice:</span>
-                              <span className="font-medium">{character.voice}</span>
+                              <span className="font-medium">{character.voice?.name || "Not selected"}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Avatar:</span>
@@ -487,7 +510,7 @@ const Create = () => {
 
       {/* Sticky Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-        <div className="max-w-4xl mx-auto flex justify-between">
+        <div className="max-w-6xl mx-auto flex justify-between">
           <Button 
             variant="ghost" 
             onClick={prev} 
@@ -510,7 +533,7 @@ const Create = () => {
           ) : (
             <Button 
               onClick={save} 
-              disabled={saving || !character.name}
+              disabled={saving || !character.name || !character.voice}
               className="flex items-center gap-2"
             >
               {saving ? (
