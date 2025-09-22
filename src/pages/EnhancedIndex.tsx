@@ -87,6 +87,7 @@ interface UserActivity {
 type View = 'home' | 'chat' | 'call' | 'profile' | 'discover' | 'stats' | 'calls' | 'chats';
 
 const EnhancedIndex = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -960,6 +961,15 @@ const EnhancedIndex = () => {
             >
               <Phone className="w-5 h-5" />
               <span>Calls</span>
+            </Button>
+            <Button 
+              variant={currentView === 'profile' ? 'romance' : 'ghost'} 
+              onClick={() => handleNavigation('profile')}
+              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
+            >
+              <User className="w-5 h-5" />
+              <span>Profile</span>
+            </Button>
             </Button>
           </div>
         </Card>
