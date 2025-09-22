@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import { EnhancedCharacterCard } from "@/components/EnhancedCharacterCard";
 import { EnhancedChatInterface } from "@/components/EnhancedChatInterface";
 import { VoiceCallInterface } from "@/components/VoiceCallInterface";
@@ -29,7 +30,15 @@ import {
   Filter,
   SlidersHorizontal,
   ArrowLeft,
-  Library
+  Library,
+  Mic,
+  Video,
+  History,
+  Star,
+  MoreHorizontal,
+  Play,
+  Pause,
+  Volume2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -55,7 +64,15 @@ interface Character {
   relationshipLevel?: number;
 }
 
-type View = 'home' | 'chat' | 'call' | 'profile' | 'discover' | 'stats';
+interface CallHistory {
+  id: string;
+  character: Character;
+  duration: string;
+  timestamp: Date;
+  type: 'voice' | 'video';
+}
+
+type View = 'home' | 'chat' | 'call' | 'profile' | 'discover' | 'stats' | 'calls' | 'chats';
 
 const EnhancedIndex = () => {
   const { toast } = useToast();
@@ -67,6 +84,8 @@ const EnhancedIndex = () => {
   const [isPremium, setIsPremium] = useState(false);
   const [timeOfDay, setTimeOfDay] = useState('');
   const [favorites, setFavorites] = useState<string[]>(['1']);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [callHistory, setCallHistory] = useState<CallHistory[]>([]);
   
   const [userPreferences, setUserPreferences] = useState({
     preferredName: 'Darling',
@@ -81,6 +100,57 @@ const EnhancedIndex = () => {
     if (hour < 12) setTimeOfDay('morning');
     else if (hour < 17) setTimeOfDay('afternoon');
     else setTimeOfDay('evening');
+  }, []);
+
+  // Mock call history data
+  useEffect(() => {
+    setCallHistory([
+      {
+        id: '1',
+        character: {
+          id: '1',
+          name: 'Luna',
+          avatar: lunaAvatar,
+          bio: 'Sweet and caring with a gentle soul.',
+          personality: ['Sweet', 'Caring', 'Romantic'],
+          voice: 'Soft & Melodic',
+          isOnline: true
+        },
+        duration: '12:34',
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        type: 'voice'
+      },
+      {
+        id: '2',
+        character: {
+          id: '2',
+          name: 'Aria',
+          avatar: ariaAvatar,
+          bio: 'Energetic and playful with a bright personality.',
+          personality: ['Playful', 'Energetic', 'Funny'],
+          voice: 'Bright & Cheerful',
+          isOnline: true
+        },
+        duration: '8:45',
+        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+        type: 'video'
+      },
+      {
+        id: '3',
+        character: {
+          id: '4',
+          name: 'Natalie',
+          avatar: '/natalie.png',
+          bio: 'Confident and caring with a modern vibe.',
+          personality: ['Confident', 'Affectionate', 'Witty'],
+          voice: 'Smooth & Modern',
+          isOnline: true
+        },
+        duration: '15:22',
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+        type: 'voice'
+      }
+    ]);
   }, []);
 
   const characters: Character[] = [
@@ -213,6 +283,31 @@ const EnhancedIndex = () => {
     });
   };
 
+  const handleNavigation = (view: View) => {
+    setCurrentView(view);
+    if (view === 'home') {
+      setSelectedCharacter(null);
+    }
+  };
+
+  const filteredCharacters = characters.filter(character =>
+    character.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    character.bio.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    character.personality.some(trait => 
+      trait.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
+
+  const formatTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays}d ago`;
+  };
+
   // Render different views
   if (currentView === 'profile') {
     return (
@@ -275,6 +370,219 @@ const EnhancedIndex = () => {
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>Swipe right to like • Swipe left to pass • Swipe up to super like</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'calls') {
+    return (
+      <div className="min-h-screen bg-gradient-soft">
+        <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b p-4 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleBackToHome}
+                className="p-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <h1 className="text-xl font-semibold">Call History</h1>
+            </div>
+            <Button variant="outline" size="sm">
+              <Filter className="w-4 h-4 mr-2" />
+              Filter
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {callHistory.length === 0 ? (
+            <div className="text-center py-12">
+              <Phone className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No calls yet</h3>
+              <p className="text-muted-foreground mb-6">
+                Start a voice or video call with your companions
+              </p>
+              <Button onClick={() => setCurrentView('home')}>
+                <Phone className="w-4 h-4 mr-2" />
+                Start Your First Call
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {callHistory.map((call) => (
+                <Card key={call.id} className="p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={call.character.avatar} alt={call.character.name} />
+                      <AvatarFallback>{call.character.name[0]}</AvatarFallback>
+                    </Avatar>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold">{call.character.name}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {call.type === 'voice' ? 'Voice' : 'Video'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatTimeAgo(call.timestamp)} • {call.duration}
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCharacterSelect(call.character)}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStartCall(call.character)}
+                      >
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'chats') {
+    return (
+      <div className="min-h-screen bg-gradient-soft">
+        <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b p-4 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleBackToHome}
+                className="p-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <h1 className="text-xl font-semibold">All Chats</h1>
+            </div>
+            <div className="flex gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {filteredCharacters.length === 0 ? (
+            <div className="text-center py-12">
+              <MessageSquare className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                {searchQuery ? 'No chats found' : 'No chats yet'}
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                {searchQuery 
+                  ? 'Try adjusting your search terms'
+                  : 'Start a conversation with your companions'
+                }
+              </p>
+              {!searchQuery && (
+                <Button onClick={() => setCurrentView('home')}>
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Start Chatting
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredCharacters.map((character) => (
+                <Card 
+                  key={character.id} 
+                  className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => handleCharacterSelect(character)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={character.avatar} alt={character.name} />
+                        <AvatarFallback>{character.name[0]}</AvatarFallback>
+                      </Avatar>
+                      {character.unreadCount && character.unreadCount > 0 && (
+                        <Badge className="absolute -top-2 -right-2 bg-primary text-white text-xs w-6 h-6 rounded-full flex items-center justify-center">
+                          {character.unreadCount}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold">{character.name}</h3>
+                        {character.isOnline && (
+                          <div className="w-2 h-2 bg-green-400 rounded-full" />
+                        )}
+                        {character.relationshipLevel && character.relationshipLevel > 3 && (
+                          <Heart className="w-4 h-4 text-red-400 fill-current" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {character.lastMessage || 'No messages yet'}
+                      </p>
+                    </div>
+                    
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {character.mood && character.mood.charAt(0).toUpperCase() + character.mood.slice(1)}
+                      </p>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartCall(character);
+                          }}
+                          className="p-2"
+                        >
+                          <Phone className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFavorite(character);
+                          }}
+                          className="p-2"
+                        >
+                          <Heart className={`w-4 h-4 ${favorites.includes(character.id) ? 'text-red-400 fill-current' : ''}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -411,33 +719,35 @@ const EnhancedIndex = () => {
           <div className="grid grid-cols-4 gap-2">
             <Button 
               variant={currentView === 'home' ? 'romance' : 'ghost'} 
+              onClick={() => handleNavigation('home')}
+              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span>Home</span>
+            </Button>
+            <Button 
+              variant={currentView === 'chats' ? 'romance' : 'ghost'} 
+              onClick={() => handleNavigation('chats')}
               className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
             >
               <MessageSquare className="w-5 h-5" />
               <span>Chats</span>
             </Button>
             <Button 
-              variant="ghost" 
+              variant={currentView === 'discover' ? 'romance' : 'ghost'} 
+              onClick={() => handleNavigation('discover')}
               className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
-              onClick={() => setCurrentView('discover')}
             >
               <Search className="w-5 h-5" />
               <span>Discover</span>
             </Button>
             <Button 
-              variant="ghost" 
+              variant={currentView === 'calls' ? 'romance' : 'ghost'} 
+              onClick={() => handleNavigation('calls')}
               className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
             >
               <Phone className="w-5 h-5" />
               <span>Calls</span>
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
-              onClick={handleShowProfile}
-            >
-              <User className="w-5 h-5" />
-              <span>Profile</span>
             </Button>
           </div>
         </Card>
