@@ -14,7 +14,7 @@ import {
   Pause,
   Play
 } from "lucide-react";
-import { speakText } from "@/lib/voice";
+import { speakText, stopAllTTS } from "@/lib/voice";
 import { personalityAI, type ChatContext, type ChatMessage } from "@/lib/ai-chat";
 import { useToast } from "@/hooks/use-toast";
 
@@ -252,6 +252,7 @@ export const VoiceCallInterface = ({
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
+      stopAllTTS();
     };
   }, []);
 
@@ -516,6 +517,8 @@ export const VoiceCallInterface = ({
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
     }
+    stopAllTTS();
+    try { speechSynthesis.cancel(); } catch {}
     
     setTimeout(() => {
       onEndCall();

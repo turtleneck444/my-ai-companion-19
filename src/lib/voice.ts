@@ -1,4 +1,5 @@
 let playbackQueue: Promise<void> = Promise.resolve();
+let currentAudio: HTMLAudioElement | null = null;
 
 export interface ElevenLabsSettings {
   stability?: number;
@@ -52,6 +53,17 @@ export async function speakText(
 
   playbackQueue = playbackQueue.then(task).catch(() => task());
   return playbackQueue;
+}
+
+export function stopAllTTS(): void {
+  try { speechSynthesis.cancel(); } catch {}
+  try {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
+  } catch {}
 }
 
 async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<void> {
@@ -121,7 +133,15 @@ async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<voi
 
 function playAudio(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
+    // Stop any previous audio
+    try {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+    } catch {}
     const audio = new Audio(url);
+    currentAudio = audio;
     const onEnded = () => {
       cleanup();
       resolve();
@@ -133,6 +153,7 @@ function playAudio(url: string): Promise<void> {
     const cleanup = () => {
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
+      if (currentAudio === audio) currentAudio = null;
     };
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
