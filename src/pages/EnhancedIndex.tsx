@@ -374,24 +374,24 @@ const EnhancedIndex = () => {
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold mb-1">Hey {userPreferences.preferredName}!</h2>
-                    <p className="text-white/80 text-sm">Your companions are online and ready to chat</p>
+                    <h2 className="text-xl font-bold mb-1 text-white">Hey {userPreferences.preferredName}!</h2>
+                    <p className="text-white/90 text-sm">Your companions are online and ready to chat</p>
                   </div>
                 </div>
                 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/20">
                   <div className="text-center">
-                    <p className="text-2xl font-bold">3</p>
-                    <p className="text-xs text-white/70">Available</p>
+                    <p className="text-2xl font-bold text-white">3</p>
+                    <p className="text-xs text-white/80">Available</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold">{favorites.length}</p>
-                    <p className="text-xs text-white/70">Favorites</p>
+                    <p className="text-2xl font-bold text-white">{favorites.length}</p>
+                    <p className="text-xs text-white/80">Favorites</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold">24/7</p>
-                    <p className="text-xs text-white/70">Online</p>
+                    <p className="text-2xl font-bold text-white">24/7</p>
+                    <p className="text-xs text-white/80">Online</p>
                   </div>
                 </div>
               </CardContent>
