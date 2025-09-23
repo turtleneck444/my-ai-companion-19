@@ -557,14 +557,11 @@ const EnhancedIndex = () => {
                 <div className="absolute inset-0 bg-gradient-to-br from-pink-600/25 via-rose-600/20 to-purple-600/15" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-pink-400/15 via-transparent to-transparent" />
-                {/* Creative clock wedge */}
-                <div className="absolute -top-3 -right-3 rotate-6">
-                  <div className="relative">
-                    <div className="bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl text-white rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-pink-200" />
-                      <span className="text-[11px] font-semibold tracking-wide" aria-live="polite">{currentTime}</span>
-                    </div>
-                    <div className="absolute -bottom-1 left-2 w-8 h-2 bg-pink-500/40 blur-md" />
+                {/* Live clock - clean top-right pill */}
+                <div className="absolute top-2 right-2 z-20">
+                  <div className="bg-white/12 backdrop-blur-md border border-white/20 shadow-sm text-white rounded-full px-2.5 py-1 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-pink-200" />
+                    <span className="text-[11px] font-semibold tracking-wide leading-none" aria-live="polite">{currentTime}</span>
                   </div>
                 </div>
                 
@@ -582,11 +579,7 @@ const EnhancedIndex = () => {
                         Your companions missed you
                       </p>
                     </div>
-                    <Avatar className="w-14 h-14 border-2 border-pink-400/40 shadow-2xl ring-2 ring-pink-300/30 ring-offset-2 ring-offset-pink-900/50">
-                      <AvatarFallback className="bg-gradient-to-br from-pink-500 to-rose-500 text-white font-bold text-lg shadow-inner">
-                        {user?.email?.charAt(0).toUpperCase() || userName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
+                    {/* Avatar removed per request for a cleaner card */}
                   </div>
                   
                   {/* Enhanced Quick Stats */}
