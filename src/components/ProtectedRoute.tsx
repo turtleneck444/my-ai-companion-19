@@ -1,7 +1,6 @@
-import { ReactNode } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { AuthForm } from './AuthForm';
-import { Loader2 } from 'lucide-react';
+import { ReactNode } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthForm } from "@/components/AuthForm";
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface ProtectedRouteProps {

@@ -58,6 +58,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+          
+          // Redirect to /app after successful sign in
+          if (event === 'SIGNED_IN' && session?.user) {
+            console.log('✅ User signed in, redirecting to /app');
+            window.location.href = '/app';
+          }
         }
       );
 
@@ -67,6 +73,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   }, []);
+
+  // Handle user state changes for demo mode as well
+  useEffect(() => {
+    if (user && !loading) {
+      // Check if we just signed in (not on page load)
+      const currentPath = window.location.pathname;
+      if (currentPath === '/auth' || currentPath === '/' || currentPath === '/home') {
+        console.log('✅ User authenticated, redirecting to /app');
+        window.location.href = '/app';
+      }
+    }
+  }, [user, loading]);
 
   const signUp = async (email: string, password: string, userData?: any) => {
     // Handle case when Supabase is not configured
@@ -130,21 +148,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (demoUserData) {
         const demoUser = JSON.parse(demoUserData);
         if (demoUser.email === email) {
-                     // Simulate user state update
-           setTimeout(() => {
-             setUser({
-               id: demoUser.id,
-               email: demoUser.email,
-               user_metadata: {
-                 preferred_name: demoUser.preferred_name,
-                 treatment_style: demoUser.treatment_style
-               },
-               app_metadata: {},
-               aud: 'authenticated',
-               created_at: new Date().toISOString()
-             } as unknown as User);
-           }, 100);
-          
+          // Simulate user state update
+          setTimeout(() => {
+            setUser({
+              id: demoUser.id,
+              email: demoUser.email,
+              user_metadata: {
+                preferred_name: demoUser.preferred_name,
+                treatment_style: demoUser.treatment_style
+              },
+              app_metadata: {},
+              aud: 'authenticated',
+              created_at: new Date().toISOString()
+            } as unknown as User);
+            
+            // Redirect to /app after demo sign in
+            console.log('✅ Demo user signed in, redirecting to /app');
+            setTimeout(() => {
+              window.location.href = '/app';
+            }, 100);
+          }, 100);
+         
           return { error: null };
         }
       }
