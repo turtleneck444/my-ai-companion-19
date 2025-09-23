@@ -5,7 +5,7 @@ export async function handler(event) {
   try {
     const body = JSON.parse(event.body || '{}');
     const { text, voiceId, voice_id, model_id, voice_settings } = body;
-    const finalVoiceId = voice_id || voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID || process.env.VITE_ELEVENLABS_VOICE_ID;
+    const finalVoiceId = voice_id || voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID;
     if (!process.env.ELEVENLABS_API_KEY) {
       return { statusCode: 500, body: JSON.stringify({ error: 'Missing ELEVENLABS_API_KEY' }) };
     }

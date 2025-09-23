@@ -58,7 +58,7 @@ export async function speakText(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         text, 
-        voice_id: voiceId || (import.meta.env.VITE_ELEVENLABS_VOICE_ID as string) || '21m00Tcm4TlvDq8ikWAM',
+        voice_id: voiceId || '21m00Tcm4TlvDq8ikWAM',
         model_id: options?.modelId || 'eleven_multilingual_v2',
         voice_settings: settings
       }),
