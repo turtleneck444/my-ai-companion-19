@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+
+  <!-- Launch Announcement -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/launch-announcement</loc>
+    <news:news>
+      <news:publication>
+        <news:name>LoveAI Blog</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>2024-01-15T00:00:00Z</news:publication_date>
+      <news:title>LoveAI Launches Revolutionary AI Companion Platform</news:title>
+      <news:keywords>AI companion, artificial intelligence, virtual relationship, emotional AI, technology launch</news:keywords>
+    </news:news>
+  </url>
+
+  <!-- AI Companion Revolution Blog Post -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/blog/ai-companion-revolution</loc>
+    <news:news>
+      <news:publication>
+        <news:name>LoveAI Blog</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>2024-01-15T00:00:00Z</news:publication_date>
+      <news:title>The AI Companion Revolution: How Emotional AI is Changing Relationships</news:title>
+      <news:keywords>AI revolution, emotional AI, virtual relationships, future of dating, artificial intelligence</news:keywords>
+    </news:news>
+  </url>
+
+  <!-- Future of AI Relationships -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/blog/future-of-ai-relationships</loc>
+    <news:news>
+      <news:publication>
+        <news:name>LoveAI Blog</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>2024-01-15T00:00:00Z</news:publication_date>
+      <news:title>The Future of AI Relationships: Beyond Traditional Dating</news:title>
+      <news:keywords>AI dating, future relationships, virtual love, digital companions, technology trends</news:keywords>
+    </news:news>
+  </url>
+
+  <!-- Emotional AI Breakthrough -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/blog/emotional-ai-breakthrough</loc>
+    <news:news>
+      <news:publication>
+        <news:name>LoveAI Blog</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>2024-01-15T00:00:00Z</news:publication_date>
+      <news:title>Breakthrough in Emotional AI: Making Virtual Relationships Feel Real</news:title>
+      <news:keywords>emotional AI, breakthrough technology, virtual emotions, AI psychology, relationship technology</news:keywords>
+    </news:news>
+  </url>
+
+  <!-- AI Loneliness Solution -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/blog/ai-loneliness-solution</loc>
+    <news:news>
+      <news:publication>
+        <news:name>LoveAI Blog</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>2024-01-15T00:00:00Z</news:publication_date>
+      <news:title>How AI Companions Are Solving the Loneliness Epidemic</news:title>
+      <news:keywords>loneliness epidemic, AI solution, mental health, emotional support, virtual companionship</news:keywords>
+    </news:news>
+  </url>
+
+  <!-- GPT4 vs AI Companions -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/blog/gpt4-vs-ai-companions</loc>
+    <news:news>
+      <news:publication>
+        <news:name>LoveAI Blog</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>2024-01-15T00:00:00Z</news:publication_date>
+      <news:title>GPT-4 vs Specialized AI Companions: Why Emotional Intelligence Matters</news:title>
+      <news:keywords>GPT-4, AI comparison, emotional intelligence, specialized AI, companion technology</news:keywords>
+    </news:news>
+  </url>
+
+  <!-- News Updates -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/news</loc>
+    <news:news>
+      <news:publication>
+        <news:name>LoveAI News</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>2024-01-15T00:00:00Z</news:publication_date>
+      <news:title>LoveAI Platform Updates and Industry News</news:title>
+      <news:keywords>AI news, platform updates, industry developments, technology announcements</news:keywords>
+    </news:news>
+  </url>
+
+</urlset> 

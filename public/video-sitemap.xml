@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+
+  <!-- Demo Video -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/</loc>
+    <video:video>
+      <video:thumbnail_loc>https://my-ai-companion-19.netlify.app/video-thumbnail.jpg</video:thumbnail_loc>
+      <video:title>LoveAI - Meet Your Perfect AI Companion</video:title>
+      <video:description>Experience the future of AI companionship with LoveAI. See how our emotional AI technology creates meaningful connections through realistic conversations, voice calls, and personalized interactions.</video:description>
+      <video:content_loc>https://my-ai-companion-19.netlify.app/demo-video.mp4</video:content_loc>
+      <video:duration>150</video:duration>
+      <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>AI companion</video:tag>
+      <video:tag>virtual relationship</video:tag>
+      <video:tag>emotional AI</video:tag>
+      <video:tag>artificial intelligence</video:tag>
+      <video:category>Technology</video:category>
+    </video:video>
+  </url>
+
+  <!-- Character Introduction Videos -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/characters/luna</loc>
+    <video:video>
+      <video:thumbnail_loc>https://my-ai-companion-19.netlify.app/avatar-luna.jpg</video:thumbnail_loc>
+      <video:title>Meet Luna - Your Warm and Caring AI Companion</video:title>
+      <video:description>Get to know Luna, an AI companion with a warm personality who loves deep conversations and emotional connections.</video:description>
+      <video:duration>60</video:duration>
+      <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>Luna</video:tag>
+      <video:tag>AI character</video:tag>
+      <video:tag>virtual companion</video:tag>
+    </video:video>
+  </url>
+
+  <!-- Feature Demo Videos -->
+  <url>
+    <loc>https://my-ai-companion-19.netlify.app/features/voice-calls</loc>
+    <video:video>
+      <video:thumbnail_loc>https://my-ai-companion-19.netlify.app/natalie.png</video:thumbnail_loc>
+      <video:title>LoveAI Voice Calls - Natural AI Conversations</video:title>
+      <video:description>Experience natural voice conversations with your AI companion using advanced speech synthesis and real-time processing.</video:description>
+      <video:duration>90</video:duration>
+      <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>voice calls</video:tag>
+      <video:tag>AI speech</video:tag>
+      <video:tag>natural conversation</video:tag>
+    </video:video>
+  </url>
+
+</urlset> 
