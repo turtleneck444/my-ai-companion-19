@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import Create from "./pages/Create";
 import CreationSuccess from "./pages/CreationSuccess";
 import CompanionLibrary from "./pages/CompanionLibrary";
+import { FooterNotice } from "@/components/FooterNotice";
 
 const queryClient = new QueryClient();
 
@@ -67,11 +68,13 @@ const App = () => (
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <FooterNotice />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
     </HelmetProvider>
   </QueryClientProvider>
 );
+
 
 export default App;
