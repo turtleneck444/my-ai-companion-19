@@ -93,7 +93,7 @@ export const VoiceSelector = ({
           preview_url: '',
           labels: { accent: 'american', gender: 'female', age: 'young_adult' },
           suggestedPersonality: ['Caring', 'Sweet', 'Empathetic'],
-          characteristics: { warmth: 9, energy: 6, clarity: 8, depth: 7 }
+          characteristics: { warmth: 95, energy: 72, clarity: 88, depth: 85 }
         },
         {
           voice_id: 'emma',
@@ -103,7 +103,7 @@ export const VoiceSelector = ({
           preview_url: '',
           labels: { accent: 'british', gender: 'female', age: 'young_adult' },
           suggestedPersonality: ['Sweet', 'Caring', 'Intelligent'],
-          characteristics: { warmth: 8, energy: 5, clarity: 9, depth: 8 }
+          characteristics: { warmth: 92, energy: 68, clarity: 94, depth: 89 }
         },
         {
           voice_id: 'lily',
@@ -113,7 +113,7 @@ export const VoiceSelector = ({
           preview_url: '',
           labels: { accent: 'american', gender: 'female', age: 'young_adult' },
           suggestedPersonality: ['Playful', 'Adventurous', 'Sweet'],
-          characteristics: { warmth: 7, energy: 9, clarity: 8, depth: 6 }
+          characteristics: { warmth: 85, energy: 96, clarity: 91, depth: 78 }
         },
         {
           voice_id: 'sophia',
@@ -123,7 +123,7 @@ export const VoiceSelector = ({
           preview_url: '',
           labels: { accent: 'american', gender: 'female', age: 'middle_aged' },
           suggestedPersonality: ['Intelligent', 'Confident', 'Romantic'],
-          characteristics: { warmth: 6, energy: 5, clarity: 9, depth: 9 }
+          characteristics: { warmth: 82, energy: 74, clarity: 97, depth: 93 }
         },
         {
           voice_id: 'aria',
@@ -133,7 +133,7 @@ export const VoiceSelector = ({
           preview_url: '',
           labels: { accent: 'american', gender: 'female', age: 'young_adult' },
           suggestedPersonality: ['Mysterious', 'Romantic', 'Confident'],
-          characteristics: { warmth: 6, energy: 7, clarity: 8, depth: 9 }
+          characteristics: { warmth: 87, energy: 79, clarity: 90, depth: 95 }
         },
         {
           voice_id: 'maya',
@@ -143,7 +143,7 @@ export const VoiceSelector = ({
           preview_url: '',
           labels: { accent: 'american', gender: 'female', age: 'young_adult' },
           suggestedPersonality: ['Confident', 'Adventurous', 'Playful'],
-          characteristics: { warmth: 7, energy: 8, clarity: 8, depth: 7 }
+          characteristics: { warmth: 88, energy: 91, clarity: 93, depth: 86 }
         }
       ];
       
