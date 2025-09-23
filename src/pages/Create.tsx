@@ -350,6 +350,17 @@ const Create = () => {
 
       <div className="max-w-6xl mx-auto p-4 pb-24">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Mobile Live Preview - Shows at top on mobile */}
+          <div className="lg:hidden order-first">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                <Volume2 className="w-5 h-5 text-primary" />
+                Live Preview
+              </h3>
+              <LivePreviewCard />
+            </div>
+          </div>
+
           {/* Main Content */}
           <div className="space-y-6">
             {/* Step Content with Animations */}
@@ -535,8 +546,8 @@ const Create = () => {
             </div>
           </div>
 
-          {/* Live Preview Sidebar */}
-          <div className="lg:sticky lg:top-24">
+          {/* Live Preview Sidebar - Desktop only */}
+          <div className="hidden lg:block lg:sticky lg:top-24">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Volume2 className="w-5 h-5 text-primary" />
