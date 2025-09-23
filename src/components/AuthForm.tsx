@@ -21,7 +21,8 @@ export const AuthForm = () => {
     password: '',
     confirmPassword: '',
     preferredName: '',
-    treatmentStyle: 'romantic'
+    treatmentStyle: 'romantic',
+    plan: 'free'
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,7 +102,8 @@ export const AuthForm = () => {
     try {
       const { error } = await signUp(formData.email, formData.password, {
         preferred_name: formData.preferredName,
-        treatment_style: formData.treatmentStyle
+        treatment_style: formData.treatmentStyle,
+        plan: formData.plan
       });
       
       if (error) {
@@ -307,6 +309,23 @@ export const AuthForm = () => {
                       className="pl-10"
                       required
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="signup-plan">Choose Plan</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['free','premium','pro'].map(p => (
+                      <button
+                        type="button"
+                        key={p}
+                        onClick={() => setFormData(prev => ({ ...prev, plan: p }))}
+                        className={`text-sm rounded-md border px-3 py-2 transition ${formData.plan === p ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}`}
+                        aria-pressed={formData.plan === p}
+                      >
+                        {p === 'free' ? 'Free' : p === 'premium' ? 'Premium' : 'Pro'}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 

@@ -122,6 +122,8 @@ export const SimpleChatInterface = ({
   const [showQuickReplies, setShowQuickReplies] = useState(true);
   const [relationshipLevel, setRelationshipLevel] = useState(25);
   const [showGames, setShowGames] = useState(false);
+  const [likedMessageIds, setLikedMessageIds] = useState<Set<string>>(new Set());
+  const [burstIds, setBurstIds] = useState<Set<string>>(new Set());
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -310,6 +312,23 @@ export const SimpleChatInterface = ({
     sendMessage(reply);
   };
 
+  const toggleLike = (messageId: string) => {
+    setLikedMessageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId); else next.add(messageId);
+      return next;
+    });
+    // Trigger a brief burst animation
+    setBurstIds(prev => new Set(prev).add(messageId));
+    setTimeout(() => {
+      setBurstIds(prev => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
+    }, 600);
+  };
+
   const startGame = () => {
     setShowGames(true);
   };
@@ -440,13 +459,25 @@ export const SimpleChatInterface = ({
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   {message.sender === 'ai' && (
-                    <div className="flex gap-1 ml-2">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-red-500/10">
-                        <Heart className="w-3 h-3 text-red-500" />
-                      </Button>
+                    <div className="flex gap-1 ml-2 items-center">
+                      <button
+                        onClick={() => toggleLike(message.id)}
+                        className={`h-6 w-6 grid place-items-center rounded transition-transform ${likedMessageIds.has(message.id) ? 'scale-110' : ''} hover:bg-red-500/10`}
+                        aria-label="Like message"
+                      >
+                        <Heart className={`w-3.5 h-3.5 ${likedMessageIds.has(message.id) ? 'text-red-500 fill-red-500' : 'text-red-500'}`} />
+                      </button>
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10">
                         <Reply className="w-3 h-3" />
                       </Button>
+                      {/* Heart burst */}
+                      {burstIds.has(message.id) && (
+                        <div className="relative w-0 h-0">
+                          <span className="absolute -top-3 -right-2 text-red-500 animate-ping">❤</span>
+                          <span className="absolute -top-1 right-1 text-pink-400 animate-ping" style={{ animationDelay: '100ms' }}>❤</span>
+                          <span className="absolute -top-2 right-4 text-rose-400 animate-ping" style={{ animationDelay: '200ms' }}>❤</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
