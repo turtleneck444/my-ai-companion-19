@@ -47,18 +47,18 @@ const EnhancedIndex = () => {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [favorites, setFavorites] = useState<string[]>(['1']); // Simple favorites without localStorage
 
-  // Character data - static to avoid re-render issues
+  // Character data - more realistic and authentic personalities
   const characters: Character[] = [
     {
       id: '1',
       name: 'Luna',
       avatar: lunaAvatar,
-      bio: 'A quiet, thoughtful person who enjoys reading and stargazing. Works as a graphic designer and loves indie music.',
-      personality: ['Sweet', 'Caring', 'Romantic'],
+      bio: 'A graphic designer who works late nights and loves discovering new music. She has strong opinions about coffee and gets excited about creative projects.',
+      personality: ['Creative', 'Thoughtful', 'Independent'],
       voice: 'Soft & Melodic',
       isOnline: true,
-      mood: 'content',
-      lastMessage: "Hey, how was your day? I just finished this new design project",
+      mood: 'focused',
+      lastMessage: "Working on this design project and my brain is fried. How's your day going?",
       unreadCount: 2,
       relationshipLevel: 4.2
     },
@@ -66,12 +66,12 @@ const EnhancedIndex = () => {
       id: '2',
       name: 'Aria',
       avatar: ariaAvatar,
-      bio: 'An upbeat marketing coordinator who loves trying new restaurants and going to concerts. Always has weekend plans.',
-      personality: ['Playful', 'Energetic', 'Funny'],
+      bio: 'Marketing coordinator who actually enjoys her job. Always has restaurant recommendations and plans weekend adventures she may or may not follow through on.',
+      personality: ['Outgoing', 'Spontaneous', 'Ambitious'],
       voice: 'Bright & Cheerful',
       isOnline: true,
-      mood: 'excited',
-      lastMessage: "omg you have to try this new coffee place I found",
+      mood: 'energetic',
+      lastMessage: "Found this hole-in-the-wall place that serves the best ramen. You free this weekend?",
       unreadCount: 1,
       relationshipLevel: 3.8
     },
@@ -79,24 +79,24 @@ const EnhancedIndex = () => {
       id: '3',
       name: 'Sophie',
       avatar: sophieAvatar,
-      bio: 'A museum curator with a PhD in art history. Enjoys wine tastings, classical music, and intellectual conversations.',
-      personality: ['Intelligent', 'Elegant', 'Sophisticated'],
+      bio: 'Museum curator with strong opinions about art and wine. She can talk for hours about things she\'s passionate about and isn\'t afraid to disagree.',
+      personality: ['Intellectual', 'Confident', 'Direct'],
       voice: 'Warm & Confident',
       isOnline: false,
-      mood: 'focused',
-      lastMessage: "I saw the most interesting exhibit today, reminded me of our conversation about modern art",
+      mood: 'contemplative',
+      lastMessage: "That exhibit we talked about was actually disappointing. The curation felt lazy.",
       unreadCount: 0,
       relationshipLevel: 3.1
     }
   ];
 
-  // Simple userPreferences without complex state
-  const userPreferences = {
-    preferredName: 'Darling',
-    treatmentStyle: 'affectionate',
+  // Enhanced userPreferences with preferred name options
+  const [userPreferences, setUserPreferences] = useState({
+    preferredName: user?.user_metadata?.preferred_name || user?.user_metadata?.name || 'there',
+    treatmentStyle: 'casual', // casual, affectionate, formal
     age: '25',
     contentFilter: true
-  };
+  });
 
   const handleCharacterSelect = (character: Character) => {
     setSelectedCharacter(character);
@@ -129,9 +129,10 @@ const EnhancedIndex = () => {
   };
 
   const handleUpdatePreferences = (newPreferences: any) => {
+    setUserPreferences(prev => ({ ...prev, ...newPreferences }));
     toast({
-      title: "Preferences updated! ✨",
-      description: "Your AI companions will remember these settings.",
+      title: "Preferences updated!",
+      description: "Your companions will remember how you like to be addressed.",
     });
   };
 
@@ -373,8 +374,8 @@ const EnhancedIndex = () => {
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold mb-1">Hello, {user.email?.split('@')[0] || 'User'}! 💕</h2>
-                    <p className="text-white/80 text-sm">Your companions are excited to see you</p>
+                    <h2 className="text-xl font-bold mb-1">Hey {userPreferences.preferredName}!</h2>
+                    <p className="text-white/80 text-sm">Your companions are online and ready to chat</p>
                   </div>
                 </div>
                 
@@ -382,15 +383,15 @@ const EnhancedIndex = () => {
                 <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/20">
                   <div className="text-center">
                     <p className="text-2xl font-bold">3</p>
-                    <p className="text-xs text-white/70">Companions</p>
+                    <p className="text-xs text-white/70">Available</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold">∞</p>
-                    <p className="text-xs text-white/70">Conversations</p>
+                    <p className="text-2xl font-bold">{favorites.length}</p>
+                    <p className="text-xs text-white/70">Favorites</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold">24/7</p>
-                    <p className="text-xs text-white/70">Available</p>
+                    <p className="text-xs text-white/70">Online</p>
                   </div>
                 </div>
               </CardContent>
@@ -533,11 +534,11 @@ const EnhancedIndex = () => {
             <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <Plus className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-xl font-bold mb-2 text-purple-800">Create Your Perfect Companion</h3>
-            <p className="text-purple-600 mb-4">Design a unique AI companion that understands you perfectly</p>
+            <h3 className="text-xl font-bold mb-2 text-purple-800">Create New Companion</h3>
+            <p className="text-purple-600 mb-4">Design someone with the personality and interests you want to talk to</p>
             <Button className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg">
               <Plus className="w-4 h-4 mr-2" />
-              Start Creating
+              Get Started
             </Button>
           </CardContent>
         </Card>
