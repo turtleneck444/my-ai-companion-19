@@ -177,6 +177,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // Always clear local demo state
+    try {
+      localStorage.removeItem('loveai-demo-user');
+      setUser(null);
+      setSession(null);
+    } catch {}
+
     if (!isSupabaseConfigured || !supabase) {
       return;
     }

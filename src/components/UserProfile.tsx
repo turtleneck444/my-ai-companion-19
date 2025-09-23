@@ -189,6 +189,10 @@ export const UserProfile = () => {
       title: "Signed out 👋",
       description: "You've been successfully signed out.",
     });
+    // Redirect to homepage after sign out
+    try {
+      window.location.href = '/';
+    } catch {}
   };
 
   const handleDeleteAccount = () => {

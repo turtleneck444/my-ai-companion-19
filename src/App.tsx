@@ -7,6 +7,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { UserProfile } from "@/components/UserProfile";
+import { AgeGate } from "@/components/AgeGate";
 import { LandingPage } from "@/pages/LandingPage";
 import { PricingPage } from "@/pages/PricingPage";
 import { AuthPage } from "@/pages/Auth";
@@ -26,6 +27,7 @@ const App = () => (
           <Toaster />
           <Sonner />
                   <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AgeGate />
           <Routes>
               {/* Public routes */}
               <Route path="/" element={<LandingPage />} />
