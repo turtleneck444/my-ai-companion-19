@@ -89,6 +89,27 @@ const Create = () => {
   const [stepIdx, setStepIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const [voiceTuning, setVoiceTuning] = useState<{ stability: number; similarity: number; style: number; boost: boolean }>(() => {
+    try {
+      const raw = localStorage.getItem('loveai-voice-tuning');
+      if (raw) {
+        const all = JSON.parse(raw);
+        const def = all['__default'];
+        if (def) return { stability: def.stability ?? 0.3, similarity: def.similarity_boost ?? 0.95, style: def.style ?? 0.55, boost: def.use_speaker_boost ?? true };
+      }
+    } catch {}
+    return { stability: 0.3, similarity: 0.95, style: 0.55, boost: true };
+  });
+
+  const persistTuning = (id: string | undefined, values: { stability: number; similarity: number; style: number; boost: boolean }) => {
+    try {
+      const raw = localStorage.getItem('loveai-voice-tuning');
+      const all = raw ? JSON.parse(raw) : {};
+      const key = id || '__default';
+      all[key] = { stability: values.stability, similarity_boost: values.similarity, style: values.style, use_speaker_boost: values.boost };
+      localStorage.setItem('loveai-voice-tuning', JSON.stringify(all));
+    } catch {}
+  };
   const [dragActive, setDragActive] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imagePrompt, setImagePrompt] = useState('');
@@ -314,6 +335,15 @@ const Create = () => {
 
   const handleVoiceSelect = (voice: Voice) => {
     setCharacter(prev => ({ ...prev, voice }));
+    // Load tuning for this specific voice if present
+    try {
+      const raw = localStorage.getItem('loveai-voice-tuning');
+      if (raw) {
+        const all = JSON.parse(raw);
+        const sel = all[voice.voice_id];
+        if (sel) setVoiceTuning({ stability: sel.stability ?? 0.3, similarity: sel.similarity_boost ?? 0.95, style: sel.style ?? 0.55, boost: sel.use_speaker_boost ?? true });
+      }
+    } catch {}
   };
 
   const handlePersonalitySuggest = (traits: string[]) => {
@@ -328,29 +358,20 @@ const Create = () => {
       toast({ title: "No voice selected", description: "Please select a voice first." });
       return;
     }
-    
-    setIsPlayingVoice(true);
     try {
-      // Create a personalized preview message
-      const previewText = character.name 
-        ? `Hi! I'm ${character.name}. ${character.bio ? character.bio.slice(0, 100) : "I'm excited to be your AI companion!"}`
-        : "Hello! I'm your AI companion. I can't wait to chat with you!";
-      
-      console.log('Playing voice preview:', { voiceId: character.voice.voice_id, text: previewText });
-      
-      await speakText(previewText, character.voice.voice_id);
-      
-      toast({ 
-        title: "Voice preview played! 🎉", 
+      setIsPlayingVoice(true);
+      const previewText = `Hi! I'm ${character.name || 'your AI companion'}. Can't wait to talk with you.`;
+      console.log('Playing voice preview:', { voiceId: character.voice.voice_id, text: previewText, tuning: voiceTuning });
+      await speakText(previewText, character.voice.voice_id, { voiceSettings: { stability: voiceTuning.stability, similarity_boost: voiceTuning.similarity, style: voiceTuning.style, use_speaker_boost: voiceTuning.boost } });
+      toast({
+        title: "Voice preview played! 🎉",
         description: `You just heard ${character.voice.name}'s voice`,
-        duration: 3000
       });
     } catch (error) {
       console.error('Voice preview error:', error);
-      toast({ 
-        title: "Voice preview", 
+      toast({
+        title: "Voice preview",
         description: "Using browser voice. Premium ElevenLabs voices available when connected.",
-        variant: "default"
       });
     } finally {
       setIsPlayingVoice(false);
@@ -578,11 +599,46 @@ const Create = () => {
                             <Button onClick={() => navigate('/pricing?plan=premium')}>Upgrade to Unlock</Button>
                           </Card>
                         ) : (
-                          <VoiceSelector
-                            selectedVoice={character.voice}
-                            onVoiceSelect={handleVoiceSelect}
-                            onPersonalitySuggest={handlePersonalitySuggest}
-                          />
+                          <div className="space-y-6">
+                            <VoiceSelector
+                              selectedVoice={character.voice}
+                              onVoiceSelect={handleVoiceSelect}
+                              onPersonalitySuggest={handlePersonalitySuggest}
+                            />
+                            <Card className="p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <h4 className="font-semibold">Voice Tuning</h4>
+                                  <p className="text-xs text-muted-foreground">Fine-tune naturalness for ElevenLabs voices</p>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => { persistTuning(character.voice?.voice_id, voiceTuning); toast({ title: 'Saved', description: 'Your voice tuning preferences were saved.' }); }}>Save</Button>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Stability ({voiceTuning.stability.toFixed(2)})</Label>
+                                  <input type="range" min={0} max={1} step={0.01} value={voiceTuning.stability} onChange={(e) => setVoiceTuning(v => ({ ...v, stability: parseFloat(e.target.value) }))} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Similarity Boost ({voiceTuning.similarity.toFixed(2)})</Label>
+                                  <input type="range" min={0} max={1} step={0.01} value={voiceTuning.similarity} onChange={(e) => setVoiceTuning(v => ({ ...v, similarity: parseFloat(e.target.value) }))} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Style ({voiceTuning.style.toFixed(2)})</Label>
+                                  <input type="range" min={0} max={1} step={0.01} value={voiceTuning.style} onChange={(e) => setVoiceTuning(v => ({ ...v, style: parseFloat(e.target.value) }))} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Speaker Boost</Label>
+                                  <div className="flex items-center gap-3">
+                                    <input id="boost" type="checkbox" checked={voiceTuning.boost} onChange={(e) => setVoiceTuning(v => ({ ...v, boost: e.target.checked }))} />
+                                    <Label htmlFor="boost">Enable</Label>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex justify-end mt-3">
+                                <Button variant="default" size="sm" onClick={previewSelectedVoice} disabled={isPlayingVoice || !character.voice}>Preview with Tuning</Button>
+                              </div>
+                            </Card>
+                          </div>
                         )
                       )}
 
