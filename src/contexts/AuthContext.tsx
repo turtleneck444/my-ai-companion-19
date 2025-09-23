@@ -69,36 +69,106 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string, userData?: any) => {
+    // Handle case when Supabase is not configured
     if (!isSupabaseConfigured || !supabase) {
-      return { error: new Error('Supabase not configured') as AuthError };
+      console.warn('Supabase not configured, using demo mode');
+      
+      // Demo mode - simulate successful signup
+      const demoUser = {
+        id: 'demo-' + Date.now(),
+        email,
+        preferred_name: userData?.preferred_name || 'User',
+        treatment_style: userData?.treatment_style || 'romantic'
+      };
+      
+      // Store demo user in localStorage
+      localStorage.setItem('loveai-demo-user', JSON.stringify(demoUser));
+      
+      // Simulate user state update
+      setTimeout(() => {
+        setUser({
+          id: demoUser.id,
+          email: demoUser.email,
+          user_metadata: userData
+        } as User);
+      }, 100);
+      
+      return { error: null };
     }
     
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('🔐 Attempting Supabase signup for:', email);
+      
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: userData
         }
       });
+      
+      if (error) {
+        console.error('❌ Supabase signup error:', error);
+      } else {
+        console.log('✅ Supabase signup successful:', data);
+      }
+      
       return { error };
     } catch (error) {
+      console.error('❌ Unexpected signup error:', error);
       return { error: error as AuthError };
     }
   };
 
   const signIn = async (email: string, password: string) => {
+    // Handle case when Supabase is not configured
     if (!isSupabaseConfigured || !supabase) {
-      return { error: new Error('Supabase not configured') as AuthError };
+      console.warn('Supabase not configured, checking demo mode');
+      
+      // Check for demo user
+      const demoUserData = localStorage.getItem('loveai-demo-user');
+      if (demoUserData) {
+        const demoUser = JSON.parse(demoUserData);
+        if (demoUser.email === email) {
+                     // Simulate user state update
+           setTimeout(() => {
+             setUser({
+               id: demoUser.id,
+               email: demoUser.email,
+               user_metadata: {
+                 preferred_name: demoUser.preferred_name,
+                 treatment_style: demoUser.treatment_style
+               },
+               app_metadata: {},
+               aud: 'authenticated',
+               created_at: new Date().toISOString()
+             } as unknown as User);
+           }, 100);
+          
+          return { error: null };
+        }
+      }
+      
+      return { error: new Error('Invalid credentials or demo user not found') as AuthError };
     }
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('🔐 Attempting Supabase signin for:', email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
+      if (error) {
+        console.error('❌ Supabase signin error:', error);
+      } else {
+        console.log('✅ Supabase signin successful:', data);
+      }
+      
       return { error };
     } catch (error) {
+      console.error('❌ Unexpected signin error:', error);
       return { error: error as AuthError };
     }
   };

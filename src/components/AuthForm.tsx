@@ -37,15 +37,28 @@ export const AuthForm = () => {
       const { error } = await signIn(formData.email, formData.password);
       
       if (error) {
+        console.error('Signin error details:', error);
+        
+        // Enhanced error messaging
+        let errorMessage = error.message;
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please check your email and click the confirmation link before signing in.';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = 'Too many login attempts. Please wait a moment and try again.';
+        }
+        
         toast({
           title: "Sign in failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive"
         });
       } else {
+        console.log('Signin successful!');
         toast({
-          title: "Welcome back!",
-          description: "You've successfully signed in.",
+          title: "Welcome back! 💕",
+          description: "Great to see you again! Your AI companions missed you.",
         });
       }
     } catch (error) {
@@ -89,15 +102,28 @@ export const AuthForm = () => {
       });
       
       if (error) {
+        console.error('Signup error details:', error);
+        
+        // Enhanced error messaging
+        let errorMessage = error.message;
+        if (error.message.includes('User already registered')) {
+          errorMessage = 'An account with this email already exists. Try signing in instead.';
+        } else if (error.message.includes('Invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else if (error.message.includes('Password')) {
+          errorMessage = 'Password must be at least 6 characters long.';
+        }
+        
         toast({
           title: "Sign up failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive"
         });
       } else {
+        console.log('Signup successful!');
         toast({
-          title: "Account created!",
-          description: "Please check your email to verify your account.",
+          title: "Account created! 🎉",
+          description: "Welcome to LoveAI! You can now start creating your AI companion.",
         });
       }
     } catch (error) {
