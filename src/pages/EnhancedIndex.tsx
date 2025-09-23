@@ -22,6 +22,7 @@ import {
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
@@ -122,6 +123,34 @@ const CHARACTERS: Character[] = [
     unreadCount: 0,
     relationshipLevel: 2.7,
     voiceId: 'ErXwobaYiN019PkySvjV' // Elli: expressive and modern
+  },
+  {
+    id: '6',
+    name: 'Heather',
+    avatar: '/heather.png',
+    bio: 'Art director with an elegant eye; calm, composed, and a little mischievous. Loves gallery nights, good tea, and honest conversations.',
+    personality: ['Intellectual', 'Romantic', 'Gentle', 'Elegant'],
+    voice: { voice_id: 'default_elegant_clear', name: 'Elegant & Clear' },
+    isOnline: true,
+    mood: 'serene',
+    lastMessage: 'Just got back from a small gallery opening—want to hear about my favorite piece?',
+    unreadCount: 0,
+    relationshipLevel: 3.9,
+    voiceId: 'pNInz6obpgDQGcFmaJgB' // Olivia: crisp, elegant, assured (British)
+  },
+  {
+    id: '7',
+    name: 'Natalie',
+    avatar: '/natalie.png',
+    bio: 'Fitness enthusiast and weekend foodie. Playful energy, quick wit, and a habit of sending memes at 2am.',
+    personality: ['Outgoing', 'Playful', 'Confident', 'Caring'],
+    voice: { voice_id: 'default_bright_bubbly', name: 'Bright & Bubbly' },
+    isOnline: false,
+    mood: 'cheerful',
+    lastMessage: 'Made the best tacos of my life—be honest, would you try my hot sauce?',
+    unreadCount: 0,
+    relationshipLevel: 3.4,
+    voiceId: 'MF3mGyEYCl7XYWbV9V6O' // Cora: bright, friendly, youthful
   }
 ];
 
@@ -130,6 +159,7 @@ const EnhancedIndex = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { currentPlan, setCurrentPlan, remainingMessages, remainingVoiceCalls } = useUsageTracking();
   
   // Core state - minimal and stable
   const [currentView, setCurrentView] = useState<View>('home');
@@ -158,6 +188,12 @@ const EnhancedIndex = () => {
     }, 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Initialize current plan for meters
+  useEffect(() => {
+    const plan = (user as any)?.user_metadata?.plan || 'free';
+    setCurrentPlan(plan);
+  }, [user, setCurrentPlan]);
 
   // Plan handoff: if URL contains ?plan=, handle auto-upgrade or redirect to auth
   useEffect(() => {
@@ -580,6 +616,7 @@ const EnhancedIndex = () => {
                       </p>
                     </div>
                     {/* Avatar removed per request for a cleaner card */}
+                    <Badge className="bg-white/15 text-white border-white/20">{currentPlan === 'free' ? 'Free' : currentPlan === 'premium' ? 'Premium' : 'Pro'}</Badge>
                   </div>
                   
                   {/* Enhanced Quick Stats */}
@@ -601,12 +638,11 @@ const EnhancedIndex = () => {
                       }}>Favorites</p>
                     </div>
                     <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-pink-400/30">
-                      <p className="text-white text-2xl font-bold drop-shadow-2xl mb-1" style={{ 
-                        textShadow: '0 4px 12px rgba(0,0,0,1), 0 0 40px rgba(255,255,255,0.6), 0 0 80px rgba(236,72,153,0.6)'
-                      }}>2</p>
-                      <p className="text-pink-100 text-xs font-semibold uppercase tracking-wide drop-shadow-lg" style={{ 
-                        textShadow: '0 3px 8px rgba(0,0,0,0.9), 0 0 20px rgba(255,255,255,0.4)'
-                      }}>Online</p>
+                      <p className="text-white text-[11px] font-semibold uppercase tracking-wide">Usage Today</p>
+                      <div className="mt-2 space-y-1">
+                        <div className="text-[11px] text-pink-100">Messages left: {remainingMessages === -1 ? '∞' : remainingMessages}</div>
+                        <div className="text-[11px] text-pink-100">Calls left: {typeof remainingVoiceCalls === 'number' ? remainingVoiceCalls : '∞'}</div>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
