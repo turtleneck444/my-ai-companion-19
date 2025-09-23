@@ -3,6 +3,11 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+  
+  console.log('🔧 OpenAI API Debug:');
+  console.log('- OPENAI_API_KEY available:', !!process.env.OPENAI_API_KEY);
+  console.log('- VITE_OPENAI_API_KEY available:', !!process.env.VITE_OPENAI_API_KEY);
+  
   try {
     const { 
       messages, 
@@ -28,8 +33,8 @@ export default async function handler(req, res) {
     const resolvedFrequency = typeof frequency_penalty === 'number' ? frequency_penalty : 0.3; // Reduce repetition
     const resolvedTopP = typeof top_p === 'number' ? top_p : 0.95; // High quality responses
 
-    if (!process.env.OPENAI_API_KEY) {
-      res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
+    if (!process.env.OPENAI_API_KEY && !process.env.VITE_OPENAI_API_KEY) {
+      res.status(500).json({ error: 'Missing OPENAI_API_KEY or VITE_OPENAI_API_KEY' });
       return;
     }
     if (!messages || !Array.isArray(messages)) {
@@ -67,7 +72,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY}`,
       },
       body: JSON.stringify(requestPayload),
     });
@@ -84,8 +89,13 @@ export default async function handler(req, res) {
     
     // Log successful personality response
     if (character && responseContent) {
-      console.log(`✨ Generated personality response for ${character}: ${responseContent.slice(0, 50)}...`);
+      console.log(`✨ Generated personality response for`, character, ':', responseContent.slice(0, 50) + '...');
     }
+
+    console.log('✅ Sending OpenAI response:', {
+      messageLength: responseContent.length,
+      firstWords: responseContent.slice(0, 30) + '...'
+    });
 
     res.status(200).json({ message: responseContent });
   } catch (err) {
