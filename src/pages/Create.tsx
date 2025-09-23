@@ -15,6 +15,8 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { speakText } from "@/lib/voice";
 import { generateAvatarImage, validateImagePrompt, examplePrompts } from "@/lib/image-generation";
 import { useNavigate } from "react-router-dom";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Upload, 
   X, 
@@ -79,6 +81,8 @@ const personalityTraitSliders = [
 const Create = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { currentPlan, setCurrentPlan } = useUsageTracking();
   const [stepIdx, setStepIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
@@ -88,6 +92,12 @@ const Create = () => {
   const [imageStyle, setImageStyle] = useState('realistic');
   const [avatarMethod, setAvatarMethod] = useState('upload'); // 'upload' or 'generate'
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const plan = (user as any)?.user_metadata?.plan || 'free';
+    setCurrentPlan(plan);
+  }, [user, setCurrentPlan]);
+
   const [character, setCharacter] = useState<NewCharacter>({
     name: "",
     bio: "",
@@ -535,11 +545,19 @@ const Create = () => {
                       )}
 
                       {stepName === "Voice" && (
-                        <VoiceSelector
-                          selectedVoice={character.voice}
-                          onVoiceSelect={handleVoiceSelect}
-                          onPersonalitySuggest={handlePersonalitySuggest}
-                        />
+                        currentPlan === 'free' ? (
+                          <Card className="p-6 text-center">
+                            <h3 className="font-semibold mb-2">Premium Feature</h3>
+                            <p className="text-sm text-muted-foreground mb-4">Select from premium voices with a Premium or Pro plan.</p>
+                            <Button onClick={() => navigate('/pricing?plan=premium')}>Upgrade to Unlock</Button>
+                          </Card>
+                        ) : (
+                          <VoiceSelector
+                            selectedVoice={character.voice}
+                            onVoiceSelect={handleVoiceSelect}
+                            onPersonalitySuggest={handlePersonalitySuggest}
+                          />
+                        )
                       )}
 
                       {stepName === "Avatar" && (
@@ -556,7 +574,12 @@ const Create = () => {
                             onDragOver={handleDrag}
                             onDrop={handleDrop}
                           >
-                            {character.avatarUrl ? (
+                            {currentPlan === 'free' ? (
+                              <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">Custom avatar upload is a Premium feature.</p>
+                                <Button onClick={() => navigate('/pricing?plan=premium')}>Upgrade to Unlock</Button>
+                              </div>
+                            ) : character.avatarUrl ? (
                               <div className="space-y-4">
                                 <div className="w-24 h-24 rounded-full overflow-hidden mx-auto ring-4 ring-primary/20">
                                   <img

@@ -17,6 +17,8 @@ import {
 import { speakText, stopAllTTS } from "@/lib/voice";
 import { personalityAI, type ChatContext, type ChatMessage } from "@/lib/ai-chat";
 import { useToast } from "@/hooks/use-toast";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Character {
   id: string;
@@ -47,6 +49,8 @@ export const VoiceCallInterface = ({
   onMinimize, 
   userPreferences 
 }: VoiceCallInterfaceProps) => {
+  const { user } = useAuth();
+  const { canMakeVoiceCall, incrementVoiceCalls, currentPlan, setCurrentPlan } = useUsageTracking();
   // Helper: resolve selected ElevenLabs voice id
   const getVoiceId = () => character.voiceId || character.voice?.voice_id;
   // Call state
@@ -57,6 +61,8 @@ export const VoiceCallInterface = ({
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [callConnected, setCallConnected] = useState(false);
+  const [pushToTalk, setPushToTalk] = useState(false);
+  const [isPTTHeld, setIsPTTHeld] = useState(false);
   
   // Conversation state
   const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
@@ -109,11 +115,16 @@ export const VoiceCallInterface = ({
 
   // Initialize call duration timer
   useEffect(() => {
+    const plan = (user as any)?.user_metadata?.plan || 'free';
+    setCurrentPlan(plan);
+    if (!canMakeVoiceCall) {
+      toast({ title: 'Upgrade required', description: `Your plan (${currentPlan}) has reached voice call limits.`, variant: 'destructive' });
+    }
     const timer = setInterval(() => {
       setCallDuration(prev => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [user, canMakeVoiceCall, currentPlan, setCurrentPlan, toast]);
 
   // Initialize advanced speech recognition with real-time features
   useEffect(() => {
@@ -163,6 +174,10 @@ export const VoiceCallInterface = ({
         };
 
         recognition.onresult = (event: any) => {
+          if (pushToTalk && !isPTTHeld) {
+            // Ignore interim/final results if PTT not held
+            return;
+          }
           let interimTranscript = '';
           let finalTranscript = '';
 
@@ -204,7 +219,7 @@ export const VoiceCallInterface = ({
           setIsListening(false);
           
           // Only auto-restart if call is active, AI isn't speaking, and user isn't muted
-          if (callConnected && !isAiSpeaking && !isMuted && !isProcessing) {
+          if (callConnected && !isAiSpeaking && !isMuted && !isProcessing && (!pushToTalk || isPTTHeld)) {
             setTimeout(() => {
               if (recognitionRef.current && callConnected && !isAiSpeaking && !isMuted) {
                 try {
@@ -534,6 +549,7 @@ export const VoiceCallInterface = ({
     setTimeout(() => {
       onEndCall();
     }, 1200);
+    try { incrementVoiceCalls(); } catch {}
   };
 
   const formatDuration = (seconds: number) => {
@@ -671,6 +687,30 @@ export const VoiceCallInterface = ({
       {/* Call Controls */}
       <div className="p-6 bg-background/50 backdrop-blur border-t">
         <div className="flex items-center justify-center gap-6">
+          {/* Push-to-Talk Toggle */}
+          <Button
+            variant={pushToTalk ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPushToTalk(!pushToTalk)}
+            className="h-8 px-3 rounded-full"
+          >
+            {pushToTalk ? 'PTT: On' : 'PTT: Off'}
+          </Button>
+
+          {/* Hold-to-speak button (visible when PTT on) */}
+          {pushToTalk && (
+            <Button
+              variant={isPTTHeld ? "default" : "outline"}
+              size="lg"
+              onMouseDown={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
+              onMouseUp={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
+              onTouchStart={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
+              onTouchEnd={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
+              className="h-14 px-6 rounded-full"
+            >
+              Hold to Speak
+            </Button>
+          )}
           {/* Mute Button */}
           <Button
             variant={isMuted ? "destructive" : "outline"}

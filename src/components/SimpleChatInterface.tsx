@@ -23,6 +23,7 @@ import {
   MoreHorizontal
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { personalityAI, type ChatMessage, type ChatContext } from "@/lib/ai-chat";
 import { voiceCallManager } from "@/lib/voice-call";
 import { EmojiPicker } from "@/components/EmojiPicker";
@@ -85,6 +86,13 @@ export const SimpleChatInterface = ({
   }
 }: SimpleChatInterfaceProps) => {
   const { user } = useAuth();
+  const {
+    currentPlan,
+    setCurrentPlan,
+    incrementMessages,
+    canSendMessage,
+    remainingMessages
+  } = useUsageTracking();
   // Generate initial message based on character personality
   const getInitialMessage = () => {
     const name = userPreferences.preferredName;
@@ -124,10 +132,17 @@ export const SimpleChatInterface = ({
   const [showGames, setShowGames] = useState(false);
   const [likedMessageIds, setLikedMessageIds] = useState<Set<string>>(new Set());
   const [burstIds, setBurstIds] = useState<Set<string>>(new Set());
+  const [likedOnly, setLikedOnly] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Initialize plan from user metadata
+  useEffect(() => {
+    const plan = (user as any)?.user_metadata?.plan || 'free';
+    setCurrentPlan(plan);
+  }, [user, setCurrentPlan]);
 
   // Environment check for debugging
   useEffect(() => {
@@ -203,6 +218,16 @@ export const SimpleChatInterface = ({
     const currentInput = messageContent || inputValue.trim();
     if (!currentInput || isAiTyping) return;
 
+    // Enforce per-plan message limit
+    if (!canSendMessage) {
+      toast({
+        title: "Daily message limit reached",
+        description: `Your plan (${currentPlan}) limit has been reached${remainingMessages === 0 ? '' : ''}. Upgrade for more messages.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -212,6 +237,7 @@ export const SimpleChatInterface = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
+    incrementMessages();
     // Persist user message
     persistMessage(userMessage);
     setInputValue("");
@@ -429,7 +455,7 @@ export const SimpleChatInterface = ({
       {/* Messages Area */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
+          {(likedOnly ? messages.filter(m => likedMessageIds.has(m.id)) : messages).map((message) => (
             <div
               key={message.id}
               className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
@@ -510,7 +536,15 @@ export const SimpleChatInterface = ({
       {/* Quick Replies */}
       {showQuickReplies && !isAiTyping && (
         <div className="px-4 py-2">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide items-center">
+            <Button
+              variant={likedOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setLikedOnly(!likedOnly)}
+              className="flex-shrink-0 text-xs"
+            >
+              {likedOnly ? 'Showing Liked' : 'Liked Only'}
+            </Button>
             {quickReplies.map((reply, index) => (
               <Button
                 key={index}
