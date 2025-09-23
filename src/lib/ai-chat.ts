@@ -251,6 +251,13 @@ export class PersonalityAI {
     try {
       console.log('🔍 Checking API availability at:', this.apiEndpoint);
       
+      // In production, always assume API is available since keys are configured
+      if (import.meta.env.PROD) {
+        console.log('🚀 Production mode: Assuming API is available');
+        return true;
+      }
+      
+      // In development, do a proper check
       const response = await fetch(this.apiEndpoint, {
         method: 'HEAD',
         signal: AbortSignal.timeout(5000) // 5 second timeout
@@ -264,6 +271,13 @@ export class PersonalityAI {
       return available;
     } catch (error) {
       console.error('❌ API availability check failed:', error);
+      
+      // In production with environment variables set, still try API call
+      if (import.meta.env.PROD) {
+        console.log('🔄 Production mode: Will attempt API call despite check failure');
+        return true;
+      }
+      
       return false;
     }
   }
