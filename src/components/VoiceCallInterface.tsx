@@ -276,6 +276,17 @@ export const VoiceCallInterface = ({
       // Detect if user is speaking (threshold can be adjusted)
       const isCurrentlySpeaking = normalizedLevel > 0.12;
       setIsSpeaking(isCurrentlySpeaking);
+
+      // Barge-in: if user starts speaking while AI is speaking, stop TTS immediately
+      if (isCurrentlySpeaking && isAiSpeaking) {
+        try {
+          speechSynthesis.cancel();
+        } catch {}
+        setIsAiSpeaking(false);
+        // Ensure recognition is ready to capture user's words
+        try { recognitionRef.current?.stop(); } catch {}
+        try { recognitionRef.current?.start(); } catch {}
+      }
       
       // Reset silence timer if user is speaking
       if (isCurrentlySpeaking) {
