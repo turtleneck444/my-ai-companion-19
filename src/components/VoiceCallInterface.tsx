@@ -496,6 +496,7 @@ export const VoiceCallInterface = ({
       
     } catch (error) {
       console.error('Failed to generate AI response:', error);
+      toast({ title: 'Voice error', description: 'Voice service was unavailable. Please retry in a moment.', variant: 'destructive' });
       
       // Fallback response
       const fallbackResponses = [
