@@ -24,7 +24,7 @@ interface Character {
   avatar: string;
   bio: string;
   personality: string[];
-  voice: string;
+  voice: { voice_id: string; name: string };
   isOnline: boolean;
   voiceId?: string;
 }
@@ -47,6 +47,8 @@ export const VoiceCallInterface = ({
   onMinimize, 
   userPreferences 
 }: VoiceCallInterfaceProps) => {
+  // Helper: resolve selected ElevenLabs voice id
+  const getVoiceId = () => character.voiceId || character.voice?.voice_id;
   // Call state
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -68,12 +70,28 @@ export const VoiceCallInterface = ({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const unlockedRef = useRef(false);
   
   // Voice activity detection
   const [voiceLevel, setVoiceLevel] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   
   const { toast } = useToast();
+
+  // Utility: unlock/resume audio on first user gesture (required by mobile browsers)
+  const unlockAudio = async () => {
+    try {
+      if (audioContextRef.current && audioContextRef.current.state !== 'running') {
+        await audioContextRef.current.resume();
+      }
+      if (!unlockedRef.current) {
+        const a = new Audio();
+        a.src = "data:audio/mp3;base64,//uQxAAAA"; // tiny silence
+        await a.play().catch(() => {});
+        unlockedRef.current = true;
+      }
+    } catch {}
+  };
 
   // Initialize call duration timer
   useEffect(() => {
@@ -157,17 +175,13 @@ export const VoiceCallInterface = ({
 
         recognition.onerror = (event: any) => {
           console.error('🚫 Speech recognition error:', event.error);
-          if (event.error === 'no-speech') {
-            // Restart recognition after a brief pause
+          if (event.error === 'no-speech' || event.error === 'aborted') {
+            // Attempt gentle restart
             setTimeout(() => {
-              if (recognitionRef.current && !isAiSpeaking) {
-                try {
-                  recognitionRef.current.start();
-                } catch (e) {
-                  console.log('Recognition already active');
-                }
+              if (recognitionRef.current && !isAiSpeaking && callConnected && !isMuted) {
+                try { recognitionRef.current.start(); } catch {}
               }
-            }, 1000);
+            }, 1200);
           }
         };
 
@@ -182,11 +196,9 @@ export const VoiceCallInterface = ({
                 try {
                   recognitionRef.current.start();
                   console.log('🎤 Auto-restarted speech recognition');
-                } catch (e) {
-                  console.log('Could not restart recognition - likely already active');
-                }
+                } catch {}
               }
-            }, 1500); // Increased delay to give AI more time to finish speaking
+            }, 1500);
           }
         };
 
@@ -194,6 +206,11 @@ export const VoiceCallInterface = ({
         
         // Start the call with AI greeting
         await startCallWithGreeting();
+        
+        // Set global user gesture listeners to resume audio
+        const gesture = async () => { await unlockAudio(); };
+        document.addEventListener('click', gesture, { once: true, passive: true });
+        document.addEventListener('touchstart', gesture, { once: true, passive: true });
         
       } catch (error) {
         console.error('Failed to initialize voice call:', error);
@@ -210,10 +227,10 @@ export const VoiceCallInterface = ({
     return () => {
       // Cleanup
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try { recognitionRef.current.stop(); } catch {}
       }
       if (audioContextRef.current) {
-        audioContextRef.current.close();
+        try { audioContextRef.current.close(); } catch {}
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -272,6 +289,7 @@ export const VoiceCallInterface = ({
   // Start call with personalized AI greeting
   const startCallWithGreeting = async () => {
     setIsAiSpeaking(true);
+    await unlockAudio();
     
     const hour = new Date().getHours();
     const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
@@ -297,7 +315,10 @@ export const VoiceCallInterface = ({
     setConversationHistory([aiMessage]);
     
     try {
-      await speakText(greeting, character.voiceId);
+      await speakText(greeting, getVoiceId(), {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
+      });
       console.log('🤖 AI greeting spoken');
     } catch (error) {
       console.error('Failed to speak greeting:', error);
@@ -310,9 +331,7 @@ export const VoiceCallInterface = ({
       setTimeout(() => {
         try {
           recognitionRef.current.start();
-        } catch (e) {
-          console.log('Recognition already active');
-        }
+        } catch {}
       }, 1000);
     }
   };
@@ -365,6 +384,7 @@ export const VoiceCallInterface = ({
   // Generate AI response using personality system
   const generateAIResponse = async (userInput: string, isContextual: boolean = false) => {
     setIsAiSpeaking(true);
+    await unlockAudio();
     
     try {
       const hour = new Date().getHours();
@@ -394,8 +414,11 @@ export const VoiceCallInterface = ({
       
       setConversationHistory(prev => [...prev, aiMessage]);
       
-      // Speak the response
-      await speakText(aiResponse, character.voiceId);
+      // Speak the response (natural settings)
+      await speakText(aiResponse, getVoiceId(), {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
+      });
       console.log('🗣️ AI response spoken:', aiResponse.slice(0, 50) + '...');
       
       // Increase relationship level with each interaction
@@ -412,7 +435,10 @@ export const VoiceCallInterface = ({
       ];
       
       const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-      await speakText(fallback, character.voiceId);
+      await speakText(fallback, getVoiceId(), {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
+      });
     }
     
     setIsAiSpeaking(false);
@@ -423,30 +449,25 @@ export const VoiceCallInterface = ({
         try {
           recognitionRef.current.start();
           console.log('🎤 Resumed listening after AI response');
-        } catch (e) {
-          console.log('Could not restart recognition - may already be active');
-        }
+        } catch {}
       }
-    }, 2000); // Longer delay to allow AI speech to complete and user to process
+    }, 1200);
   };
 
   // Toggle microphone
   const toggleMicrophone = () => {
     setIsMuted(!isMuted);
+    unlockAudio();
     
     if (!isMuted) {
       // Mute: stop recognition
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try { recognitionRef.current.stop(); } catch {}
       }
     } else {
       // Unmute: restart recognition
       if (recognitionRef.current && !isAiSpeaking) {
-        try {
-          recognitionRef.current.start();
-        } catch (e) {
-          console.log('Recognition already active');
-        }
+        try { recognitionRef.current.start(); } catch {}
       }
     }
   };
@@ -465,19 +486,22 @@ export const VoiceCallInterface = ({
     const goodbye = goodbyes[Math.floor(Math.random() * goodbyes.length)];
     
     try {
-      await speakText(goodbye, character.voiceId);
+      await speakText(goodbye, getVoiceId(), {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
+      });
     } catch (error) {
       console.error('Failed to speak goodbye:', error);
     }
     
     // Cleanup and end call
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try { recognitionRef.current.stop(); } catch {}
     }
     
     setTimeout(() => {
       onEndCall();
-    }, 2000);
+    }, 1200);
   };
 
   const formatDuration = (seconds: number) => {
@@ -487,7 +511,7 @@ export const VoiceCallInterface = ({
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-primary/20 via-background to-accent/10 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-primary/20 via-background to-accent/10 flex flex-col" onClick={unlockAudio} onTouchStart={unlockAudio}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-background/50 backdrop-blur border-b">
         <div className="flex items-center gap-3">
@@ -622,7 +646,7 @@ export const VoiceCallInterface = ({
           <Button
             variant={isSpeakerOn ? "default" : "outline"}
             size="lg"
-            onClick={() => setIsSpeakerOn(!isSpeakerOn)}
+            onClick={() => { setIsSpeakerOn(!isSpeakerOn); unlockAudio(); }}
             className="h-14 w-14 rounded-full"
           >
             {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
