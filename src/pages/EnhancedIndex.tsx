@@ -130,7 +130,10 @@ const EnhancedIndex = () => {
     preferredMood: 'happy',
     streakDays: 15
   });
-  const [currentGreeting, setCurrentGreeting] = useState({ main: '', sub: '' });
+  const [currentGreeting, setCurrentGreeting] = useState({ 
+    main: "Welcome! 🌟", 
+    sub: "Ready for some quality time together?" 
+  });
   const [isGeneratingGreeting, setIsGeneratingGreeting] = useState(false);
   
   const [userPreferences, setUserPreferences] = useState({
@@ -243,11 +246,6 @@ const EnhancedIndex = () => {
     setIsGeneratingGreeting(false);
   }, [timeOfDay]); // Only depend on timeOfDay
   */
-
-  // Set a simple default greeting
-  if (currentGreeting.main === '') {
-    setCurrentGreeting({ main: "Welcome! 🌟", sub: "Ready for some quality time together?" });
-  }
 
   const handleRefreshGreeting = () => {
     // Simple refresh without any state dependencies
