@@ -142,23 +142,40 @@ const EnhancedIndex = () => {
     }
   }, []);
 
-  // Load user activity from localStorage
+  // Load user activity from localStorage (only once on mount)
   useEffect(() => {
     const savedActivity = localStorage.getItem('userActivity');
     if (savedActivity) {
       const parsed = JSON.parse(savedActivity);
+      // Only increment visit count if it's been more than 5 minutes since last visit
+      const lastVisit = new Date(parsed.lastVisit || 0);
+      const now = new Date();
+      const timeDiff = now.getTime() - lastVisit.getTime();
+      const shouldIncrementVisit = timeDiff > 5 * 60 * 1000; // 5 minutes
+      
       setUserActivity({
         ...parsed,
-        lastVisit: new Date(parsed.lastVisit),
-        visitCount: parsed.visitCount + 1
+        lastVisit: now,
+        visitCount: shouldIncrementVisit ? (parsed.visitCount || 0) + 1 : (parsed.visitCount || 0)
+      });
+    } else {
+      // First time user
+      setUserActivity({
+        ...userActivity,
+        visitCount: 1,
+        lastVisit: new Date()
       });
     }
-  }, []);
+  }, []); // Empty dependency array - only run once
 
-  // Save user activity to localStorage (only when specific fields change)
+  // Save user activity to localStorage (debounced to prevent excessive updates)
   useEffect(() => {
-    localStorage.setItem('userActivity', JSON.stringify(userActivity));
-  }, [userActivity.visitCount, userActivity.streakDays, userActivity.totalChatTime]);
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem('userActivity', JSON.stringify(userActivity));
+    }, 1000); // Debounce by 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [userActivity]);
 
   // Generate smart greeting (only on mount and time change, not on every userActivity change)
   useEffect(() => {
