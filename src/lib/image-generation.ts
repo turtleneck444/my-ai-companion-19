@@ -203,11 +203,11 @@ export function validateImagePrompt(prompt: string): { isValid: boolean; message
 // Example prompts for inspiration
 export const examplePrompts = [
   "A confident woman with long brown hair and warm brown eyes, wearing a casual sweater",
-  "A friendly person with short blonde hair and blue eyes, smiling gently",
+  "A friendly woman with short blonde hair and blue eyes, smiling gently",
   "An artistic woman with curly red hair and green eyes, wearing glasses",
   "A professional woman with black hair in a ponytail and kind eyes",
-  "A creative person with purple highlights in their hair and expressive eyes",
+  "A creative woman with purple highlights in her hair and expressive eyes",
   "A gentle woman with wavy hair and a warm smile, wearing a cozy cardigan",
-  "An adventurous person with braided hair and bright, curious eyes",
+  "An adventurous woman with braided hair and bright, curious eyes",
   "A sophisticated woman with elegant features and intelligent eyes"
 ]; 
