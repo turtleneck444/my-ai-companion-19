@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,10 +27,21 @@ interface PaymentModalProps {
   onSuccess: (subscription: any) => void;
 }
 
+declare global {
+  interface Window {
+    Square?: any;
+  }
+}
+
 export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: PaymentModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
+  const paymentsRef = useRef<any>(null);
+  const cardRef = useRef<any>(null);
+
   const [paymentMethod, setPaymentMethod] = useState({
     cardNumber: '',
     expiryDate: '',
@@ -59,11 +70,37 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
     }
   };
 
-  const tokenizeCardLocally = () => {
-    // Placeholder: In production, use Square Web Payments SDK to get a secure sourceId (nonce)
-    // This mock keeps flow working until SDK UI is added.
-    return `mock_source_${Date.now()}`;
-  };
+  // Initialize Square Web Payments SDK Card
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setPaymentsError(null);
+        if (!window.Square) return; // loaded via index.html defer script
+        const applicationId = import.meta.env.VITE_PAYMENT_PUBLISHABLE_KEY;
+        const locationId = import.meta.env.VITE_SQUARE_LOCATION_ID;
+        if (!applicationId || !locationId) {
+          setPaymentsError('Missing Square Application ID or Location ID');
+          return;
+        }
+        paymentsRef.current = await window.Square.payments(applicationId, locationId);
+        cardRef.current = await paymentsRef.current.card();
+        await cardRef.current.attach('#sq-card');
+        setSdkReady(true);
+      } catch (e: any) {
+        setPaymentsError(e?.message || 'Failed to init Square');
+      }
+    };
+    if (isOpen) {
+      // Mount on open
+      setSdkReady(false);
+      setTimeout(init, 0);
+    }
+    return () => {
+      // best-effort cleanup
+      try { cardRef.current?.destroy?.(); } catch {}
+      cardRef.current = null;
+    };
+  }, [isOpen]);
 
   const handlePayment = async () => {
     if (!user) {
@@ -73,7 +110,6 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
 
     if (!isPaymentConfigured()) {
       toast({ title: 'Payments not configured', description: 'Provider keys missing. Using demo success.', variant: 'destructive' });
-      // Demo success path to avoid blocking UX
       onSuccess({ id: `demo_${Date.now()}`, status: 'active', planId: plan.id });
       onClose();
       return;
@@ -82,13 +118,18 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
     try {
       setIsLoading(true);
 
-      // 1) Create intent
+      // Tokenize card for real sourceId
+      if (!cardRef.current) throw new Error('Card is not ready');
+      const tokenResult = await cardRef.current.tokenize();
+      if (tokenResult.status !== 'OK') {
+        throw new Error(tokenResult?.errors?.[0]?.message || 'Card tokenization failed');
+      }
+      const sourceId = tokenResult.token;
+
+      // 1) Create intent (amount for plan)
       const intent = await paymentProcessor.createPaymentIntent(plan.id, user.id);
 
-      // 2) Get (mock) sourceId / nonce
-      const sourceId = tokenizeCardLocally();
-
-      // 3) Confirm payment
+      // 2) Confirm payment with sourceId
       const result = await paymentProcessor.confirmPayment({
         paymentIntentId: intent.id,
         sourceId,
@@ -112,15 +153,13 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5" />
             Complete Your Payment
           </DialogTitle>
-          <DialogDescription>
-            Secure payment processing powered by industry-leading providers
-          </DialogDescription>
+          <DialogDescription>Secure payment processing powered by Square</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -154,31 +193,23 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
             </CardContent>
           </Card>
 
-          {/* Payment Method */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Payment Information</h3>
-            {/* Note: Replace the following fields with Square Web Payments SDK UI for real card collection */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input id="cardNumber" placeholder="1234 5678 9012 3456" value={paymentMethod.cardNumber} onChange={(e) => handleInputChange('payment.cardNumber', e.target.value)} />
+          {/* Square Card Element */}
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Card Details</h3>
+            <div id="sq-card" className="border rounded-md p-3 bg-background" />
+            {!sdkReady && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Preparing secure card field...
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="expiryDate">Expiry Date</Label>
-                <Input id="expiryDate" placeholder="MM/YY" value={paymentMethod.expiryDate} onChange={(e) => handleInputChange('payment.expiryDate', e.target.value)} />
+            )}
+            {paymentsError && (
+              <div className="flex items-center gap-2 text-sm text-red-600">
+                <AlertCircle className="w-4 h-4" /> {paymentsError}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cvv">CVV</Label>
-                <Input id="cvv" placeholder="123" value={paymentMethod.cvv} onChange={(e) => handleInputChange('payment.cvv', e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Cardholder Name</Label>
-                <Input id="name" placeholder="John Doe" value={paymentMethod.name} onChange={(e) => handleInputChange('payment.name', e.target.value)} />
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Billing Address */}
+          {/* Billing Address (optional) */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Billing Address</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -234,7 +265,7 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <Button variant="outline" onClick={onClose} className="flex-1" disabled={isLoading}>Cancel</Button>
-            <Button onClick={handlePayment} disabled={isLoading} className="flex-1 bg-gradient-to-r from-primary to-primary-glow">
+            <Button onClick={handlePayment} disabled={isLoading || !sdkReady} className="flex-1 bg-gradient-to-r from-primary to-primary-glow">
               {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>) : (<><Lock className="w-4 h-4 mr-2" />Pay {formatPrice(plan.price)}</>)}
             </Button>
           </div>
