@@ -159,11 +159,17 @@ const EnhancedIndex = () => {
         visitCount: shouldIncrementVisit ? (parsed.visitCount || 0) + 1 : (parsed.visitCount || 0)
       });
     } else {
-      // First time user
+      // First time user - use default values instead of spreading current state
       setUserActivity({
-        ...userActivity,
         visitCount: 1,
-        lastVisit: new Date()
+        lastVisit: new Date(),
+        streakDays: 1,
+        totalChatTime: 0,
+        favoriteCharacters: [],
+        achievements: [],
+        xp: 0,
+        level: 1,
+        mostActiveCharacter: null
       });
     }
   }, []); // Empty dependency array - only run once
