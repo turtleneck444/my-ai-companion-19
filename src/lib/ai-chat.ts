@@ -107,6 +107,13 @@ export class PersonalityAI {
 
       console.log('🚀 Making OpenAI API call...');
 
+      // Grounding system message to tie response to user's last utterance
+      const groundingSystem = [
+        `GROUNDING: The user just said: "${message}"`,
+        messageAnalysis.topics?.length ? `Detected topics: ${messageAnalysis.topics.join(', ')}` : '',
+        `Instructions: In the first sentence, reference a concrete detail from the user's last utterance (paraphrase or quote a short fragment). Be specific and reactive. If the user asked a question, answer it directly before adding anything else. Keep responses to 1-2 sentences in ${context.character.name}'s voice.`
+      ].filter(Boolean).join('\n');
+
       // Call OpenAI API with enhanced personality context and memory
       const response = await fetch(this.apiEndpoint, {
         method: 'POST',
@@ -117,13 +124,14 @@ export class PersonalityAI {
           model: 'gpt-4', // Use GPT-4 for best personality responses
           messages: [
             { role: 'system', content: systemPrompt },
+            { role: 'system', content: groundingSystem },
             ...this.buildMessageHistory(context.conversationHistory, context.userPreferences.preferredName, context.character.name),
             { role: 'user', content: message }
           ],
-          max_tokens: 250, // Increased for more detailed responses
-          temperature: 0.9, // High creativity for personality
-          presence_penalty: 0.6, // Encourage new topics
-          frequency_penalty: 0.3, // Reduce repetition
+          max_tokens: 220,
+          temperature: 0.7,
+          presence_penalty: 0.5,
+          frequency_penalty: 0.4,
           top_p: 0.95,
           character: context.character.name,
           user_preferences: context.userPreferences,

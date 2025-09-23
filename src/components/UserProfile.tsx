@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { PaymentModal } from '@/components/PaymentModal';
 
 interface PlanDetails {
   name: string;
@@ -41,6 +42,8 @@ export const UserProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showPayment, setShowPayment] = useState(false);
+  const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
   
   // Profile data state
   const [profileData, setProfileData] = useState({
@@ -52,7 +55,14 @@ export const UserProfile = () => {
     location: '',
     interests: '',
     relationship_status: 'single',
-    pronouns: 'they/them'
+    pronouns: 'they/them',
+    occupation: '',
+    languages: '',
+    love_language: 'quality_time',
+    favorite_music: '',
+    favorite_food: '',
+    favorite_shows: '',
+    work_schedule: ''
   });
 
   // Settings state
@@ -123,7 +133,14 @@ export const UserProfile = () => {
         location: user.user_metadata.location || '',
         interests: user.user_metadata.interests || '',
         relationship_status: user.user_metadata.relationship_status || 'single',
-        pronouns: user.user_metadata.pronouns || 'they/them'
+        pronouns: user.user_metadata.pronouns || 'they/them',
+        occupation: user.user_metadata.occupation || '',
+        languages: user.user_metadata.languages || '',
+        love_language: user.user_metadata.love_language || 'quality_time',
+        favorite_music: user.user_metadata.favorite_music || '',
+        favorite_food: user.user_metadata.favorite_food || '',
+        favorite_shows: user.user_metadata.favorite_shows || '',
+        work_schedule: user.user_metadata.work_schedule || ''
       });
     }
   }, [user]);
@@ -158,7 +175,14 @@ export const UserProfile = () => {
         location: profileData.location,
         interests: profileData.interests,
         relationship_status: profileData.relationship_status,
-        pronouns: profileData.pronouns
+        pronouns: profileData.pronouns,
+        occupation: profileData.occupation,
+        languages: profileData.languages,
+        love_language: profileData.love_language,
+        favorite_music: profileData.favorite_music,
+        favorite_food: profileData.favorite_food,
+        favorite_shows: profileData.favorite_shows,
+        work_schedule: profileData.work_schedule
       });
       
       if (error) {
@@ -206,10 +230,8 @@ export const UserProfile = () => {
   };
 
   const handleUpgradePlan = () => {
-    toast({
-      title: "Upgrade coming soon! 🚀",
-      description: "Premium plans will be available after launch week.",
-    });
+    setUpgradePlan('premium');
+    setShowPayment(true);
   };
 
   const getTreatmentStyleEmoji = (style: string) => {
@@ -651,16 +673,43 @@ export const UserProfile = () => {
                 <Input value={user?.email || ''} disabled />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Location</Label>
-                <Input value={profileData.location} onChange={(e) => handleInputChange('location', e.target.value)} placeholder="City, Country" />
+                <Label className="text-xs text-muted-foreground">Occupation</Label>
+                <Input value={profileData.occupation} onChange={(e) => handleInputChange('occupation', e.target.value)} placeholder="What do you do?" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Interests</Label>
-                <Input value={profileData.interests} onChange={(e) => handleInputChange('interests', e.target.value)} placeholder="e.g. Music, Design, Travel" />
+                <Label className="text-xs text-muted-foreground">Languages</Label>
+                <Input value={profileData.languages} onChange={(e) => handleInputChange('languages', e.target.value)} placeholder="e.g. English, Spanish" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Love Language</Label>
+                <Select value={profileData.love_language} onValueChange={(v) => handleInputChange('love_language', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="words_of_affirmation">Words of Affirmation</SelectItem>
+                    <SelectItem value="quality_time">Quality Time</SelectItem>
+                    <SelectItem value="acts_of_service">Acts of Service</SelectItem>
+                    <SelectItem value="gifts">Gifts</SelectItem>
+                    <SelectItem value="physical_touch">Physical Touch</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Favorite Music</Label>
+                <Input value={profileData.favorite_music} onChange={(e) => handleInputChange('favorite_music', e.target.value)} placeholder="Genres or artists you love" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Favorite Food</Label>
+                <Input value={profileData.favorite_food} onChange={(e) => handleInputChange('favorite_food', e.target.value)} placeholder="Dishes or cuisines" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Favorite Shows</Label>
+                <Input value={profileData.favorite_shows} onChange={(e) => handleInputChange('favorite_shows', e.target.value)} placeholder="Series or movies" />
               </div>
               <div className="md:col-span-2">
-                <Label className="text-xs text-muted-foreground">Bio</Label>
-                <Textarea value={profileData.bio} onChange={(e) => handleInputChange('bio', e.target.value)} placeholder="A short bio about you" />
+                <Label className="text-xs text-muted-foreground">Work Schedule</Label>
+                <Input value={profileData.work_schedule} onChange={(e) => handleInputChange('work_schedule', e.target.value)} placeholder="e.g., Mon–Fri 9–5, night shifts, flexible" />
               </div>
               <div className="md:col-span-2 flex gap-2 justify-end">
                 <Button variant="outline" onClick={handleSaveProfile} disabled={isLoading}>{isLoading ? 'Saving…' : 'Save Changes'}</Button>
@@ -1114,6 +1163,19 @@ export const UserProfile = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {upgradePlan && (
+        <PaymentModal
+          isOpen={showPayment}
+          onClose={() => { setShowPayment(false); setUpgradePlan(null); }}
+          selectedPlan={upgradePlan}
+          onSuccess={() => {
+            setShowPayment(false);
+            setUpgradePlan(null);
+            toast({ title: 'Upgraded!', description: 'Your plan has been updated.' });
+          }}
+        />
+      )}
     </div>
   );
 };

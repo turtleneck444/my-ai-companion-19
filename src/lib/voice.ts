@@ -80,12 +80,16 @@ async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<voi
 
     // Map voice IDs to preferred voice characteristics
     const voicePreferences: Record<string, string[]> = {
-      'sarah': ['samantha', 'karen', 'female'],
-      'emma': ['emily', 'kate', 'british'],
-      'lily': ['samantha', 'allison', 'young'],
-      'sophia': ['alex', 'victoria', 'elegant'],
-      'aria': ['samantha', 'zoe', 'sultry'],
-      'maya': ['alex', 'samantha', 'confident']
+      // ElevenLabs IDs we use → browser TTS preferences (case-insensitive contains)
+      '21m00Tcm4TlvDq8ikWAM': ['samantha', 'female', 'karen'], // Rachel
+      'AZnzlk1XvdvUeBnXmlld': ['allison', 'female', 'samantha'], // Bella
+      'EXAVITQu4vr4xnSDxMaL': ['karen', 'female', 'samantha'], // Sarah
+      'TxGEqnHWrfWFTfGW9XjX': ['kate', 'emily', 'female'], // Emily (en-GB)
+      'ErXwobaYiN019PkySvjV': ['zoe', 'samantha', 'female'], // Elli
+      'pNInz6obpgDQGcFmaJgB': ['victoria', 'kate', 'female'], // Olivia (elegant)
+      'MF3mGyEYCl7XYWbV9V6O': ['allison', 'samantha', 'female'], // Cora (bright)
+      'onwK4e9ZLuTAKqWW03F9': ['samantha', 'allison', 'female'], // Domi (sultry)
+      'ZQe5CZNOzWyzPSCn5a3a': ['monica', 'isabella', 'es'], // Ana (Spanish)
     };
 
     // Wait for voices to load

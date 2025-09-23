@@ -248,8 +248,8 @@ const Create = () => {
       });
 
       // Navigate to success page with character data
-      navigate('/success', { 
-        state: { character: characterForSuccess } 
+      navigate('/app', { 
+        state: { startChatWith: characterForSuccess } 
       });
     } catch (e: any) {
       toast({ title: "Error", description: String(e?.message || e) });
@@ -729,7 +729,7 @@ const Create = () => {
           ) : (
             <Button 
               onClick={save} 
-              disabled={saving || !character.name || !character.voice}
+              disabled={saving || !character.name}
               className="flex items-center gap-2"
             >
               {saving ? (

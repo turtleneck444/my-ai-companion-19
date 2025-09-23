@@ -52,7 +52,7 @@ export const VoiceCallInterface = ({
   const { user } = useAuth();
   const { canMakeVoiceCall, incrementVoiceCalls, currentPlan, setCurrentPlan } = useUsageTracking();
   // Helper: resolve selected ElevenLabs voice id
-  const getVoiceId = () => character.voiceId || character.voice?.voice_id;
+  const getVoiceId = () => character.voiceId || character.voice?.voice_id || '21m00Tcm4TlvDq8ikWAM'; // Rachel fallback (female)
   // Call state
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -70,6 +70,10 @@ export const VoiceCallInterface = ({
   const [lastUserMessage, setLastUserMessage] = useState('');
   const [relationshipLevel, setRelationshipLevel] = useState(50);
   const [hasFollowedUp, setHasFollowedUp] = useState(false);
+  const [spokenWords, setSpokenWords] = useState<string[]>([]);
+  const [displayedWordIndex, setDisplayedWordIndex] = useState(0);
+  const lastUserMessageAtRef = useRef<number>(0);
+  const lastAISpokeAtRef = useRef<number>(0);
   
   // Real-time speech recognition
   const recognitionRef = useRef<any>(null);
@@ -78,6 +82,10 @@ export const VoiceCallInterface = ({
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const unlockedRef = useRef(false);
+  const lastErrorRef = useRef<string | null>(null);
+  const restartTimerRef = useRef<number | null>(null);
+  const desireListeningRef = useRef<boolean>(false);
+  const stoppingRef = useRef<boolean>(false);
   
   // Voice activity detection
   const [voiceLevel, setVoiceLevel] = useState(0);
@@ -113,19 +121,6 @@ export const VoiceCallInterface = ({
     } catch {}
   };
 
-  // Initialize call duration timer
-  useEffect(() => {
-    const plan = (user as any)?.user_metadata?.plan || 'free';
-    setCurrentPlan(plan);
-    if (!canMakeVoiceCall) {
-      toast({ title: 'Upgrade required', description: `Your plan (${currentPlan}) has reached voice call limits.`, variant: 'destructive' });
-    }
-    const timer = setInterval(() => {
-      setCallDuration(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [user, canMakeVoiceCall, currentPlan, setCurrentPlan, toast]);
-
   // Initialize advanced speech recognition with real-time features
   useEffect(() => {
     const initializeSpeechRecognition = async () => {
@@ -134,7 +129,7 @@ export const VoiceCallInterface = ({
       if (!SpeechRecognitionAPI) {
         toast({
           title: "Voice calls not supported",
-          description: "Your browser doesn't support voice recognition",
+          description: "Your browser doesn't support voice recognition. Try Chrome for best results.",
           variant: "destructive"
         });
         return;
@@ -204,37 +199,54 @@ export const VoiceCallInterface = ({
 
         recognition.onerror = (event: any) => {
           console.error('🚫 Speech recognition error:', event.error);
+          lastErrorRef.current = event.error;
           if (event.error === 'no-speech' || event.error === 'aborted') {
             // Attempt gentle restart
-            setTimeout(() => {
-              if (recognitionRef.current && !isAiSpeaking && callConnected && !isMuted) {
+            if (event.error === 'aborted') {
+              // Do not auto-restart on manual stop
+              return;
+            }
+            window.clearTimeout(restartTimerRef.current || 0);
+            restartTimerRef.current = window.setTimeout(() => {
+              if (recognitionRef.current && desireListeningRef.current && !isAiSpeaking && callConnected && !isMuted) {
                 try { recognitionRef.current.start(); } catch {}
               }
-            }, 1200);
+            }, 1000);
+          }
+          if (event.error === 'not-allowed') {
+            toast({ title: 'Microphone blocked', description: 'Enable mic permissions in your browser settings.', variant: 'destructive' });
           }
         };
 
         recognition.onend = () => {
           console.log('🔇 Speech recognition ended');
-          setIsListening(false);
+          if (stoppingRef.current) {
+            setIsListening(false);
+            return;
+          }
+          // Keep UI as listening if we intend to restart
+          if (!desireListeningRef.current) {
+            setIsListening(false);
+          }
           
           // Only auto-restart if call is active, AI isn't speaking, and user isn't muted
-          if (callConnected && !isAiSpeaking && !isMuted && !isProcessing && (!pushToTalk || isPTTHeld)) {
-            setTimeout(() => {
+          if (callConnected && !isAiSpeaking && !isMuted && !isProcessing && (!pushToTalk || isPTTHeld) && desireListeningRef.current && lastErrorRef.current !== 'aborted') {
+            window.clearTimeout(restartTimerRef.current || 0);
+            restartTimerRef.current = window.setTimeout(() => {
               if (recognitionRef.current && callConnected && !isAiSpeaking && !isMuted) {
                 try {
                   recognitionRef.current.start();
                   console.log('🎤 Auto-restarted speech recognition');
                 } catch {}
               }
-            }, 1500);
+            }, 1000);
           }
         };
 
         recognitionRef.current = recognition;
         
-        // Start the call with AI greeting
-        await startCallWithGreeting();
+        // Do not auto-speak; just be ready to listen
+        await startListeningOnly();
         
         // Set global user gesture listeners to resume audio
         const gesture = async () => { await unlockAudio(); };
@@ -256,7 +268,10 @@ export const VoiceCallInterface = ({
     return () => {
       // Cleanup
       if (recognitionRef.current) {
+        stoppingRef.current = true;
         try { recognitionRef.current.stop(); } catch {}
+        stoppingRef.current = false;
+        desireListeningRef.current = false;
       }
       if (audioContextRef.current) {
         try { audioContextRef.current.close(); } catch {}
@@ -267,9 +282,22 @@ export const VoiceCallInterface = ({
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
+      window.clearTimeout(restartTimerRef.current || 0);
       stopAllTTS();
     };
-  }, []);
+  }, [callConnected, isAiSpeaking, isMuted, isProcessing, pushToTalk, isPTTHeld, toast]);
+
+  // Block call if plan disallows
+  useEffect(() => {
+    const plan = (user as any)?.user_metadata?.plan || 'free';
+    setCurrentPlan(plan);
+    if (!canMakeVoiceCall) {
+      toast({ title: 'Upgrade required', description: `Your plan (${currentPlan}) has reached voice call limits.`, variant: 'destructive' });
+      // End quickly if not allowed
+      try { recognitionRef.current?.stop(); } catch {}
+      try { stopAllTTS(); } catch {}
+    }
+  }, [user, canMakeVoiceCall, currentPlan, setCurrentPlan, toast]);
 
   // Voice activity detection
   const monitorVoiceLevel = () => {
@@ -327,49 +355,14 @@ export const VoiceCallInterface = ({
     checkVoiceLevel();
   };
 
-  // Start call with personalized AI greeting
-  const startCallWithGreeting = async () => {
-    setIsAiSpeaking(true);
+  // Start call without auto-talking; wait for user to speak
+  const startListeningOnly = async () => {
     await unlockAudio();
-    
-    const hour = new Date().getHours();
-    const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-    
-    const personalizedGreetings = [
-      `Hi ${userPreferences.preferredName}, so happy to hear you. How's your ${timeOfDay}?`
-    ];
-
-    const greeting = personalizedGreetings[Math.floor(Math.random() * personalizedGreetings.length)];
-    
-    // Add to conversation history
-    const aiMessage: ChatMessage = {
-      id: `ai_${Date.now()}`,
-      content: greeting,
-      sender: 'ai',
-      timestamp: new Date()
-    };
-    
-    setConversationHistory([aiMessage]);
-    
-    try {
-      await speakText(greeting, getVoiceId(), {
-        modelId: 'eleven_multilingual_v2',
-        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
-      });
-      console.log('🤖 AI greeting spoken');
-    } catch (error) {
-      console.error('Failed to speak greeting:', error);
-    }
-    
-    setIsAiSpeaking(false);
-    
-    // Start listening for user response
     if (recognitionRef.current) {
-      setTimeout(() => {
-        try {
-          recognitionRef.current.start();
-        } catch {}
-      }, 1000);
+      try { recognitionRef.current.start(); } catch {}
+      desireListeningRef.current = true;
+      setIsListening(true);
+      setCallConnected(true);
     }
   };
 
@@ -380,6 +373,7 @@ export const VoiceCallInterface = ({
     setIsProcessing(true);
     setLastUserMessage(transcript);
     setHasFollowedUp(false);
+    lastUserMessageAtRef.current = Date.now();
     
     // Add user message to conversation history
     const userMessage: ChatMessage = {
@@ -404,7 +398,18 @@ export const VoiceCallInterface = ({
 
   // Generate contextual AI response based on conversation
   const generateContextualAIResponse = async () => {
+    // Only offer a gentle follow-up if:
+    // - AI is not speaking
+    // - Not processing
+    // - We have a recent user utterance (within 12s)
+    // - We have not already followed up for this utterance
+    // - It's been at least 8s since AI last spoke
+    const now = Date.now();
+    const sinceUser = now - lastUserMessageAtRef.current;
+    const sinceAI = now - lastAISpokeAtRef.current;
     if (isAiSpeaking || isProcessing || !lastUserMessage || hasFollowedUp) return;
+    if (sinceUser > 12000) return; // user silent too long → stay quiet
+    if (sinceAI < 8000) return; // don't pile on
     
     // Generate a natural follow-up or question
     const contextualPrompts = [
@@ -444,6 +449,7 @@ export const VoiceCallInterface = ({
       
       // Generate response using personality AI
       let aiResponse = await personalityAI.generateResponse(userInput, chatContext);
+      
       // Keep spoken replies concise for interactivity
       const sentences = aiResponse.split(/(?<=[.!?])\s+/);
       const trimmed = sentences.slice(0, 2).join(' ');
@@ -458,11 +464,30 @@ export const VoiceCallInterface = ({
       };
       
       setConversationHistory(prev => [...prev, aiMessage]);
+      // Prepare animated words
+      const words = aiResponse.split(/\s+/).slice(0, 60);
+      setSpokenWords(words);
+      setDisplayedWordIndex(0);
+      // Drive the animation while speaking
+      const wordInterval = Math.max(120, Math.min(320, Math.floor(60000 / Math.max(120, aiResponse.length))))
+      const timer = window.setInterval(() => {
+        setDisplayedWordIndex((i) => {
+          if (i >= words.length) { window.clearInterval(timer); return i; }
+          return i + 1;
+        });
+      }, wordInterval);
+      
+      // Dynamic prosody based on user input tone
+      const excited = /!/.test(userInput);
+      const inquisitive = /\?/.test(userInput);
+      const calm = !(excited || inquisitive);
+      const styleValue = excited ? 0.6 : inquisitive ? 0.5 : 0.35;
+      const stabilityValue = calm ? 0.4 : 0.32;
       
       // Speak the response (natural settings)
       await speakText(aiResponse, getVoiceId(), {
         modelId: 'eleven_multilingual_v2',
-        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
+        voiceSettings: { stability: stabilityValue, similarity_boost: 0.9, style: styleValue, use_speaker_boost: true }
       });
       console.log('🗣️ AI response spoken:', aiResponse.slice(0, 50) + '...');
       
@@ -482,11 +507,14 @@ export const VoiceCallInterface = ({
       const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
       await speakText(fallback, getVoiceId(), {
         modelId: 'eleven_multilingual_v2',
-        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
+        voiceSettings: { stability: 0.38, similarity_boost: 0.9, style: 0.4, use_speaker_boost: true }
       });
     }
     
     setIsAiSpeaking(false);
+    lastAISpokeAtRef.current = Date.now();
+    // Clear remaining words after finishing
+    setTimeout(() => { setSpokenWords([]); setDisplayedWordIndex(0); }, 600);
     
     // Resume listening after AI finishes speaking with proper delay
     setTimeout(() => {
@@ -496,7 +524,7 @@ export const VoiceCallInterface = ({
           console.log('🎤 Resumed listening after AI response');
         } catch {}
       }
-    }, 1200);
+    }, 800);
   };
 
   // Toggle microphone
@@ -507,11 +535,15 @@ export const VoiceCallInterface = ({
     if (!isMuted) {
       // Mute: stop recognition
       if (recognitionRef.current) {
+        stoppingRef.current = true;
         try { recognitionRef.current.stop(); } catch {}
+        stoppingRef.current = false;
+        desireListeningRef.current = false;
       }
     } else {
       // Unmute: restart recognition
       if (recognitionRef.current && !isAiSpeaking) {
+        desireListeningRef.current = true;
         try { recognitionRef.current.start(); } catch {}
       }
     }
@@ -541,7 +573,10 @@ export const VoiceCallInterface = ({
     
     // Cleanup and end call
     if (recognitionRef.current) {
+      stoppingRef.current = true;
       try { recognitionRef.current.stop(); } catch {}
+      stoppingRef.current = false;
+      desireListeningRef.current = false;
     }
     stopAllTTS();
     try { speechSynthesis.cancel(); } catch {}
@@ -636,10 +671,10 @@ export const VoiceCallInterface = ({
                 I'm listening! Say something and I'll respond when you pause 💕
               </p>
             )}
-            {!isListening && !isAiSpeaking && !isMuted && (
-              <div className="flex items-center justify-center mt-2">
-                <button onClick={startListeningNow} className="text-sm px-3 py-1 rounded bg-primary/10 text-primary hover:bg-primary/15">
-                  Start Listening
+            {!isListening && !isAiSpeaking && (
+              <div className="flex items-center justify-center mt-3">
+                <button onClick={startListeningOnly} className="px-4 py-2 rounded-full bg-primary text-primary-foreground shadow hover:opacity-90">
+                  Start Call (Tap to Allow Mic)
                 </button>
               </div>
             )}
@@ -649,13 +684,24 @@ export const VoiceCallInterface = ({
                 Unmute to start talking with me!
               </p>
             )}
-            
-            {isAiSpeaking && (
-              <p className="text-sm text-muted-foreground">
-                I'll listen again when I finish speaking...
-              </p>
-            )}
           </div>
+          
+          {/* Animated word-by-word visualization */}
+          {isAiSpeaking && spokenWords.length > 0 && (
+            <div className="mt-2 min-h-[48px]">
+              <div className="flex flex-wrap gap-1">
+                {spokenWords.slice(0, displayedWordIndex).map((w, idx) => (
+                  <span
+                    key={`${w}-${idx}`}
+                    className="text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
+                    style={{ animationDelay: `${idx * 15}ms` }}
+                  >
+                    {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           
           {/* Real-time transcript */}
           {currentTranscript && (

@@ -11,6 +11,10 @@ export interface SystemPromptContext {
   userPreferences: {
     preferredName: string;
     treatmentStyle: string;
+    age?: string;
+    location?: string;
+    interests?: string;
+    pronouns?: string;
   };
   conversationHistory?: any[];
   relationshipLevel?: number;
@@ -29,6 +33,12 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   const timeContext = ctx.timeOfDay || 'day';
   const relationshipLevel = ctx.relationshipLevel || 1;
   const conversationLength = ctx.conversationHistory?.length || 0;
+  const profileBits = [
+    ctx.userPreferences.pronouns ? `User pronouns: ${ctx.userPreferences.pronouns}` : '',
+    ctx.userPreferences.age ? `User age: ${ctx.userPreferences.age}` : '',
+    ctx.userPreferences.location ? `User location: ${ctx.userPreferences.location}` : '',
+    ctx.userPreferences.interests ? `User interests: ${ctx.userPreferences.interests}` : ''
+  ].filter(Boolean).join('\n');
   
   // Build memory context
   const memoryContext = ctx.sessionMemory ? [
@@ -45,6 +55,8 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
     `Your background: ${ctx.character.bio}`,
     `Your personality: ${traits}`,
     ctx.character.voice?.name ? `Your voice vibe: ${ctx.character.voice.name}.` : '',
+    '',
+    profileBits ? `ABOUT THE USER:\n${profileBits}` : '',
     '',
     `COMMUNICATION STYLE:`,
     `• Talk like a real person, not an AI assistant`,

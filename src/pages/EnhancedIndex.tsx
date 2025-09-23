@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { useLocation } from "react-router-dom";
 
 // Import avatar images
 import lunaAvatar from "@/assets/avatar-luna.jpg";
@@ -159,6 +160,7 @@ const EnhancedIndex = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation() as any;
   const { currentPlan, setCurrentPlan, remainingMessages, remainingVoiceCalls } = useUsageTracking();
   
   // Core state - minimal and stable
@@ -194,6 +196,17 @@ const EnhancedIndex = () => {
     const plan = (user as any)?.user_metadata?.plan || 'free';
     setCurrentPlan(plan);
   }, [user, setCurrentPlan]);
+
+  // If navigated with a character to start chat with, open chat
+  useEffect(() => {
+    const starter = location?.state?.startChatWith;
+    if (starter) {
+      setSelectedCharacter(starter);
+      setCurrentView('chat');
+      // clear state so back nav doesn't retrigger
+      navigate('/app', { replace: true, state: {} });
+    }
+  }, [location?.state?.startChatWith, navigate]);
 
   // Plan handoff: if URL contains ?plan=, handle auto-upgrade or redirect to auth
   useEffect(() => {
@@ -459,90 +472,8 @@ const EnhancedIndex = () => {
 
       {/* Profile View */}
       {currentView === 'profile' && (
-        <div className="relative z-10 p-6 pt-16 pb-24">
-          <div className="max-w-md mx-auto">
-            <h1 className="text-2xl font-bold mb-6 text-white">Your Profile</h1>
-            
-            <div className="space-y-4">
-              {/* User Card */}
-              <Card className="bg-white/90 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <Avatar className="w-16 h-16">
-                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white text-xl">
-                        {user?.email?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h2 className="text-xl font-bold">{userName}</h2>
-                      <p className="text-muted-foreground text-sm">{user?.email}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="preferred-name" className="text-sm font-medium">
-                        Preferred Name
-                      </Label>
-                      <Input 
-                        id="preferred-name"
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value)}
-                        placeholder="How would you like to be addressed?"
-                        className="mt-1"
-                      />
-                    </div>
-                    
-                    <Button 
-                      onClick={() => {
-                        handleUpdatePreferences({ preferredName: userName });
-                      }}
-                      className="w-full"
-                    >
-                      Save Changes
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Stats Card */}
-              <Card className="bg-white/90 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">Your Activity</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-purple-600">3</p>
-                      <p className="text-xs text-muted-foreground">Companions</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-pink-600">{favorites.length}</p>
-                      <p className="text-xs text-muted-foreground">Favorites</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Sign Out */}
-              <Card className="bg-white/90 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <Button 
-                    variant="outline" 
-                    className="w-full text-red-600 border-red-200 hover:bg-red-50"
-                    onClick={() => {
-                      // Add sign out logic here if needed
-                      toast({
-                        title: "Sign out",
-                        description: "You have been signed out successfully.",
-                      });
-                    }}
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+        <div className="relative z-10 p-4 pt-16 pb-24">
+          <UserProfile />
         </div>
       )}
 
