@@ -155,15 +155,15 @@ const EnhancedIndex = () => {
     }
   }, []);
 
-  // Save user activity to localStorage
+  // Save user activity to localStorage (only when specific fields change)
   useEffect(() => {
     localStorage.setItem('userActivity', JSON.stringify(userActivity));
-  }, [userActivity]);
+  }, [userActivity.visitCount, userActivity.streakDays, userActivity.totalChatTime]);
 
-  // Generate smart greeting
+  // Generate smart greeting (only on mount and time change, not on every userActivity change)
   useEffect(() => {
     generateSmartGreeting();
-  }, [timeOfDay, userActivity, userPreferences]);
+  }, [timeOfDay]);
 
   const generateSmartGreeting = async () => {
     setIsGeneratingGreeting(true);
@@ -890,9 +890,10 @@ const EnhancedIndex = () => {
     );
   }
 
-  // Main enhanced home view
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
+  // Main enhanced home view - explicit condition
+  if (currentView === 'home') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       {/* Enhanced Hero Section */}
       <div 
         className="relative min-h-[40vh] bg-cover bg-center animate-fade-in"
@@ -1245,6 +1246,17 @@ const EnhancedIndex = () => {
             <p className="text-xs text-muted-foreground">Strong connections</p>
           </Card>
         </div>
+      </div>
+    </div>
+  );
+  }
+
+  // Fallback for any unhandled view states
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/10">
+      <div className="text-center">
+        <h2 className="text-xl font-semibold mb-2">Loading...</h2>
+        <p className="text-muted-foreground">Getting your experience ready</p>
       </div>
     </div>
   );

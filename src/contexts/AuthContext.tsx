@@ -74,18 +74,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Handle user state changes for demo mode as well
-  useEffect(() => {
-    if (user && !loading) {
-      // Check if we just signed in (not on page load)
-      const currentPath = window.location.pathname;
-      if (currentPath === '/auth' || currentPath === '/' || currentPath === '/home') {
-        console.log('✅ User authenticated, redirecting to /app');
-        window.location.href = '/app';
-      }
-    }
-  }, [user, loading]);
-
   const signUp = async (email: string, password: string, userData?: any) => {
     // Handle case when Supabase is not configured
     if (!isSupabaseConfigured || !supabase) {
