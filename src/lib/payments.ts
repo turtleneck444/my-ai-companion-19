@@ -4,8 +4,8 @@
 export interface PaymentConfig {
   provider: 'stripe' | 'square' | 'paypal' | 'razorpay';
   publishableKey: string;
-  secretKey: string;
-  webhookSecret: string;
+  // Secrets must NEVER be bundled client-side
+  // They are intentionally omitted from the client configuration
   environment: 'test' | 'live';
 }
 
@@ -36,12 +36,10 @@ export interface PaymentIntent {
   receiptUrl?: string;
 }
 
-// Payment provider configurations
+// Payment provider configurations (client-safe only)
 export const PAYMENT_CONFIG: PaymentConfig = {
   provider: (import.meta.env.VITE_PAYMENT_PROVIDER as any) || 'stripe',
   publishableKey: import.meta.env.VITE_PAYMENT_PUBLISHABLE_KEY || '',
-  secretKey: import.meta.env.VITE_PAYMENT_SECRET_KEY || '',
-  webhookSecret: import.meta.env.VITE_PAYMENT_WEBHOOK_SECRET || '',
   environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test'
 };
 
@@ -143,8 +141,7 @@ export class PaymentProcessor {
     const response = await fetch(`${API_BASE}/create-intent`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.secretKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         planId,
@@ -166,8 +163,7 @@ export class PaymentProcessor {
     const response = await fetch(`${API_BASE}/confirm`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.secretKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         paymentIntentId: params.paymentIntentId,
@@ -189,8 +185,7 @@ export class PaymentProcessor {
     const response = await fetch(`${API_BASE}/create-subscription`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.secretKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         planId,
@@ -211,8 +206,7 @@ export class PaymentProcessor {
     const response = await fetch(`${API_BASE}/cancel-subscription`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.secretKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         subscriptionId,
@@ -244,7 +238,8 @@ export const getPlanById = (planId: string): SubscriptionPlan | undefined => {
 };
 
 export const isPaymentConfigured = (): boolean => {
-  return !!(PAYMENT_CONFIG.publishableKey && PAYMENT_CONFIG.secretKey);
+  // Only publishable key is needed on the client
+  return !!(PAYMENT_CONFIG.publishableKey);
 };
 
 // Usage tracking utilities
