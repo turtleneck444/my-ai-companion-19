@@ -18,4 +18,6 @@
   # Use an LTS Node to avoid toolchain mismatches
   NODE_VERSION = "20"
   # Secrets scanner: omit non-sensitive, expected client-side keys
-  SECRETS_SCAN_OMIT_KEYS = "VITE_PAYMENT_PROVIDER,VITE_PAYMENT_ENVIRONMENT,SQUARE_ENVIRONMENT" 
+  SECRETS_SCAN_OMIT_KEYS = "VITE_PAYMENT_PROVIDER,VITE_PAYMENT_ENVIRONMENT,SQUARE_ENVIRONMENT,VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_PAYMENT_PUBLISHABLE_KEY"
+  # Uncomment to fully disable secrets scanning if your org policy allows it
+  # SECRETS_SCAN_ENABLED = "false" 
