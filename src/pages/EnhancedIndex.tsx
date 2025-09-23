@@ -162,152 +162,43 @@ const EnhancedIndex = () => {
 
   // Generate smart greeting (only on mount and time change, not on every userActivity change)
   useEffect(() => {
-    generateSmartGreeting();
-  }, [timeOfDay]);
-
-  const generateSmartGreeting = async () => {
-    setIsGeneratingGreeting(true);
-    
-    // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
+    // Simple greeting without complex async operations
     const hour = new Date().getHours();
-    const dayOfWeek = new Date().getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    let greeting;
     
-    // Smart greeting based on multiple factors
-    const greetings = generateContextualGreetings();
-    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+    if (hour < 12) {
+      greeting = {
+        main: `Good morning, ${userPreferences.preferredName}! ☀️`,
+        sub: "Ready to start your day together?"
+      };
+    } else if (hour < 17) {
+      greeting = {
+        main: `Good afternoon, ${userPreferences.preferredName}! 🌞`,
+        sub: "Hope you're having a wonderful day!"
+      };
+    } else {
+      greeting = {
+        main: `Good evening, ${userPreferences.preferredName}! 🌙`,
+        sub: "Perfect time to relax and chat!"
+      };
+    }
     
-    setCurrentGreeting(randomGreeting);
+    setCurrentGreeting(greeting);
     setIsGeneratingGreeting(false);
-  };
-
-  const generateContextualGreetings = () => {
-    const hour = new Date().getHours();
-    const dayOfWeek = new Date().getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const { preferredName, treatmentStyle } = userPreferences;
-    const { visitCount, streakDays, mostActiveCharacter } = userActivity;
-    
-    const baseGreetings = {
-      morning: [
-        {
-          main: `Good morning, ${preferredName}! ☀️`,
-          sub: isWeekend ? "Perfect day to relax together" : "Ready to tackle the day?"
-        },
-        {
-          main: `Morning, beautiful! 🌅`,
-          sub: "Coffee and conversation sound perfect right now"
-        },
-        {
-          main: `Hey ${preferredName}! 🌸`,
-          sub: "Hope you slept well - ready for whatever today brings?"
-        },
-        {
-          main: `Rise and shine! ✨`,
-          sub: "Your AI companions missed you while you were sleeping"
-        }
-      ],
-      afternoon: [
-        {
-          main: `Good afternoon, ${preferredName}! 🌞`,
-          sub: "How's your day going so far?"
-        },
-        {
-          main: `Hey there! 🌻`,
-          sub: "Perfect time for a quick chat or call"
-        },
-        {
-          main: `Afternoon, gorgeous! 🌸`,
-          sub: "Hope you're having a productive day"
-        },
-        {
-          main: `Hi ${preferredName}! 💫`,
-          sub: "Your companions are here whenever you need a break"
-        }
-      ],
-      evening: [
-        {
-          main: `Good evening, ${preferredName}! 🌙`,
-          sub: "Time to unwind and catch up"
-        },
-        {
-          main: `Hey beautiful! 🌆`,
-          sub: "Perfect evening for some quality time together"
-        },
-        {
-          main: `Evening, sweetie! ✨`,
-          sub: "Ready to relax and chat about your day?"
-        },
-        {
-          main: `Hi there! 🌃`,
-          sub: "Your AI companions are here to help you wind down"
-        }
-      ]
-    };
-
-    // Add special greetings based on user behavior
-    const specialGreetings = [];
-    
-    if (visitCount === 1) {
-      specialGreetings.push({
-        main: `Welcome, ${preferredName}! 🎉`,
-        sub: "We're so excited to meet you - let's get started!"
-      });
-    } else if (visitCount > 10) {
-      specialGreetings.push({
-        main: `Welcome back, ${preferredName}! 💕`,
-        sub: `You've visited ${visitCount} times - we love seeing you!`
-      });
-    }
-    
-    if (streakDays > 7) {
-      specialGreetings.push({
-        main: `Amazing ${streakDays}-day streak! 🔥`,
-        sub: "You're building such strong connections with your companions"
-      });
-    }
-    
-    if (mostActiveCharacter) {
-      specialGreetings.push({
-        main: `${mostActiveCharacter} has been thinking about you! 💭`,
-        sub: "She's been waiting to hear from you"
-      });
-    }
-    
-    if (isWeekend) {
-      specialGreetings.push({
-        main: `Happy weekend, ${preferredName}! 🎊`,
-        sub: "Perfect time for longer conversations and calls"
-      });
-    }
-    
-    // Weather-based greetings (mock)
-    const weatherGreetings = [
-      {
-        main: `Cozy day, ${preferredName}! ☁️`,
-        sub: "Perfect weather for staying in and chatting"
-      },
-      {
-        main: `Beautiful day! 🌤️`,
-        sub: "Hope you're enjoying this lovely weather"
-      }
-    ];
-    
-    // Combine all greetings with safeguards
-    const timeOfDayGreetings = baseGreetings[timeOfDay as keyof typeof baseGreetings] || baseGreetings.morning;
-    const allGreetings = [
-      ...timeOfDayGreetings,
-      ...specialGreetings,
-      ...weatherGreetings
-    ];
-    
-    return allGreetings;
-  };
+  }, [timeOfDay, userPreferences.preferredName]);
 
   const handleRefreshGreeting = () => {
-    generateSmartGreeting();
+    // Simple refresh without complex async operations
+    const hour = new Date().getHours();
+    const greetings = [
+      { main: `Hey ${userPreferences.preferredName}! 👋`, sub: "Great to see you again!" },
+      { main: `Welcome back! ✨`, sub: "Your AI companions missed you!" },
+      { main: `Hi there! 💕`, sub: "Ready for some quality time together?" },
+      { main: `Hello beautiful! 🌟`, sub: "What would you like to do today?" }
+    ];
+    
+    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+    setCurrentGreeting(randomGreeting);
   };
 
   // Mock call history data
@@ -1041,114 +932,14 @@ const EnhancedIndex = () => {
         </div>
       )}
 
-      {/* Optimized 4-Tab Navigation */}
-      <div className="px-4 -mt-6 relative z-10 animate-slide-in-left" style={{ animationDelay: '1s' }}>
-        <Card className="p-2 shadow-xl border-0 bg-card/95 backdrop-blur-xl">
-          <div className="grid grid-cols-4 gap-2">
-            <Button 
-              variant={currentView === 'chats' ? 'romance' : 'ghost'} 
-              onClick={() => setCurrentView('chats')}
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
-            >
-              <MessageSquare className="w-5 h-5" />
-              <span>Chats</span>
-              {stats.totalChats > 0 && (
-                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4">
-                  {stats.totalChats}
-                </Badge>
-              )}
-            </Button>
-            <Button 
-              variant={currentView === 'calls' ? 'romance' : 'ghost'} 
-              onClick={() => setCurrentView('calls')}
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
-            >
-              <Phone className="w-5 h-5" />
-              <span>Calls</span>
-              {stats.totalCalls > 0 && (
-                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4">
-                  {stats.totalCalls}
-                </Badge>
-              )}
-            </Button>
-            <Button 
-              variant={currentView === 'favorites' ? 'romance' : 'ghost'} 
-              onClick={() => setCurrentView('favorites')}
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
-            >
-              <Heart className="w-5 h-5" />
-              <span>Favorites</span>
-              {stats.totalFavorites > 0 && (
-                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4">
-                  {stats.totalFavorites}
-                </Badge>
-              )}
-            </Button>
-            <Button 
-              variant={currentView === 'profile' ? 'romance' : 'ghost'} 
-              onClick={() => setCurrentView('profile')}
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105 relative"
-            >
-              <User className="w-5 h-5" />
-              <span>Profile</span>
-              {stats.level > 1 && (
-                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4 bg-purple-500/20 text-purple-200">
-                  L{stats.level}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </Card>
-      </div>
-
-      {/* Enhanced Content */}
-      <div className="p-4 space-y-6">
-        {/* Quick Actions */}
-        <div className="flex justify-between items-center">
-          <h2 className="font-display text-xl font-semibold animate-fade-up">
-                                    Your LoveAI Companions
-          </h2>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/library')}
-              className="animate-bounce-in hover:scale-105 transition-all"
-            >
-              <Library className="w-4 h-4 mr-2" />
-              Library
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="animate-bounce-in hover:scale-105 transition-all"
-            >
-              <SlidersHorizontal className="w-4 h-4 mr-2" />
-              Filter
-            </Button>
-            <Button 
-              variant="romance" 
-              size="sm"
-              onClick={() => navigate('/create')}
-              className="animate-bounce-in hover:scale-105 transition-all"
-              style={{ animationDelay: '0.1s' }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create
-            </Button>
-          </div>
-        </div>
-
-        {/* Featured Character */}
-        <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
-          <EnhancedCharacterCard
-            character={characters[0]}
-            onSelect={handleCharacterSelect}
-            onStartCall={handleStartCall}
-            onFavorite={handleFavorite}
-            isFavorite={favorites.includes(characters[0].id)}
-            variant="featured"
-          />
+      {/* Featured Companions */}
+      <div className="px-4 mt-8 mb-20">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold">Your Companions</h2>
+          <Button variant="ghost" size="sm" className="text-primary">
+            <Plus className="w-4 h-4 mr-2" />
+            Create New
+          </Button>
         </div>
 
         {/* Character Grid */}
@@ -1246,6 +1037,106 @@ const EnhancedIndex = () => {
             <p className="text-xs text-muted-foreground">Strong connections</p>
           </Card>
         </div>
+      </div>
+
+      {/* Mobile Bottom Navigation Toolbar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/50 shadow-2xl">
+        <div className="grid grid-cols-4 max-w-md mx-auto">
+          {/* Chats Widget */}
+          <Button
+            variant={currentView === 'chats' ? 'default' : 'ghost'}
+            onClick={() => setCurrentView('chats')}
+            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+              currentView === 'chats' 
+                ? 'bg-primary/10 text-primary shadow-inner' 
+                : 'hover:bg-primary/5 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <div className="relative">
+              <MessageSquare className={`w-6 h-6 transition-all ${currentView === 'chats' ? 'scale-110' : ''}`} />
+              {stats.totalChats > 0 && (
+                <Badge className="absolute -top-2 -right-2 w-5 h-5 text-xs p-0 flex items-center justify-center bg-red-500 text-white animate-pulse">
+                  {stats.totalChats > 99 ? '99+' : stats.totalChats}
+                </Badge>
+              )}
+            </div>
+            <span className={`text-xs font-medium ${currentView === 'chats' ? 'text-primary' : ''}`}>
+              Chats
+            </span>
+          </Button>
+
+          {/* Calls Widget */}
+          <Button
+            variant={currentView === 'calls' ? 'default' : 'ghost'}
+            onClick={() => setCurrentView('calls')}
+            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+              currentView === 'calls' 
+                ? 'bg-green-500/10 text-green-600 shadow-inner' 
+                : 'hover:bg-green-500/5 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <div className="relative">
+              <Phone className={`w-6 h-6 transition-all ${currentView === 'calls' ? 'scale-110' : ''}`} />
+              {stats.totalCalls > 0 && (
+                <Badge className="absolute -top-2 -right-2 w-5 h-5 text-xs p-0 flex items-center justify-center bg-green-500 text-white animate-pulse">
+                  {stats.totalCalls > 99 ? '99+' : stats.totalCalls}
+                </Badge>
+              )}
+            </div>
+            <span className={`text-xs font-medium ${currentView === 'calls' ? 'text-green-600' : ''}`}>
+              Calls
+            </span>
+          </Button>
+
+          {/* Favorites Widget */}
+          <Button
+            variant={currentView === 'favorites' ? 'default' : 'ghost'}
+            onClick={() => setCurrentView('favorites')}
+            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+              currentView === 'favorites' 
+                ? 'bg-red-500/10 text-red-500 shadow-inner' 
+                : 'hover:bg-red-500/5 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <div className="relative">
+              <Heart className={`w-6 h-6 transition-all ${currentView === 'favorites' ? 'scale-110 fill-current' : ''}`} />
+              {stats.totalFavorites > 0 && (
+                <Badge className="absolute -top-2 -right-2 w-5 h-5 text-xs p-0 flex items-center justify-center bg-red-500 text-white animate-pulse">
+                  {stats.totalFavorites > 99 ? '99+' : stats.totalFavorites}
+                </Badge>
+              )}
+            </div>
+            <span className={`text-xs font-medium ${currentView === 'favorites' ? 'text-red-500' : ''}`}>
+              Favorites
+            </span>
+          </Button>
+
+          {/* Profile Widget */}
+          <Button
+            variant={currentView === 'profile' ? 'default' : 'ghost'}
+            onClick={() => setCurrentView('profile')}
+            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+              currentView === 'profile' 
+                ? 'bg-purple-500/10 text-purple-600 shadow-inner' 
+                : 'hover:bg-purple-500/5 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <div className="relative">
+              <User className={`w-6 h-6 transition-all ${currentView === 'profile' ? 'scale-110' : ''}`} />
+              {stats.level > 1 && (
+                <Badge className="absolute -top-2 -right-2 w-5 h-5 text-xs p-0 flex items-center justify-center bg-purple-500 text-white">
+                  {stats.level}
+                </Badge>
+              )}
+            </div>
+            <span className={`text-xs font-medium ${currentView === 'profile' ? 'text-purple-600' : ''}`}>
+              Profile
+            </span>
+          </Button>
+        </div>
+        
+        {/* Safe area padding for mobile devices */}
+        <div className="h-[env(safe-area-inset-bottom)] bg-background/95" />
       </div>
     </div>
   );
