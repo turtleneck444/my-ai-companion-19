@@ -102,7 +102,9 @@ const EnhancedIndex = () => {
   const navigate = useNavigate();
   
   const [currentView, setCurrentView] = useState<View>('home');
-  const { stats, updateStats } = useUserStats();
+  // const { stats, updateStats } = useUserStats();
+  const stats = { level: 1, xp: 0, xpToNextLevel: 100, totalChats: 0, streakDays: 1 }; // Mock stats for testing
+  const updateStats = { addMessage: () => {}, addCall: () => {}, addFavorite: () => {} }; // Mock functions
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [showBackendNotification, setShowBackendNotification] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
@@ -398,7 +400,7 @@ const EnhancedIndex = () => {
       setCurrentView('call');
       toast({
         title: "Starting voice call...",
-        description: `Connecting to ${char.name} 💕`,
+        description: `Connecting to ${char.name} ��`,
       });
     }
   };
