@@ -630,6 +630,63 @@ export const UserProfile = () => {
             </CardContent>
           </Card>
 
+          {/* Personal Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="w-5 h-5" />
+                Personal Details
+              </CardTitle>
+              <CardDescription>Your account information</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Full Name</Label>
+                <Input value={profileData.preferredName} onChange={(e) => handleInputChange('preferredName', e.target.value)} placeholder="Your name" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Email</Label>
+                <Input value={user?.email || ''} disabled />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Location</Label>
+                <Input value={profileData.location} onChange={(e) => handleInputChange('location', e.target.value)} placeholder="City, Country" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Interests</Label>
+                <Input value={profileData.interests} onChange={(e) => handleInputChange('interests', e.target.value)} placeholder="e.g. Music, Design, Travel" />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs text-muted-foreground">Bio</Label>
+                <Textarea value={profileData.bio} onChange={(e) => handleInputChange('bio', e.target.value)} placeholder="A short bio about you" />
+              </div>
+              <div className="md:col-span-2 flex gap-2 justify-end">
+                <Button variant="outline" onClick={handleSaveProfile} disabled={isLoading}>{isLoading ? 'Saving…' : 'Save Changes'}</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Plan & Billing */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="w-5 h-5" />
+                Plan & Billing
+              </CardTitle>
+              <CardDescription>Your current plan and billing options</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">Current Plan</div>
+                <div className="text-base font-semibold">{currentPlan.name}</div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => window.location.href = '/pricing'}>Upgrade</Button>
+                <Button variant="outline" disabled>Manage Billing</Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Payment Methods */}
           <Card>
             <CardHeader>
