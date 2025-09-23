@@ -147,59 +147,24 @@ export const SimpleChatInterface = ({
         historyLength: messages.length
       });
 
-      // Add realistic "thinking" delay based on message complexity
-      const thinkingTime = Math.max(
-        2000, // Minimum 2 seconds
-        Math.min(8000, currentInput.length * 100 + Math.random() * 3000) // Max 8 seconds
-      );
-
-      console.log('⏱️ Thinking time:', thinkingTime + 'ms');
-
-      // Show typing indicator for realistic duration
+      // Add realistic "thinking" delay
+      const thinkingTime = Math.max(2000, Math.min(8000, currentInput.length * 100 + Math.random() * 3000));
       await new Promise(resolve => setTimeout(resolve, thinkingTime));
 
-      console.log('🚀 Generating AI response...');
-
-      // Generate AI response using personality system
+      // Generate AI response
       const aiResponse = await personalityAI.generateResponse(currentInput, chatContext);
-
-      console.log('✅ Received AI response:', aiResponse.slice(0, 100) + '...');
-
-      // Add typing simulation - show characters appearing gradually
-      setIsAiTyping(false);
       
-      // Create message with typing effect
+      // Create and add AI message instantly (like iPhone/Android)
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: '',
+        content: aiResponse,
         sender: 'ai',
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
-
-      // Simulate typing effect
-      let currentText = '';
-      const typingSpeed = 50 + Math.random() * 50; // 50-100ms per character
       
-      console.log('⌨️ Starting typing simulation...');
-      
-      for (let i = 0; i < aiResponse.length; i++) {
-        currentText += aiResponse[i];
-        
-        setMessages(prev => prev.map(msg => 
-          msg.id === aiMessage.id 
-            ? { ...msg, content: currentText }
-            : msg
-        ));
-        
-        // Add small delay between characters
-        if (i < aiResponse.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, typingSpeed));
-        }
-      }
-      
-      console.log('✅ Typing simulation complete');
+      console.log('✅ AI message sent instantly (no typing animation)');
       
       // Increase relationship level slightly with each interaction
       setRelationshipLevel(prev => Math.min(prev + 1, 100));
