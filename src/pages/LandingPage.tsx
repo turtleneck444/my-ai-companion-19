@@ -483,9 +483,13 @@ export const LandingPage = () => {
               size="lg" 
               variant="outline"
               className="text-lg px-8 py-6"
+              onClick={() => {
+                const el = document.getElementById('preview');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
             >
-              <Play className="w-5 h-5 mr-2" />
-              Watch Demo
+              Try Now
+              <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </div>
           
@@ -570,14 +574,15 @@ export const LandingPage = () => {
                     <ArrowLeft className="w-5 h-5 text-gray-600" />
                   </Button>
                   <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-pink-300/50">
-                    <img 
+                                          <img 
                       src="/avatar-luna.jpg" 
                       alt="Luna" 
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        // Fallback to a gradient if image not found
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                        const img = e.currentTarget as HTMLImageElement;
+                        img.style.display = 'none';
+                        const sib = img.nextElementSibling as HTMLElement | null;
+                        if (sib) sib.style.display = 'flex';
                       }}
                     />
                     <div className="w-full h-full bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm hidden">
