@@ -46,13 +46,28 @@ export interface ChatContext {
 
 // Enhanced AI Response Generation System with Memory
 export class PersonalityAI {
-  private apiEndpoint = '/api/openai-chat';
+  private apiEndpoint: string;
   private sessionMemory: Map<string, any> = new Map();
+
+  constructor() {
+    // Use correct API endpoint based on environment
+    this.apiEndpoint = import.meta.env.DEV 
+      ? '/api/openai-chat' 
+      : '/.netlify/functions/openai-chat';
+    
+    console.log('🔧 PersonalityAI initialized with endpoint:', this.apiEndpoint);
+  }
 
   async generateResponse(
     message: string, 
     context: ChatContext
   ): Promise<string> {
+    console.log('🤖 PersonalityAI.generateResponse called with:', {
+      message: message.slice(0, 50) + '...',
+      character: context.character.name,
+      userPreferences: context.userPreferences.preferredName
+    });
+
     try {
       // Analyze and store message context for memory
       const messageAnalysis = this.analyzeMessage(message);
@@ -71,13 +86,23 @@ export class PersonalityAI {
         sessionMemory
       });
 
+      console.log('🧠 System prompt length:', systemPrompt.length);
+      console.log('🎯 API endpoint:', this.apiEndpoint);
+
       // Prepare conversation context with memory
       const conversationContext = this.buildConversationContext(context, sessionMemory);
       
+      // Check if API is available first
+      const apiAvailable = await this.isApiAvailable();
+      console.log('🔌 API Available:', apiAvailable);
+      
       // If API is not available, use enhanced personality-based fallback
-      if (!await this.isApiAvailable()) {
+      if (!apiAvailable) {
+        console.warn('⚠️ API not available, using personality fallback');
         return this.generatePersonalityFallback(message, context, sessionMemory);
       }
+
+      console.log('🚀 Making OpenAI API call...');
 
       // Call OpenAI API with enhanced personality context and memory
       const response = await fetch(this.apiEndpoint, {
@@ -104,12 +129,25 @@ export class PersonalityAI {
         })
       });
 
+      console.log('📡 API Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ API Error:', response.status, errorText);
+        throw new Error(`API request failed: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const aiResponse = data.message || data.response || this.generatePersonalityFallback(message, context, sessionMemory);
+      console.log('📥 API Response data:', data);
+      
+      const aiResponse = data.message || data.response;
+      
+      if (!aiResponse) {
+        console.warn('⚠️ No message in API response, using fallback');
+        return this.generatePersonalityFallback(message, context, sessionMemory);
+      }
+      
+      console.log('✅ AI Response generated:', aiResponse.slice(0, 50) + '...');
       
       // Store AI response in memory for continuity
       this.storeAIResponse(context.character.id, aiResponse, messageAnalysis);
@@ -117,7 +155,8 @@ export class PersonalityAI {
       return aiResponse;
 
     } catch (error) {
-      console.warn('AI API unavailable, using enhanced personality fallback:', error);
+      console.error('💥 AI API Error:', error);
+      console.warn('🔄 Using enhanced personality fallback');
       const sessionMemory = this.getSessionMemory(context.character.id);
       return this.generatePersonalityFallback(message, context, sessionMemory);
     }
@@ -210,12 +249,21 @@ export class PersonalityAI {
 
   private async isApiAvailable(): Promise<boolean> {
     try {
+      console.log('🔍 Checking API availability at:', this.apiEndpoint);
+      
       const response = await fetch(this.apiEndpoint, {
         method: 'HEAD',
-        signal: AbortSignal.timeout(3000) // 3 second timeout
+        signal: AbortSignal.timeout(5000) // 5 second timeout
       });
-      return response.ok;
-    } catch {
+      
+      console.log('🔌 API availability check status:', response.status);
+      
+      const available = response.ok;
+      console.log('✅ API Available:', available);
+      
+      return available;
+    } catch (error) {
+      console.error('❌ API availability check failed:', error);
       return false;
     }
   }

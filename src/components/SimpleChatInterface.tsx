@@ -73,15 +73,29 @@ export const SimpleChatInterface = ({
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
-      content: getInitialMessage(),
+      content: `Hey ${userPreferences.preferredName}! I'm ${character.name}. ${character.bio} 💕`,
       sender: 'ai',
       timestamp: new Date()
     }
   ]);
-  const [relationshipLevel, setRelationshipLevel] = useState(10);
+  
+  // Debug: Check if we're likely missing OpenAI API key
+  useEffect(() => {
+    console.log('🔧 SimpleChatInterface Environment Check:');
+    console.log('- Development mode:', import.meta.env.DEV);
+    console.log('- Production mode:', import.meta.env.PROD);
+    console.log('- API endpoint will be:', import.meta.env.DEV ? '/api/openai-chat' : '/.netlify/functions/openai-chat');
+    
+    if (import.meta.env.PROD) {
+      console.warn('🚨 PRODUCTION MODE: Ensure OPENAI_API_KEY is set in Netlify environment variables!');
+      console.warn('📖 See OPENAI_SETUP.md for configuration instructions');
+    }
+  }, []);
+
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [relationshipLevel, setRelationshipLevel] = useState(25);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -108,6 +122,10 @@ export const SimpleChatInterface = ({
     setInputValue('');
     setIsAiTyping(true);
 
+    console.log('💬 Sending message:', currentInput);
+    console.log('🎭 Character:', character.name);
+    console.log('👤 User:', userPreferences.preferredName);
+
     try {
       // Get current time of day
       const hour = new Date().getHours();
@@ -122,17 +140,30 @@ export const SimpleChatInterface = ({
         timeOfDay
       };
 
+      console.log('🧠 Chat context built:', {
+        characterName: character.name,
+        relationshipLevel,
+        timeOfDay,
+        historyLength: messages.length
+      });
+
       // Add realistic "thinking" delay based on message complexity
       const thinkingTime = Math.max(
         2000, // Minimum 2 seconds
         Math.min(8000, currentInput.length * 100 + Math.random() * 3000) // Max 8 seconds
       );
 
+      console.log('⏱️ Thinking time:', thinkingTime + 'ms');
+
       // Show typing indicator for realistic duration
       await new Promise(resolve => setTimeout(resolve, thinkingTime));
 
+      console.log('🚀 Generating AI response...');
+
       // Generate AI response using personality system
       const aiResponse = await personalityAI.generateResponse(currentInput, chatContext);
+
+      console.log('✅ Received AI response:', aiResponse.slice(0, 100) + '...');
 
       // Add typing simulation - show characters appearing gradually
       setIsAiTyping(false);
@@ -151,6 +182,8 @@ export const SimpleChatInterface = ({
       let currentText = '';
       const typingSpeed = 50 + Math.random() * 50; // 50-100ms per character
       
+      console.log('⌨️ Starting typing simulation...');
+      
       for (let i = 0; i < aiResponse.length; i++) {
         currentText += aiResponse[i];
         
@@ -166,11 +199,13 @@ export const SimpleChatInterface = ({
         }
       }
       
+      console.log('✅ Typing simulation complete');
+      
       // Increase relationship level slightly with each interaction
       setRelationshipLevel(prev => Math.min(prev + 1, 100));
       
     } catch (error) {
-      console.error('Error generating AI response:', error);
+      console.error('💥 Error generating AI response:', error);
       
       // Add realistic delay even for error
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -184,6 +219,7 @@ export const SimpleChatInterface = ({
       };
       
       setMessages(prev => [...prev, fallbackMessage]);
+      console.log('🔄 Used fallback response due to error');
     } finally {
       setIsAiTyping(false);
     }
