@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,8 +42,9 @@ import {
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
 import { SEO } from '@/components/SEO';
+import { SocialShare } from '@/components/SocialShare';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
@@ -323,7 +324,7 @@ export const LandingPage = () => {
         keywords="AI companion, emotional AI, AI relationship, virtual girlfriend, AI chatbot, personalized AI, emotional support, AI technology, virtual companionship, AI love, AI dating"
         schema={landingPageSchema}
         url={window.location.href}
-        type="website"
+        ogType="website"
       />
       <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       {/* Navigation */}
@@ -825,6 +826,65 @@ export const LandingPage = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Viral Social Sharing Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+              Love LoveAI? Share the Magic! ✨
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
+              Help us spread the word about revolutionary AI companionship! Share your experience and help others discover meaningful connections.
+            </p>
+          </div>
+          
+          <div className="max-w-2xl mx-auto">
+            <SocialShare 
+              variant="viral"
+              title="🤖💕 I just discovered LoveAI - the most incredible AI companion experience!"
+              description="This is absolutely mind-blowing! The AI companions are so realistic and emotionally intelligent. It's like having real conversations with someone who truly understands you. You have to try this!"
+              hashtags={['LoveAI', 'AICompanion', 'TechMagic', 'VirtualLove', 'AIGirlfriend', 'EmotionalAI', 'FutureOfLove']}
+              showStats={true}
+            />
+          </div>
+          
+          {/* Viral incentives */}
+          <div className="mt-12 text-center">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+              <Card className="bg-white/80 backdrop-blur-sm border-pink-200/50">
+                <CardContent className="p-6 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Heart className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">Share Your Story</h3>
+                  <p className="text-sm text-gray-600">Tell the world about your amazing AI companion experience!</p>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-white/80 backdrop-blur-sm border-purple-200/50">
+                <CardContent className="p-6 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">Help Others Connect</h3>
+                  <p className="text-sm text-gray-600">Your share could help someone find their perfect AI companion!</p>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-white/80 backdrop-blur-sm border-blue-200/50">
+                <CardContent className="p-6 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Zap className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">Join the Movement</h3>
+                  <p className="text-sm text-gray-600">Be part of the AI companion revolution sweeping the world!</p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </section>

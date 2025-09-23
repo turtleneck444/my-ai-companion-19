@@ -1,33 +1,134 @@
 User-agent: *
 Allow: /
+
+# Prioritize important pages for faster indexing and viral discovery
+Allow: /
+Allow: /auth
+Allow: /pricing
+Allow: /app
+Allow: /create
+Allow: /ai-companion
+Allow: /ai-girlfriend
+Allow: /virtual-relationship
+Allow: /emotional-ai
+Allow: /ai-dating
+Allow: /viral-moments
+Allow: /trending
+Allow: /success-stories
+Allow: /testimonials
+
+# Block admin and API endpoints
 Disallow: /api/
 Disallow: /admin/
+Disallow: /.netlify/
 Disallow: /private/
+Disallow: /_next/
+Disallow: /node_modules/
 
-# Allow important crawlers
-User-agent: Googlebot
-Allow: /
-Crawl-delay: 1
+# Block staging and development paths
+Disallow: /dev/
+Disallow: /staging/
+Disallow: /test/
+Disallow: /tmp/
 
-User-agent: Bingbot
-Allow: /
-Crawl-delay: 1
+# Block sensitive files
+Disallow: /*.json$
+Disallow: /*.env$
+Disallow: /*.config$
 
-# Social media crawlers
-User-agent: Twitterbot
-Allow: /
-
+# Allow social media crawlers for maximum viral reach
 User-agent: facebookexternalhit
 Allow: /
+Crawl-delay: 1
+
+User-agent: Twitterbot
+Allow: /
+Crawl-delay: 1
 
 User-agent: LinkedInBot
 Allow: /
+Crawl-delay: 2
 
 User-agent: WhatsApp
 Allow: /
 
-# Sitemap location
-Sitemap: https://loveai.com/sitemap.xml
+User-agent: TelegramBot
+Allow: /
 
-# Host preference
-Host: https://loveai.com
+User-agent: SkypeUriPreview
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: DiscordBot
+Allow: /
+
+User-agent: RedditBot
+Allow: /
+
+User-agent: PinterestBot
+Allow: /
+Crawl-delay: 2
+
+# Google specific optimizations
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Googlebot-Video
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+# Bing optimizations
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 2
+
+# Yahoo optimizations
+User-agent: Slurp
+Allow: /
+Crawl-delay: 3
+
+# Yandex optimizations
+User-agent: YandexBot
+Allow: /
+Crawl-delay: 2
+
+# Baidu optimizations
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 3
+
+# DuckDuckGo optimizations
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 2
+
+# Optimize crawl rate for viral content while being server-friendly
+Crawl-delay: 1
+
+# Request rate limits for aggressive crawlers
+Request-rate: 1/1s
+
+# Sitemap locations for maximum discoverability
+Sitemap: https://loveai.app/sitemap.xml
+Sitemap: https://loveai.app/image-sitemap.xml
+Sitemap: https://loveai.app/video-sitemap.xml
+Sitemap: https://loveai.app/news-sitemap.xml
+
+# Host directive (for Yandex and others)
+Host: loveai.app
+
+# Clean-param directive to ignore tracking parameters
+Clean-param: utm_source&utm_medium&utm_campaign&utm_term&utm_content&fbclid&gclid&msclkid
+
+# Comment with last updated timestamp
+# Last updated: 2024-01-15T00:00:00Z
+# Optimized for viral AI companion discovery
+# Contact: hello@loveai.app for SEO partnerships
