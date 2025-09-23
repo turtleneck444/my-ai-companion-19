@@ -27,6 +27,8 @@ import { personalityAI, type ChatMessage, type ChatContext } from "@/lib/ai-chat
 import { voiceCallManager } from "@/lib/voice-call";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { InteractiveGames } from "@/components/InteractiveGames";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Using ChatMessage from ai-chat.ts instead of local Message interface
 
@@ -82,6 +84,7 @@ export const SimpleChatInterface = ({
     contentFilter: true
   }
 }: SimpleChatInterfaceProps) => {
+  const { user } = useAuth();
   // Generate initial message based on character personality
   const getInitialMessage = () => {
     const name = userPreferences.preferredName;
@@ -110,7 +113,8 @@ export const SimpleChatInterface = ({
       timestamp: new Date()
     }
   ]);
-  
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
   const [inputValue, setInputValue] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -144,6 +148,55 @@ export const SimpleChatInterface = ({
     scrollToBottom();
   }, [messages]);
 
+  // Persist a single message to Supabase
+  const persistMessage = async (msg: ChatMessage) => {
+    try {
+      if (!isSupabaseConfigured || !user) return;
+      await supabase.from('messages').insert({
+        user_id: user.id,
+        character_id: character.id,
+        sender: msg.sender,
+        content: msg.content,
+        created_at: (msg.timestamp instanceof Date) ? msg.timestamp.toISOString() : new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('Failed to persist message', e);
+    }
+  };
+
+  // Load chat history on mount
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!isSupabaseConfigured || !user) return;
+      setIsLoadingHistory(true);
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('id, sender, content, created_at')
+          .eq('user_id', user.id)
+          .eq('character_id', character.id)
+          .order('created_at', { ascending: true })
+          .limit(500);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          const history: ChatMessage[] = data.map((row: any) => ({
+            id: row.id,
+            sender: row.sender,
+            content: row.content,
+            timestamp: new Date(row.created_at)
+          }));
+          setMessages(history);
+        }
+      } catch (err) {
+        console.warn('Could not load chat history', err);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [character.id, user?.id]);
+
   const sendMessage = async (messageContent?: string) => {
     const currentInput = messageContent || inputValue.trim();
     if (!currentInput || isAiTyping) return;
@@ -157,6 +210,8 @@ export const SimpleChatInterface = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
+    // Persist user message
+    persistMessage(userMessage);
     setInputValue("");
     setIsAiTyping(true);
     setShowQuickReplies(false);
@@ -187,6 +242,8 @@ export const SimpleChatInterface = ({
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      // Persist AI message
+      persistMessage(aiMessage);
       
       console.log('✅ AI message sent instantly (no typing animation)');
       

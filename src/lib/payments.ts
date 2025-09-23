@@ -30,8 +30,10 @@ export interface PaymentIntent {
   id: string;
   amount: number;
   currency: string;
-  status: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  status: 'pending' | 'succeeded' | 'failed' | 'canceled' | 'requires_payment_method' | 'COMPLETED';
   clientSecret?: string;
+  applicationId?: string;
+  receiptUrl?: string;
 }
 
 // Payment provider configurations
@@ -42,6 +44,8 @@ export const PAYMENT_CONFIG: PaymentConfig = {
   webhookSecret: import.meta.env.VITE_PAYMENT_WEBHOOK_SECRET || '',
   environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test'
 };
+
+const API_BASE = import.meta.env.DEV ? '/api/payments' : '/.netlify/functions/payments';
 
 // Updated subscription plans with consumer-focused Pro tier
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -136,9 +140,7 @@ export class PaymentProcessor {
       throw new Error('Plan not found');
     }
 
-    // TODO: Implement actual payment processing based on provider
-    // This is a placeholder implementation
-    const response = await fetch('/api/payments/create-intent', {
+    const response = await fetch(`${API_BASE}/create-intent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -160,17 +162,18 @@ export class PaymentProcessor {
     return await response.json();
   }
 
-  async confirmPayment(paymentIntentId: string, paymentMethodId: string): Promise<PaymentIntent> {
-    // TODO: Implement payment confirmation based on provider
-    const response = await fetch('/api/payments/confirm', {
+  async confirmPayment(params: { paymentIntentId: string; sourceId: string; amount: number; currency: string; }): Promise<PaymentIntent> {
+    const response = await fetch(`${API_BASE}/confirm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.config.secretKey}`
       },
       body: JSON.stringify({
-        paymentIntentId,
-        paymentMethodId,
+        paymentIntentId: params.paymentIntentId,
+        sourceId: params.sourceId,
+        amount: params.amount,
+        currency: params.currency,
         provider: this.config.provider
       })
     });
@@ -183,8 +186,7 @@ export class PaymentProcessor {
   }
 
   async createSubscription(planId: string, userId: string, paymentMethodId: string): Promise<any> {
-    // TODO: Implement subscription creation based on provider
-    const response = await fetch('/api/subscriptions/create', {
+    const response = await fetch(`${API_BASE}/create-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -206,8 +208,7 @@ export class PaymentProcessor {
   }
 
   async cancelSubscription(subscriptionId: string): Promise<any> {
-    // TODO: Implement subscription cancellation based on provider
-    const response = await fetch('/api/subscriptions/cancel', {
+    const response = await fetch(`${API_BASE}/cancel-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -275,6 +276,6 @@ export const getRemainingVoiceCalls = (currentPlan: string, callsUsed: number): 
   const plan = getPlanById(currentPlan);
   if (!plan) return 0;
   
-  if (plan.limits.voiceCallsPerDay === -1) return -1; // Unlimited
+  if (plan.limits.voiceCallsPerDay === -1) return true as any; // keep type compat
   return Math.max(0, plan.limits.voiceCallsPerDay - callsUsed);
 };
