@@ -815,32 +815,30 @@ const EnhancedIndex = () => {
       {/* Enhanced Mobile Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/50 shadow-2xl">
         <div className="grid grid-cols-4 max-w-md mx-auto">
-          <Button
-            variant={currentView === 'home' ? 'default' : 'ghost'}
+          <button
             onClick={() => setCurrentView('home')}
-            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1 p-4 h-auto transition-all duration-300 ${
               currentView === 'home' 
-                ? 'bg-gradient-to-t from-primary/20 to-primary/10 text-primary shadow-inner' 
+                ? 'bg-primary/10 text-primary' 
                 : 'hover:bg-primary/5 text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Home className={`w-6 h-6 transition-all ${currentView === 'home' ? 'scale-110' : ''}`} />
+            <Home className={`w-6 h-6 transition-all ${currentView === 'home' ? 'scale-105' : ''}`} />
             <span className={`text-xs font-medium ${currentView === 'home' ? 'text-primary' : ''}`}>
               Home
             </span>
-          </Button>
+          </button>
 
-          <Button
-            variant={currentView === 'chats' ? 'default' : 'ghost'}
+          <button
             onClick={() => setCurrentView('chats')}
-            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1 p-4 h-auto transition-all duration-300 ${
               currentView === 'chats' 
-                ? 'bg-gradient-to-t from-primary/20 to-primary/10 text-primary shadow-inner' 
+                ? 'bg-primary/10 text-primary' 
                 : 'hover:bg-primary/5 text-muted-foreground hover:text-foreground'
             }`}
           >
             <div className="relative">
-              <MessageSquare className={`w-6 h-6 transition-all ${currentView === 'chats' ? 'scale-110' : ''}`} />
+              <MessageSquare className={`w-6 h-6 transition-all ${currentView === 'chats' ? 'scale-105' : ''}`} />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
                 <span className="text-xs text-white font-bold">3</span>
               </div>
@@ -848,44 +846,42 @@ const EnhancedIndex = () => {
             <span className={`text-xs font-medium ${currentView === 'chats' ? 'text-primary' : ''}`}>
               Chats
             </span>
-          </Button>
+          </button>
 
-          <Button
-            variant={currentView === 'favorites' ? 'default' : 'ghost'}
+          <button
             onClick={() => setCurrentView('favorites')}
-            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1 p-4 h-auto transition-all duration-300 ${
               currentView === 'favorites' 
-                ? 'bg-gradient-to-t from-red-500/20 to-red-500/10 text-red-500 shadow-inner' 
-                : 'hover:bg-red-500/5 text-muted-foreground hover:text-foreground'
+                ? 'bg-red-50 text-red-600' 
+                : 'hover:bg-red-50/50 text-muted-foreground hover:text-foreground'
             }`}
           >
             <div className="relative">
-              <Heart className={`w-6 h-6 transition-all ${currentView === 'favorites' ? 'scale-110 fill-current' : ''}`} />
+              <Heart className={`w-6 h-6 transition-all ${currentView === 'favorites' ? 'scale-105 fill-current' : ''}`} />
               {favorites.length > 0 && (
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-pink-500 rounded-full flex items-center justify-center">
                   <span className="text-xs text-white font-bold">{favorites.length}</span>
                 </div>
               )}
             </div>
-            <span className={`text-xs font-medium ${currentView === 'favorites' ? 'text-red-500' : ''}`}>
+            <span className={`text-xs font-medium ${currentView === 'favorites' ? 'text-red-600' : ''}`}>
               Favorites
             </span>
-          </Button>
+          </button>
 
-          <Button
-            variant={currentView === 'profile' ? 'default' : 'ghost'}
+          <button
             onClick={() => setCurrentView('profile')}
-            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1 p-4 h-auto transition-all duration-300 ${
               currentView === 'profile' 
-                ? 'bg-gradient-to-t from-purple-500/20 to-purple-500/10 text-purple-600 shadow-inner' 
-                : 'hover:bg-purple-500/5 text-muted-foreground hover:text-foreground'
+                ? 'bg-purple-50 text-purple-600' 
+                : 'hover:bg-purple-50/50 text-muted-foreground hover:text-foreground'
             }`}
           >
-            <User className={`w-6 h-6 transition-all ${currentView === 'profile' ? 'scale-110' : ''}`} />
+            <User className={`w-6 h-6 transition-all ${currentView === 'profile' ? 'scale-105' : ''}`} />
             <span className={`text-xs font-medium ${currentView === 'profile' ? 'text-purple-600' : ''}`}>
               Profile
             </span>
-          </Button>
+          </button>
         </div>
         
         {/* Safe area padding for mobile devices */}

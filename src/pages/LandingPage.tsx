@@ -358,58 +358,75 @@ export const LandingPage = () => {
             </div>
             
             {/* Mobile menu button */}
-            <button
-              className="md:hidden p-2 rounded-md hover:bg-accent transition-colors"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Mobile menu dropdown */}
         {isMenuOpen && (
-          <div className="md:hidden bg-background/95 backdrop-blur-sm border-t">
-            <div className="px-4 py-2 space-y-1">
-              <a 
-                href="#features" 
-                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                onClick={() => setIsMenuOpen(false)}
+          <div className="md:hidden bg-background/95 backdrop-blur-sm border-t border-border/20">
+            <div className="px-4 py-3 space-y-1">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-base font-medium"
+                onClick={() => {
+                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+                  setIsMenuOpen(false);
+                }}
               >
                 Features
-              </a>
-              <a 
-                href="#preview" 
-                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                onClick={() => setIsMenuOpen(false)}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-base font-medium"
+                onClick={() => {
+                  document.getElementById('preview')?.scrollIntoView({ behavior: 'smooth' });
+                  setIsMenuOpen(false);
+                }}
               >
                 Preview
-              </a>
-              <a 
-                href="#pricing" 
-                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                onClick={() => setIsMenuOpen(false)}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-base font-medium"
+                onClick={() => {
+                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                  setIsMenuOpen(false);
+                }}
               >
                 Pricing
-              </a>
-              <a 
-                href="#testimonials" 
-                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                onClick={() => setIsMenuOpen(false)}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-base font-medium"
+                onClick={() => {
+                  document.getElementById('testimonials')?.scrollIntoView({ behavior: 'smooth' });
+                  setIsMenuOpen(false);
+                }}
               >
                 Reviews
-              </a>
-              <a 
-                href="#faq" 
-                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                onClick={() => setIsMenuOpen(false)}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-base font-medium"
+                onClick={() => {
+                  document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' });
+                  setIsMenuOpen(false);
+                }}
               >
                 FAQ
-              </a>
-              <div className="pt-2 border-t border-border mt-2">
+              </Button>
+              <div className="pt-2 border-t border-border/20 mt-2 space-y-2">
                 <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-base font-medium mb-2"
+                  variant="outline" 
+                  className="w-full text-base font-medium"
                   onClick={() => {
                     navigate('/auth');
                     setIsMenuOpen(false);
@@ -418,7 +435,7 @@ export const LandingPage = () => {
                   Sign In
                 </Button>
                 <Button 
-                  className="w-full bg-gradient-to-r from-primary to-primary-glow text-base font-medium"
+                  className="w-full bg-gradient-to-r from-primary to-primary-glow text-white text-base font-medium"
                   onClick={() => {
                     handleGetStarted();
                     setIsMenuOpen(false);
