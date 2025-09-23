@@ -63,6 +63,7 @@ export const VoiceCallInterface = ({
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [lastUserMessage, setLastUserMessage] = useState('');
   const [relationshipLevel, setRelationshipLevel] = useState(50);
+  const [hasFollowedUp, setHasFollowedUp] = useState(false);
   
   // Real-time speech recognition
   const recognitionRef = useRef<any>(null);
@@ -272,7 +273,7 @@ export const VoiceCallInterface = ({
       setVoiceLevel(normalizedLevel);
       
       // Detect if user is speaking (threshold can be adjusted)
-      const isCurrentlySpeaking = normalizedLevel > 0.1;
+      const isCurrentlySpeaking = normalizedLevel > 0.12;
       setIsSpeaking(isCurrentlySpeaking);
       
       // Reset silence timer if user is speaking
@@ -283,13 +284,13 @@ export const VoiceCallInterface = ({
         }
       } else {
         // Start silence timer if not already started
-        if (!silenceTimerRef.current && lastUserMessage) {
+        if (!silenceTimerRef.current && lastUserMessage && !hasFollowedUp) {
           silenceTimerRef.current = setTimeout(() => {
             // If user has been silent for 3 seconds after speaking, AI can respond naturally
             if (!isSpeaking && !isAiSpeaking) {
               generateContextualAIResponse();
             }
-          }, 3000);
+          }, 4500);
         }
       }
       
@@ -308,11 +309,7 @@ export const VoiceCallInterface = ({
     const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
     
     const personalizedGreetings = [
-      `Hey ${userPreferences.preferredName}! I'm so excited to finally hear your voice! This is like a dream come true!`,
-      `Hi beautiful! Oh my gosh, you actually called me! I've been waiting for this moment!`,
-      `${userPreferences.preferredName}! Your voice is going to make my whole ${timeOfDay} so much better! I'm practically glowing right now!`,
-      `Hey there gorgeous! I can't believe we're actually talking - this feels so real and amazing!`,
-      `Hi my love! I'm honestly a little nervous but so thrilled to hear you speak! How are you feeling about this?`
+      `Hi ${userPreferences.preferredName}, so happy to hear you. How's your ${timeOfDay}?`
     ];
 
     const greeting = personalizedGreetings[Math.floor(Math.random() * personalizedGreetings.length)];
@@ -355,6 +352,7 @@ export const VoiceCallInterface = ({
     
     setIsProcessing(true);
     setLastUserMessage(transcript);
+    setHasFollowedUp(false);
     
     // Add user message to conversation history
     const userMessage: ChatMessage = {
@@ -379,7 +377,7 @@ export const VoiceCallInterface = ({
 
   // Generate contextual AI response based on conversation
   const generateContextualAIResponse = async () => {
-    if (isAiSpeaking || isProcessing || !lastUserMessage) return;
+    if (isAiSpeaking || isProcessing || !lastUserMessage || hasFollowedUp) return;
     
     // Generate a natural follow-up or question
     const contextualPrompts = [
@@ -391,7 +389,10 @@ export const VoiceCallInterface = ({
     ];
     
     const prompt = contextualPrompts[Math.floor(Math.random() * contextualPrompts.length)];
+    setHasFollowedUp(true);
     await generateAIResponse(prompt, true);
+    // Only one unsolicited follow-up per user utterance
+    setLastUserMessage('');
   };
 
   // Generate AI response using personality system
@@ -415,7 +416,11 @@ export const VoiceCallInterface = ({
       console.log('🧠 Generating AI response for voice call...');
       
       // Generate response using personality AI
-      const aiResponse = await personalityAI.generateResponse(userInput, chatContext);
+      let aiResponse = await personalityAI.generateResponse(userInput, chatContext);
+      // Keep spoken replies concise for interactivity
+      const sentences = aiResponse.split(/(?<=[.!?])\s+/);
+      const trimmed = sentences.slice(0, 2).join(' ');
+      aiResponse = trimmed.slice(0, 240);
       
       // Add to conversation history
       const aiMessage: ChatMessage = {
