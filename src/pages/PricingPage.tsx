@@ -23,6 +23,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PaymentModal } from '@/components/PaymentModal';
 import { SUBSCRIPTION_PLANS, formatPrice } from '@/lib/payments';
 import { SEO } from '@/components/SEO';
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { getPlanById } from '@/lib/payments';
 
 export const PricingPage = () => {
   const navigate = useNavigate();
@@ -30,6 +33,27 @@ export const PricingPage = () => {
   const [isYearly, setIsYearly] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  // Auto-open checkout if arriving with ?plan=
+  useEffect(() => {
+    const planParam = searchParams.get('plan');
+    if (!planParam) return;
+    const plan = getPlanById(planParam);
+    if (!plan) return;
+
+    if (plan.id === 'free') {
+      navigate('/app');
+      return;
+    }
+
+    if (user) {
+      setSelectedPlan(plan.id);
+      setShowPaymentModal(true);
+    } else {
+      navigate(`/auth?plan=${plan.id}`);
+    }
+  }, [searchParams, user, navigate]);
 
   const handleSelectPlan = (planId: string) => {
     if (planId === 'free') {
@@ -39,7 +63,7 @@ export const PricingPage = () => {
         navigate('/app');
       } else {
         // User not logged in, redirect to home for signup/login
-        navigate('/?plan=free');
+        navigate('/auth?plan=free');
       }
     } else {
       // Paid plan - check if user is logged in
@@ -48,7 +72,7 @@ export const PricingPage = () => {
         setShowPaymentModal(true);
       } else {
         // User not logged in, redirect to home for signup/login with plan info
-        navigate(`/?plan=${planId}`);
+        navigate(`/auth?plan=${planId}`);
       }
     }
   };
@@ -147,7 +171,6 @@ export const PricingPage = () => {
         keywords="AI companion pricing, AI girlfriend cost, virtual relationship plans, AI chatbot subscription, emotional AI pricing, LoveAI plans, AI companion membership"
         schema={pricingSchema}
         url={window.location.href}
-        type="product"
       />
       <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       {/* Header */}

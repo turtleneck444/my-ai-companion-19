@@ -29,6 +29,9 @@ import lunaAvatar from "@/assets/avatar-luna.jpg";
 import ariaAvatar from "@/assets/avatar-aria.jpg";
 import sophieAvatar from "@/assets/avatar-sophie.jpg";
 import heroBg from "@/assets/hero-bg.jpg";
+import { PaymentModal } from "@/components/PaymentModal";
+import { useSearchParams } from "react-router-dom";
+import { getPlanById } from "@/lib/payments";
 
 interface Character {
   id: string;
@@ -36,7 +39,7 @@ interface Character {
   avatar: string;
   bio: string;
   personality: string[];
-  voice: string;
+  voice: { voice_id: string; name: string };
   isOnline: boolean;
   mood?: string;
   lastMessage?: string;
@@ -54,7 +57,7 @@ const CHARACTERS: Character[] = [
     avatar: lunaAvatar,
     bio: 'A graphic designer who works late nights and loves discovering new music. She has strong opinions about coffee and gets excited about creative projects.',
     personality: ['Creative', 'Thoughtful', 'Independent'],
-    voice: 'Soft & Melodic',
+    voice: { voice_id: 'default_soft_melodic', name: 'Soft & Melodic' },
     isOnline: true,
     mood: 'focused',
     lastMessage: "Working on this design project and my brain is fried. How's your day going?",
@@ -67,7 +70,7 @@ const CHARACTERS: Character[] = [
     avatar: ariaAvatar,
     bio: 'Marketing coordinator who actually enjoys her job. Always has restaurant recommendations and plans weekend adventures she may or may not follow through on.',
     personality: ['Outgoing', 'Spontaneous', 'Ambitious'],
-    voice: 'Bright & Cheerful',
+    voice: { voice_id: 'default_bright_cheerful', name: 'Bright & Cheerful' },
     isOnline: true,
     mood: 'energetic',
     lastMessage: "Found this amazing brunch spot! We should totally go this weekend.",
@@ -80,7 +83,7 @@ const CHARACTERS: Character[] = [
     avatar: sophieAvatar,
     bio: 'Bookstore employee and philosophy student. Prefers deep conversations over small talk and always has a paperback book in her bag.',
     personality: ['Intellectual', 'Gentle', 'Curious'],
-    voice: 'Warm & Soothing',
+    voice: { voice_id: 'default_warm_soothing', name: 'Warm & Soothing' },
     isOnline: false,
     mood: 'contemplative',
     lastMessage: "I've been reading this fascinating book about consciousness...",
@@ -93,12 +96,15 @@ const EnhancedIndex = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   // Core state - minimal and stable
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [favorites, setFavorites] = useState<string[]>(['1']);
   const [userName, setUserName] = useState('there');
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Update user name only when user data changes
   useEffect(() => {
@@ -110,6 +116,28 @@ const EnhancedIndex = () => {
       setUserName(name);
     }
   }, [user?.user_metadata?.preferred_name, user?.user_metadata?.name, user?.email]);
+
+  // Plan handoff: if URL contains ?plan=, handle auto-upgrade or redirect to auth
+  useEffect(() => {
+    const planParam = searchParams.get('plan');
+    if (!planParam) return;
+
+    const plan = getPlanById(planParam);
+    if (!plan) return;
+
+    if (plan.id === 'free') {
+      // Free plan → straight to app
+      navigate('/app');
+      return;
+    }
+
+    if (user) {
+      setSelectedPlan(plan.id);
+      setShowPaymentModal(true);
+    } else {
+      navigate(`/auth?plan=${plan.id}`);
+    }
+  }, [searchParams, user, navigate]);
 
   // Stable handlers
   const handleCharacterSelect = useCallback((character: Character) => {
@@ -134,11 +162,11 @@ const EnhancedIndex = () => {
     setSelectedCharacter(null);
   }, []);
 
-  const handleFavorite = useCallback((character: Character) => {
+  const handleFavorite = useCallback((characterId: string) => {
     setFavorites(prev => 
-      prev.includes(character.id) 
-        ? prev.filter(id => id !== character.id)
-        : [...prev, character.id]
+      prev.includes(characterId) 
+        ? prev.filter(id => id !== characterId)
+        : [...prev, characterId]
     );
   }, []);
 
@@ -253,7 +281,7 @@ const EnhancedIndex = () => {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleFavorite(character);
+                      handleFavorite(character.id);
                     }}
                   >
                     <Heart className={`w-4 h-4 ${favorites.includes(character.id) ? 'text-red-400 fill-current' : ''}`} />
@@ -674,144 +702,6 @@ const EnhancedIndex = () => {
         </>
       )}
 
-      {/* Chats View */}
-      {currentView === 'chats' && (
-        <div className="relative z-10 p-6 pt-16 pb-24">
-          <h1 className="text-2xl font-bold mb-6 text-white">All Chats</h1>
-          <div className="space-y-4">
-            {CHARACTERS.map((character) => (
-              <Card 
-                key={character.id} 
-                className="p-4 hover:bg-muted/50 transition-colors cursor-pointer bg-white/90 backdrop-blur-sm"
-                onClick={() => handleCharacterSelect(character)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <Avatar className="w-12 h-12">
-                      <AvatarImage src={character.avatar} alt={character.name} />
-                      <AvatarFallback>{character.name[0]}</AvatarFallback>
-                    </Avatar>
-                    {character.unreadCount && character.unreadCount > 0 && (
-                      <Badge className="absolute -top-2 -right-2 bg-primary text-white text-xs w-6 h-6 rounded-full flex items-center justify-center">
-                        {character.unreadCount}
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold">{character.name}</h3>
-                      {character.isOnline && (
-                        <div className="w-2 h-2 bg-green-400 rounded-full" />
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {character.lastMessage || 'No messages yet'}
-                    </p>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStartCall(character);
-                      }}
-                    >
-                      <Phone className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleFavorite(character.id);
-                      }}
-                    >
-                      <Heart className={`w-4 h-4 ${favorites.includes(character.id) ? 'fill-primary text-primary' : ''}`} />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Favorites View */}
-      {currentView === 'favorites' && (
-        <div className="relative z-10 p-6 pt-16 pb-24">
-          <h1 className="text-2xl font-bold mb-6 text-white">Favorites</h1>
-          <div className="space-y-4">
-            {favorites.length === 0 ? (
-              <Card className="p-8 text-center bg-white/90 backdrop-blur-sm">
-                <Heart className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">No favorites yet</h3>
-                <p className="text-muted-foreground">
-                  Add companions to your favorites by tapping the heart icon
-                </p>
-              </Card>
-            ) : (
-              CHARACTERS.filter(character => favorites.includes(character.id)).map((character) => (
-                <Card 
-                  key={character.id} 
-                  className="p-4 hover:bg-muted/50 transition-colors cursor-pointer bg-white/90 backdrop-blur-sm"
-                  onClick={() => handleCharacterSelect(character)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={character.avatar} alt={character.name} />
-                        <AvatarFallback>{character.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -top-1 -right-1">
-                        <Heart className="w-4 h-4 fill-primary text-primary" />
-                      </div>
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold">{character.name}</h3>
-                        {character.isOnline && (
-                          <div className="w-2 h-2 bg-green-400 rounded-full" />
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {character.lastMessage || 'No messages yet'}
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartCall(character);
-                        }}
-                      >
-                        <Phone className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleFavorite(character.id);
-                        }}
-                      >
-                        <Heart className="w-4 h-4 fill-primary text-primary" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Enhanced Mobile Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/50 shadow-2xl">
         <div className="grid grid-cols-4 max-w-md mx-auto">
@@ -832,18 +722,18 @@ const EnhancedIndex = () => {
           <button
             onClick={() => setCurrentView('chats')}
             className={`flex flex-col items-center gap-1 p-4 h-auto transition-all duration-300 ${
-              currentView === 'chats' 
+              (currentView as any) === 'chats' 
                 ? 'bg-primary/10 text-primary' 
                 : 'hover:bg-primary/5 text-muted-foreground hover:text-foreground'
             }`}
           >
             <div className="relative">
-              <MessageSquare className={`w-6 h-6 transition-all ${currentView === 'chats' ? 'scale-105' : ''}`} />
+              <MessageSquare className={`w-6 h-6 transition-all ${(currentView as any) === 'chats' ? 'scale-105' : ''}`} />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
                 <span className="text-xs text-white font-bold">3</span>
               </div>
             </div>
-            <span className={`text-xs font-medium ${currentView === 'chats' ? 'text-primary' : ''}`}>
+            <span className={`text-xs font-medium ${(currentView as any) === 'chats' ? 'text-primary' : ''}`}>
               Chats
             </span>
           </button>
@@ -851,20 +741,20 @@ const EnhancedIndex = () => {
           <button
             onClick={() => setCurrentView('favorites')}
             className={`flex flex-col items-center gap-1 p-4 h-auto transition-all duration-300 ${
-              currentView === 'favorites' 
+              (currentView as any) === 'favorites' 
                 ? 'bg-red-50 text-red-600' 
                 : 'hover:bg-red-50/50 text-muted-foreground hover:text-foreground'
             }`}
           >
             <div className="relative">
-              <Heart className={`w-6 h-6 transition-all ${currentView === 'favorites' ? 'scale-105 fill-current' : ''}`} />
+              <Heart className={`w-6 h-6 transition-all ${(currentView as any) === 'favorites' ? 'scale-105 fill-current' : ''}`} />
               {favorites.length > 0 && (
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-pink-500 rounded-full flex items-center justify-center">
                   <span className="text-xs text-white font-bold">{favorites.length}</span>
                 </div>
               )}
             </div>
-            <span className={`text-xs font-medium ${currentView === 'favorites' ? 'text-red-600' : ''}`}>
+            <span className={`text-xs font-medium ${(currentView as any) === 'favorites' ? 'text-red-600' : ''}`}>
               Favorites
             </span>
           </button>
@@ -887,6 +777,23 @@ const EnhancedIndex = () => {
         {/* Safe area padding for mobile devices */}
         <div className="h-[env(safe-area-inset-bottom)] bg-background/95" />
       </div>
+
+      {/* Payment Modal for plan selection from URL */}
+      {selectedPlan && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedPlan(null);
+          }}
+          selectedPlan={selectedPlan}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            setSelectedPlan(null);
+            navigate('/app');
+          }}
+        />
+      )}
     </div>
   );
 };

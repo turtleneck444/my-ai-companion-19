@@ -90,7 +90,9 @@ export const UserProfile = () => {
     xpToNext: 1580
   });
 
-  // Current plan (mock data)
+  // Current plan (launch week dynamic)
+  const formatDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric' });
+  const nextBillingDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   const [currentPlan] = useState<PlanDetails>({
     name: 'Free Launch Week',
     tier: 'free',
@@ -107,7 +109,7 @@ export const UserProfile = () => {
       messages: -1, // unlimited
       voiceCalls: 60
     },
-    nextBilling: '2024-02-01'
+    nextBilling: nextBillingDate
   });
 
   useEffect(() => {
