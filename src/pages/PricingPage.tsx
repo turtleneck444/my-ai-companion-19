@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaymentModal } from '@/components/PaymentModal';
 import { SUBSCRIPTION_PLANS, formatPrice } from '@/lib/payments';
+import { SEO } from '@/components/SEO';
 
 export const PricingPage = () => {
   const navigate = useNavigate();
@@ -56,6 +57,26 @@ export const PricingPage = () => {
     setShowPaymentModal(false);
     setSelectedPlan(null);
     navigate('/app');
+  };
+
+  const pricingSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: 'LoveAI Subscription Plans',
+    description: 'Choose your perfect AI companion experience with flexible pricing plans',
+    brand: {
+      '@type': 'Brand',
+      name: 'LoveAI'
+    },
+    offers: SUBSCRIPTION_PLANS.map(plan => ({
+      '@type': 'Offer',
+      name: plan.name,
+      price: plan.price,
+      priceCurrency: plan.currency,
+      description: `${plan.name} plan with ${plan.limits.companions} companions and ${plan.limits.messagesPerDay} daily messages`,
+      availability: 'https://schema.org/InStock',
+      priceValidUntil: '2025-12-31'
+    }))
   };
 
   const features = [
@@ -119,7 +140,16 @@ export const PricingPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
+    <>
+      <SEO 
+        title="LoveAI Pricing - Choose Your AI Companion Plan | Affordable AI Relationships"
+        description="Choose the perfect LoveAI plan for your needs. From free AI companion trials to unlimited relationships with premium features. Start your AI love journey today!"
+        keywords="AI companion pricing, AI girlfriend cost, virtual relationship plans, AI chatbot subscription, emotional AI pricing, LoveAI plans, AI companion membership"
+        schema={pricingSchema}
+        url={window.location.href}
+        type="product"
+      />
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       {/* Header */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -128,7 +158,7 @@ export const PricingPage = () => {
               <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center">
                 <Heart className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold font-display">AI Companion</span>
+              <span className="text-xl font-bold font-display">LoveAI</span>
             </div>
             <Button variant="ghost" onClick={() => navigate('/')}>
               Back to Home
@@ -339,5 +369,6 @@ export const PricingPage = () => {
         />
       )}
     </div>
+    </>
   );
 };

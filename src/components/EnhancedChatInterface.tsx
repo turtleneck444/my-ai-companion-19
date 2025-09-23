@@ -54,13 +54,20 @@ interface Character {
 interface EnhancedChatInterfaceProps {
   character: Character;
   onBack: () => void;
-  onCall?: () => void;
+  onStartCall?: () => void;
+  userPreferences?: {
+    preferredName: string;
+    treatmentStyle: string;
+    age: string;
+    contentFilter: boolean;
+  };
 }
 
 export const EnhancedChatInterface = ({ 
   character, 
-  onBack, 
-  onCall 
+  onBack,
+  onStartCall,
+  userPreferences 
 }: EnhancedChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -241,7 +248,7 @@ export const EnhancedChatInterface = ({
     }
 
     incrementVoiceCalls();
-    onCall?.();
+                onStartCall?.();
   };
 
   const getMoodEmoji = (mood?: string) => {

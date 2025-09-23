@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { EnhancedCharacterCard } from "@/components/EnhancedCharacterCard";
-import { EnhancedChatInterface } from "@/components/EnhancedChatInterface";
+import { SimpleChatInterface } from "@/components/SimpleChatInterface";
 import { VoiceCallInterface } from "@/components/VoiceCallInterface";
 import { 
   MessageSquare, 
@@ -263,7 +263,7 @@ const CompanionLibrary = () => {
 
   if (currentView === 'chat' && selectedCharacter) {
     return (
-      <EnhancedChatInterface 
+      <SimpleChatInterface 
         character={selectedCharacter}
         onBack={handleBackToLibrary}
         onStartCall={() => handleStartCall()}

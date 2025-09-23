@@ -38,6 +38,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
+import { SEO } from '@/components/SEO';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
@@ -256,8 +257,70 @@ export const LandingPage = () => {
     }
   ];
 
+  const landingPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'LoveAI',
+    description: 'Advanced AI companion platform for meaningful emotional connections and relationships',
+    url: window.location.origin,
+    applicationCategory: 'SocialNetworkingApplication',
+    operatingSystem: 'Web',
+    offers: [
+      {
+        '@type': 'Offer',
+        name: 'Free Plan',
+        price: '0',
+        priceCurrency: 'USD',
+        description: 'Try LoveAI with 1 AI companion and 10 daily messages'
+      },
+      {
+        '@type': 'Offer',
+        name: 'Premium Plan', 
+        price: '19.99',
+        priceCurrency: 'USD',
+        description: 'Unlimited messages with up to 3 AI companions'
+      },
+      {
+        '@type': 'Offer',
+        name: 'Pro Plan',
+        price: '39.99', 
+        priceCurrency: 'USD',
+        description: 'Unlimited AI companions with voice calls and premium features'
+      }
+    ],
+    author: {
+      '@type': 'Organization',
+      name: 'LoveAI',
+      url: window.location.origin
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      reviewCount: '1247',
+      bestRating: '5',
+      worstRating: '1'
+    },
+    featureList: [
+      'Emotional AI conversations',
+      'Voice calls with AI companions', 
+      'Personalized AI personalities',
+      'Memory and relationship building',
+      '24/7 availability',
+      'Privacy and security focused'
+    ]
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
+    <>
+      <SEO 
+        title="LoveAI - Your Perfect AI Companion | Emotional AI Relationships"
+        description="Experience meaningful connections with personalized AI companions. Chat, call, and build lasting memories with advanced emotional AI technology. Join thousands finding love with AI."
+        keywords="AI companion, emotional AI, AI relationship, virtual girlfriend, AI chatbot, personalized AI, emotional support, AI technology, virtual companionship, AI love, AI dating"
+        schema={landingPageSchema}
+        url={window.location.href}
+        type="website"
+      />
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -266,7 +329,7 @@ export const LandingPage = () => {
               <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center">
                 <Heart className="w-5 h-5 text-white" />
               </div>
-                              <span className="text-xl font-bold font-display">LoveAI</span>
+              <span className="text-xl font-bold font-display">LoveAI</span>
             </div>
             
             <div className="hidden md:flex items-center space-x-8">
@@ -277,7 +340,8 @@ export const LandingPage = () => {
               <a href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
             </div>
             
-            <div className="flex items-center space-x-4">
+            {/* Desktop buttons - hidden on mobile */}
+            <div className="hidden md:flex items-center space-x-4">
               <Button variant="ghost" onClick={() => navigate('/auth')}>
                 Sign In
               </Button>
@@ -287,14 +351,80 @@ export const LandingPage = () => {
               </Button>
             </div>
             
+            {/* Mobile menu button */}
             <button
-              className="md:hidden"
+              className="md:hidden p-2 rounded-md hover:bg-accent transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
+
+        {/* Mobile menu dropdown */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-background/95 backdrop-blur-sm border-t">
+            <div className="px-4 py-2 space-y-1">
+              <a 
+                href="#features" 
+                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Features
+              </a>
+              <a 
+                href="#preview" 
+                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Preview
+              </a>
+              <a 
+                href="#pricing" 
+                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Pricing
+              </a>
+              <a 
+                href="#testimonials" 
+                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Reviews
+              </a>
+              <a 
+                href="#faq" 
+                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                FAQ
+              </a>
+              <div className="pt-2 border-t border-border mt-2">
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-base font-medium mb-2"
+                  onClick={() => {
+                    navigate('/auth');
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Sign In
+                </Button>
+                <Button 
+                  className="w-full bg-gradient-to-r from-primary to-primary-glow text-base font-medium"
+                  onClick={() => {
+                    handleGetStarted();
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Get Started
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
@@ -317,7 +447,7 @@ export const LandingPage = () => {
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-8 sm:mb-12 px-4">
             <Button 
               size="lg" 
               onClick={handleGetStarted}
@@ -749,5 +879,6 @@ export const LandingPage = () => {
         </div>
       </footer>
     </div>
+    </>
   );
 };

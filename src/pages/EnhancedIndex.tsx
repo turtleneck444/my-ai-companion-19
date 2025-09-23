@@ -6,13 +6,18 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { EnhancedCharacterCard } from "@/components/EnhancedCharacterCard";
-import { EnhancedChatInterface } from "@/components/EnhancedChatInterface";
+import { SimpleChatInterface } from "@/components/SimpleChatInterface";
 import { VoiceCallInterface } from "@/components/VoiceCallInterface";
 import { UserProfile } from "@/components/UserProfile";
 import { SwipeDiscovery } from "@/components/SwipeGestures";
 import { RelationshipStats, PremiumFeatures } from "@/components/AdvancedFeatures";
 import { BackendNotification } from "@/components/BackendNotification";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserStats } from "@/hooks/useUserStats";
+
+// XP Constants for display
+const XP_PER_MESSAGE = 5;
+const XP_PER_FAVORITE = 25;
 import { 
   MessageSquare, 
   Phone, 
@@ -89,14 +94,15 @@ interface UserActivity {
   streakDays: number;
 }
 
-type View = 'home' | 'chat' | 'call' | 'profile' | 'discover' | 'stats' | 'calls' | 'chats';
+type View = 'chats' | 'calls' | 'favorites' | 'profile' | 'chat' | 'call';
 
 const EnhancedIndex = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [currentView, setCurrentView] = useState<View>('home');
+  const [currentView, setCurrentView] = useState<View>('chats');
+  const { stats, updateStats } = useUserStats();
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [showBackendNotification, setShowBackendNotification] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
@@ -125,10 +131,15 @@ const EnhancedIndex = () => {
 
   // Determine time of day for personalized greeting
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setTimeOfDay('morning');
-    else if (hour < 17) setTimeOfDay('afternoon');
-    else setTimeOfDay('evening');
+    try {
+      const hour = new Date().getHours();
+      if (hour < 12) setTimeOfDay('morning');
+      else if (hour < 17) setTimeOfDay('afternoon');
+      else setTimeOfDay('evening');
+    } catch (error) {
+      console.warn('Error setting time of day:', error);
+      setTimeOfDay('morning'); // fallback
+    }
   }, []);
 
   // Load user activity from localStorage
@@ -284,9 +295,10 @@ const EnhancedIndex = () => {
       }
     ];
     
-    // Combine all greetings
+    // Combine all greetings with safeguards
+    const timeOfDayGreetings = baseGreetings[timeOfDay as keyof typeof baseGreetings] || baseGreetings.morning;
     const allGreetings = [
-      ...baseGreetings[timeOfDay as keyof typeof baseGreetings],
+      ...timeOfDayGreetings,
       ...specialGreetings,
       ...weatherGreetings
     ];
@@ -550,7 +562,7 @@ const EnhancedIndex = () => {
 
   if (currentView === 'chat' && selectedCharacter) {
     return (
-      <EnhancedChatInterface 
+      <SimpleChatInterface 
         character={selectedCharacter}
         onBack={handleBackToHome}
         onStartCall={() => handleStartCall()}
@@ -947,31 +959,75 @@ const EnhancedIndex = () => {
             </Button>
           </div>
 
-          {/* Stats Overview */}
-          <Card className="bg-white/10 backdrop-blur-lg border-white/20 animate-slide-in-left">
+          {/* Interactive Stats Overview */}
+          <Card className="bg-white/10 backdrop-blur-lg border-white/20 animate-slide-in-left cursor-pointer hover:bg-white/15 transition-colors">
             <CardContent className="p-4">
               <div className="grid grid-cols-4 gap-4 text-center">
-                <div className="animate-bounce-in" style={{ animationDelay: '0.6s' }}>
+                <button 
+                  className="animate-bounce-in hover:scale-105 transition-transform" 
+                  style={{ animationDelay: '0.6s' }}
+                  onClick={() => setCurrentView('chats')}
+                >
                   <MessageSquare className="w-5 h-5 mx-auto mb-1" />
                   <p className="text-xs opacity-90">Chats</p>
-                  <p className="font-bold">127</p>
-                </div>
-                <div className="animate-bounce-in" style={{ animationDelay: '0.7s' }}>
+                  <p className="font-bold text-sm">{stats.totalChats}</p>
+                  <div className="text-xs text-green-400">+{XP_PER_MESSAGE}XP</div>
+                </button>
+                <button 
+                  className="animate-bounce-in hover:scale-105 transition-transform" 
+                  style={{ animationDelay: '0.7s' }}
+                  onClick={() => setCurrentView('calls')}
+                >
                   <Phone className="w-5 h-5 mx-auto mb-1" />
                   <p className="text-xs opacity-90">Calls</p>
-                  <p className="font-bold">23</p>
-                </div>
-                <div className="animate-bounce-in" style={{ animationDelay: '0.8s' }}>
+                  <p className="font-bold text-sm">{stats.totalCalls}</p>
+                  <div className="text-xs text-blue-400">{Math.floor(stats.totalMinutesSpent)}m</div>
+                </button>
+                <button 
+                  className="animate-bounce-in hover:scale-105 transition-transform" 
+                  style={{ animationDelay: '0.8s' }}
+                  onClick={() => setCurrentView('favorites')}
+                >
                   <Heart className="w-5 h-5 mx-auto mb-1" />
                   <p className="text-xs opacity-90">Favorites</p>
-                  <p className="font-bold">{favorites.length}</p>
-                </div>
-                <div className="animate-bounce-in" style={{ animationDelay: '0.9s' }}>
-                  <TrendingUp className="w-5 h-5 mx-auto mb-1" />
+                  <p className="font-bold text-sm">{stats.totalFavorites}</p>
+                  <div className="text-xs text-pink-400">+{XP_PER_FAVORITE}XP</div>
+                </button>
+                <button 
+                  className="animate-bounce-in hover:scale-105 transition-transform" 
+                  style={{ animationDelay: '0.9s' }}
+                  onClick={() => setCurrentView('profile')}
+                >
+                  <div className="flex items-center justify-center mb-1">
+                    <Crown className="w-4 h-4 mr-1" />
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
                   <p className="text-xs opacity-90">Level</p>
-                  <p className="font-bold">4.2</p>
-                </div>
+                  <p className="font-bold text-sm">{stats.level}</p>
+                  <div className="text-xs text-purple-400">{stats.xp}XP</div>
+                </button>
               </div>
+              
+              {/* XP Progress Bar */}
+              <div className="mt-3 px-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Level {stats.level}</span>
+                  <span>{stats.xpToNextLevel}XP to next level</span>
+                </div>
+                <Progress 
+                  value={((stats.xp - (stats.level - 1) * 100) / (stats.level * 100)) * 100} 
+                  className="h-2 bg-white/20"
+                />
+              </div>
+              
+              {/* Streak indicator */}
+              {stats.streakDays > 0 && (
+                <div className="mt-2 text-center">
+                  <Badge variant="secondary" className="bg-orange-500/20 text-orange-200">
+                    🔥 {stats.streakDays} day streak
+                  </Badge>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -984,49 +1040,61 @@ const EnhancedIndex = () => {
         </div>
       )}
 
-      {/* Enhanced Navigation */}
+      {/* Optimized 4-Tab Navigation */}
       <div className="px-4 -mt-6 relative z-10 animate-slide-in-left" style={{ animationDelay: '1s' }}>
         <Card className="p-2 shadow-xl border-0 bg-card/95 backdrop-blur-xl">
           <div className="grid grid-cols-4 gap-2">
             <Button 
-              variant={currentView === 'home' ? 'romance' : 'ghost'} 
-              onClick={() => handleNavigation('home')}
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
-            >
-              <MessageSquare className="w-5 h-5" />
-              <span>Home</span>
-            </Button>
-            <Button 
               variant={currentView === 'chats' ? 'romance' : 'ghost'} 
-              onClick={() => handleNavigation('chats')}
+              onClick={() => setCurrentView('chats')}
               className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
             >
               <MessageSquare className="w-5 h-5" />
               <span>Chats</span>
-            </Button>
-            <Button 
-              variant={currentView === 'discover' ? 'romance' : 'ghost'} 
-              onClick={() => handleNavigation('discover')}
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
-            >
-              <Search className="w-5 h-5" />
-              <span>Discover</span>
+              {stats.totalChats > 0 && (
+                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4">
+                  {stats.totalChats}
+                </Badge>
+              )}
             </Button>
             <Button 
               variant={currentView === 'calls' ? 'romance' : 'ghost'} 
-              onClick={() => handleNavigation('calls')}
+              onClick={() => setCurrentView('calls')}
               className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
             >
               <Phone className="w-5 h-5" />
               <span>Calls</span>
+              {stats.totalCalls > 0 && (
+                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4">
+                  {stats.totalCalls}
+                </Badge>
+              )}
+            </Button>
+            <Button 
+              variant={currentView === 'favorites' ? 'romance' : 'ghost'} 
+              onClick={() => setCurrentView('favorites')}
+              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
+            >
+              <Heart className="w-5 h-5" />
+              <span>Favorites</span>
+              {stats.totalFavorites > 0 && (
+                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4">
+                  {stats.totalFavorites}
+                </Badge>
+              )}
             </Button>
             <Button 
               variant={currentView === 'profile' ? 'romance' : 'ghost'} 
-              onClick={() => handleNavigation('profile')}
-              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105"
+              onClick={() => setCurrentView('profile')}
+              className="flex flex-col gap-1 h-auto py-3 text-xs transition-all duration-300 hover:scale-105 relative"
             >
               <User className="w-5 h-5" />
               <span>Profile</span>
+              {stats.level > 1 && (
+                <Badge variant="secondary" className="text-xs px-1 py-0 min-w-0 h-4 bg-purple-500/20 text-purple-200">
+                  L{stats.level}
+                </Badge>
+              )}
             </Button>
           </div>
         </Card>

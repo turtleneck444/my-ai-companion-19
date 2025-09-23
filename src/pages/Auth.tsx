@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthForm } from '@/components/AuthForm';
+import { SEO } from '@/components/SEO';
 
 export const AuthPage = () => {
   const navigate = useNavigate();
@@ -44,8 +45,29 @@ export const AuthPage = () => {
     return null;
   }
 
+  const authSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: 'LoveAI Sign In - Join Your AI Companion',
+    description: 'Sign in or create your LoveAI account to start meaningful conversations with your perfect AI companion',
+    mainEntity: {
+      '@type': 'WebApplication',
+      name: 'LoveAI',
+      applicationCategory: 'SocialNetworkingApplication'
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-pink-50 to-blue-50 flex items-center justify-center p-4">
+    <>
+      <SEO 
+        title="Sign In to LoveAI - Join Your AI Companion | Create Account"
+        description="Sign in or create your LoveAI account to start meaningful conversations with your perfect AI companion. Join thousands experiencing emotional AI relationships."
+        keywords="LoveAI login, AI companion account, sign up AI girlfriend, create AI relationship account, LoveAI registration"
+        schema={authSchema}
+        url={window.location.href}
+        type="website"
+      />
+      <div className="min-h-screen bg-gradient-to-br from-violet-50 via-pink-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
@@ -58,5 +80,6 @@ export const AuthPage = () => {
         <AuthForm />
       </div>
     </div>
+    </>
   );
 }; 

@@ -64,17 +64,96 @@ export const VoiceSelector = ({
   const fetchVoices = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/elevenlabs-voices');
-      if (!response.ok) {
-        throw new Error('Failed to fetch voices');
+      
+      // Try to fetch from ElevenLabs API
+      const response = await fetch('/api/elevenlabs-voices', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setVoices(data.voices || []);
+      } else {
+        throw new Error('API not available');
       }
-      const data = await response.json();
-      setVoices(data.voices || []);
     } catch (error) {
-      console.error('Error fetching voices:', error);
+      console.warn('ElevenLabs API not available, using fallback voices:', error);
+      
+      // Use fallback voices when API is not available
+      const fallbackVoices: Voice[] = [
+        {
+          voice_id: 'sarah',
+          name: 'Sarah',
+          category: 'Female',
+          description: 'Warm and friendly female voice',
+          preview_url: '',
+          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
+          suggestedPersonality: ['Caring', 'Sweet', 'Empathetic'],
+          characteristics: { warmth: 9, energy: 6, clarity: 8, depth: 7 }
+        },
+        {
+          voice_id: 'emma',
+          name: 'Emma',
+          category: 'Female',
+          description: 'Sweet and caring female voice',
+          preview_url: '',
+          labels: { accent: 'british', gender: 'female', age: 'young_adult' },
+          suggestedPersonality: ['Sweet', 'Caring', 'Intelligent'],
+          characteristics: { warmth: 8, energy: 5, clarity: 9, depth: 8 }
+        },
+        {
+          voice_id: 'lily',
+          name: 'Lily',
+          category: 'Female',
+          description: 'Playful and energetic female voice',
+          preview_url: '',
+          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
+          suggestedPersonality: ['Playful', 'Adventurous', 'Sweet'],
+          characteristics: { warmth: 7, energy: 9, clarity: 8, depth: 6 }
+        },
+        {
+          voice_id: 'sophia',
+          name: 'Sophia',
+          category: 'Female',
+          description: 'Elegant and sophisticated female voice',
+          preview_url: '',
+          labels: { accent: 'american', gender: 'female', age: 'middle_aged' },
+          suggestedPersonality: ['Intelligent', 'Confident', 'Romantic'],
+          characteristics: { warmth: 6, energy: 5, clarity: 9, depth: 9 }
+        },
+        {
+          voice_id: 'aria',
+          name: 'Aria',
+          category: 'Female',
+          description: 'Mysterious and alluring female voice',
+          preview_url: '',
+          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
+          suggestedPersonality: ['Mysterious', 'Romantic', 'Confident'],
+          characteristics: { warmth: 6, energy: 7, clarity: 8, depth: 9 }
+        },
+        {
+          voice_id: 'maya',
+          name: 'Maya',
+          category: 'Female',
+          description: 'Confident and charismatic female voice',
+          preview_url: '',
+          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
+          suggestedPersonality: ['Confident', 'Adventurous', 'Playful'],
+          characteristics: { warmth: 7, energy: 8, clarity: 8, depth: 7 }
+        }
+      ];
+      
+      setVoices(fallbackVoices);
+      
+      // Show a less alarming message to users
       toast({ 
-        title: "Error", 
-        description: "Failed to load voices. Please try again." 
+        title: "Voice Selection Available", 
+        description: "Using built-in voice options. Premium voices will be available when connected to ElevenLabs.",
+        variant: "default"
       });
     } finally {
       setLoading(false);

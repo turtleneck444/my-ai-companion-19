@@ -1,0 +1,226 @@
+/* Mobile Optimizations for LoveAI Platform */
+
+/* Prevent horizontal overflow on mobile */
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Improve touch targets */
+  button, .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better mobile typography */
+  h1 {
+    font-size: 2rem !important;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.3;
+  }
+
+  /* Mobile-friendly padding */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Optimize cards for mobile */
+  .card {
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+  }
+
+  /* Better mobile navigation */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 0.5rem;
+  }
+
+  /* Mobile-specific chat interface */
+  .chat-message {
+    max-width: 85% !important;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* Mobile input area */
+  .chat-input {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .chat-input input {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Mobile character cards */
+  .character-card {
+    margin-bottom: 1rem;
+  }
+
+  .character-card img {
+    height: 200px;
+    object-fit: cover;
+  }
+
+  /* Mobile stats grid */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
+  }
+
+  /* Mobile hero section */
+  .hero-section {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    text-align: center;
+  }
+
+  /* Mobile pricing cards */
+  .pricing-card {
+    margin-bottom: 1.5rem;
+    max-width: 100%;
+  }
+
+  /* Better mobile modals */
+  .modal {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+
+  /* Mobile-specific animations */
+  .mobile-animate {
+    animation: mobile-fade-in 0.3s ease-out;
+  }
+
+  @keyframes mobile-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Safe area handling for mobile devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Mobile landscape adjustments */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .chat-header {
+      padding: 0.5rem 1rem;
+    }
+    
+    .chat-messages {
+      padding: 0.5rem;
+    }
+  }
+
+  /* Improve mobile scrolling */
+  .scroll-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Mobile-friendly forms */
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+  }
+
+  /* Mobile accessibility improvements */
+  .sr-only-mobile {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Better mobile loading states */
+  .loading-mobile {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+  }
+}
+
+/* Tablet specific adjustments */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .character-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .tablet-nav {
+    padding: 1rem 2rem;
+  }
+}
+
+/* High DPI mobile displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .high-dpi-image {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Dark mode mobile adjustments */
+@media (prefers-color-scheme: dark) and (max-width: 768px) {
+  .mobile-nav {
+    background: rgba(0, 0, 0, 0.95);
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .chat-message {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Reduce motion for mobile users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-animate,
+  .animate-bounce,
+  .animate-pulse,
+  .animate-spin {
+    animation: none;
+  }
+
+  .transition-transform {
+    transition: none;
+  }
+} 
