@@ -74,8 +74,8 @@ async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<voi
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.92;
-    utterance.pitch = 1.05;
+    utterance.rate = 0.9;
+    utterance.pitch = 1.15;
     utterance.volume = 0.85;
 
     // Map voice IDs to preferred voice characteristics
