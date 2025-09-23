@@ -103,7 +103,16 @@ const EnhancedIndex = () => {
   
   const [currentView, setCurrentView] = useState<View>('home');
   // const { stats, updateStats } = useUserStats();
-  const stats = { level: 1, xp: 0, xpToNextLevel: 100, totalChats: 0, streakDays: 1 }; // Mock stats for testing
+  const stats = { 
+    level: 1, 
+    xp: 0, 
+    xpToNextLevel: 100, 
+    totalChats: 0, 
+    totalCalls: 0,
+    totalFavorites: 0,
+    totalMinutesSpent: 0,
+    streakDays: 1 
+  }; // Mock stats for testing
   const updateStats = { addMessage: () => {}, addCall: () => {}, addFavorite: () => {} }; // Mock functions
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [showBackendNotification, setShowBackendNotification] = useState(true);
@@ -144,7 +153,8 @@ const EnhancedIndex = () => {
     }
   }, []);
 
-  // Load user activity from localStorage (only once on mount)
+  // Load user activity from localStorage (only once on mount) - DISABLED FOR TESTING
+  /*
   useEffect(() => {
     const savedActivity = localStorage.getItem('userActivity');
     if (savedActivity) {
@@ -192,8 +202,10 @@ const EnhancedIndex = () => {
       });
     }
   }, []); // Empty dependency array - only run once
+  */
 
-  // Save user activity to localStorage (debounced to prevent excessive updates)
+  // Save user activity to localStorage (debounced to prevent excessive updates) - DISABLED FOR TESTING
+  /*
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       localStorage.setItem('userActivity', JSON.stringify(userActivity));
@@ -201,8 +213,10 @@ const EnhancedIndex = () => {
 
     return () => clearTimeout(timeoutId);
   }, [userActivity]);
+  */
 
-  // Generate smart greeting (simplified to prevent re-render loops)
+  // Generate smart greeting (simplified to prevent re-render loops) - DISABLED FOR TESTING
+  /*
   useEffect(() => {
     // Simple greeting without any dependencies that could change
     const hour = new Date().getHours();
@@ -228,6 +242,12 @@ const EnhancedIndex = () => {
     setCurrentGreeting(greeting);
     setIsGeneratingGreeting(false);
   }, [timeOfDay]); // Only depend on timeOfDay
+  */
+
+  // Set a simple default greeting
+  if (currentGreeting.main === '') {
+    setCurrentGreeting({ main: "Welcome! 🌟", sub: "Ready for some quality time together?" });
+  }
 
   const handleRefreshGreeting = () => {
     // Simple refresh without any state dependencies
