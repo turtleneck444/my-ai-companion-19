@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,101 +40,118 @@ interface Character {
 
 type View = 'home' | 'chats' | 'calls' | 'favorites' | 'profile' | 'chat' | 'call';
 
+// Static character data to prevent re-creation
+const CHARACTERS: Character[] = [
+  {
+    id: '1',
+    name: 'Luna',
+    avatar: lunaAvatar,
+    bio: 'A graphic designer who works late nights and loves discovering new music. She has strong opinions about coffee and gets excited about creative projects.',
+    personality: ['Creative', 'Thoughtful', 'Independent'],
+    voice: 'Soft & Melodic',
+    isOnline: true,
+    mood: 'focused',
+    lastMessage: "Working on this design project and my brain is fried. How's your day going?",
+    unreadCount: 2,
+    relationshipLevel: 4.2
+  },
+  {
+    id: '2',
+    name: 'Aria',
+    avatar: ariaAvatar,
+    bio: 'Marketing coordinator who actually enjoys her job. Always has restaurant recommendations and plans weekend adventures she may or may not follow through on.',
+    personality: ['Outgoing', 'Spontaneous', 'Ambitious'],
+    voice: 'Bright & Cheerful',
+    isOnline: true,
+    mood: 'energetic',
+    lastMessage: "Found this hole-in-the-wall place that serves the best ramen. You free this weekend?",
+    unreadCount: 1,
+    relationshipLevel: 3.8
+  },
+  {
+    id: '3',
+    name: 'Sophie',
+    avatar: sophieAvatar,
+    bio: 'Museum curator with strong opinions about art and wine. She can talk for hours about things she\'s passionate about and isn\'t afraid to disagree.',
+    personality: ['Intellectual', 'Confident', 'Direct'],
+    voice: 'Warm & Confident',
+    isOnline: false,
+    mood: 'contemplative',
+    lastMessage: "That exhibit we talked about was actually disappointing. The curation felt lazy.",
+    unreadCount: 0,
+    relationshipLevel: 3.1
+  }
+];
+
 const EnhancedIndex = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Core state - minimal and stable
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
-  const [favorites, setFavorites] = useState<string[]>(['1']); // Simple favorites without localStorage
+  const [favorites, setFavorites] = useState<string[]>(['1']);
+  const [userName, setUserName] = useState('there');
 
-  // Character data - more realistic and authentic personalities
-  const characters: Character[] = [
-    {
-      id: '1',
-      name: 'Luna',
-      avatar: lunaAvatar,
-      bio: 'A graphic designer who works late nights and loves discovering new music. She has strong opinions about coffee and gets excited about creative projects.',
-      personality: ['Creative', 'Thoughtful', 'Independent'],
-      voice: 'Soft & Melodic',
-      isOnline: true,
-      mood: 'focused',
-      lastMessage: "Working on this design project and my brain is fried. How's your day going?",
-      unreadCount: 2,
-      relationshipLevel: 4.2
-    },
-    {
-      id: '2',
-      name: 'Aria',
-      avatar: ariaAvatar,
-      bio: 'Marketing coordinator who actually enjoys her job. Always has restaurant recommendations and plans weekend adventures she may or may not follow through on.',
-      personality: ['Outgoing', 'Spontaneous', 'Ambitious'],
-      voice: 'Bright & Cheerful',
-      isOnline: true,
-      mood: 'energetic',
-      lastMessage: "Found this hole-in-the-wall place that serves the best ramen. You free this weekend?",
-      unreadCount: 1,
-      relationshipLevel: 3.8
-    },
-    {
-      id: '3',
-      name: 'Sophie',
-      avatar: sophieAvatar,
-      bio: 'Museum curator with strong opinions about art and wine. She can talk for hours about things she\'s passionate about and isn\'t afraid to disagree.',
-      personality: ['Intellectual', 'Confident', 'Direct'],
-      voice: 'Warm & Confident',
-      isOnline: false,
-      mood: 'contemplative',
-      lastMessage: "That exhibit we talked about was actually disappointing. The curation felt lazy.",
-      unreadCount: 0,
-      relationshipLevel: 3.1
+  // Update user name only when user data changes
+  useEffect(() => {
+    if (user) {
+      const name = user.user_metadata?.preferred_name || 
+                   user.user_metadata?.name || 
+                   user.email?.split('@')[0] || 
+                   'there';
+      setUserName(name);
     }
-  ];
+  }, [user?.user_metadata?.preferred_name, user?.user_metadata?.name, user?.email]);
 
-  // Enhanced userPreferences with preferred name options
-  const [userPreferences, setUserPreferences] = useState({
-    preferredName: user?.user_metadata?.preferred_name || user?.user_metadata?.name || 'there',
-    treatmentStyle: 'casual', // casual, affectionate, formal
-    age: '25',
-    contentFilter: true
-  });
-
-  const handleCharacterSelect = (character: Character) => {
+  // Stable handlers
+  const handleCharacterSelect = useCallback((character: Character) => {
     setSelectedCharacter(character);
     setCurrentView('chat');
-  };
+  }, []);
 
-  const handleStartCall = (character?: Character) => {
+  const handleStartCall = useCallback((character?: Character) => {
     const char = character || selectedCharacter;
     if (char) {
       setSelectedCharacter(char);
       setCurrentView('call');
       toast({
         title: "Starting voice call...",
-        description: `Connecting to ${char.name} 💕`,
+        description: `Connecting to ${char.name}`,
       });
     }
-  };
+  }, [selectedCharacter, toast]);
 
-  const handleBackToHome = () => {
+  const handleBackToHome = useCallback(() => {
     setCurrentView('home');
     setSelectedCharacter(null);
-  };
+  }, []);
 
-  const handleFavorite = (character: Character) => {
+  const handleFavorite = useCallback((character: Character) => {
     setFavorites(prev => 
       prev.includes(character.id) 
         ? prev.filter(id => id !== character.id)
         : [...prev, character.id]
     );
-  };
+  }, []);
 
-  const handleUpdatePreferences = (newPreferences: any) => {
-    setUserPreferences(prev => ({ ...prev, ...newPreferences }));
+  // Stable user preferences
+  const userPreferences = useMemo(() => ({
+    preferredName: userName,
+    treatmentStyle: 'casual',
+    age: '25',
+    contentFilter: true
+  }), [userName]);
+
+  const handleUpdatePreferences = useCallback((newPreferences: any) => {
+    if (newPreferences.preferredName) {
+      setUserName(newPreferences.preferredName);
+    }
     toast({
       title: "Preferences updated!",
       description: "Your companions will remember how you like to be addressed.",
     });
-  };
+  }, [toast]);
 
   // Render different views
   if (currentView === 'profile') {
@@ -187,7 +204,7 @@ const EnhancedIndex = () => {
         </div>
 
         <div className="p-4 space-y-4 mb-20">
-          {characters.map((character) => (
+          {CHARACTERS.map((character) => (
             <Card 
               key={character.id} 
               className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
@@ -249,7 +266,7 @@ const EnhancedIndex = () => {
   }
 
   if (currentView === 'favorites') {
-    const favoriteCharacters = characters.filter(char => favorites.includes(char.id));
+    const favoriteCharacters = CHARACTERS.filter(char => favorites.includes(char.id));
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
@@ -374,7 +391,7 @@ const EnhancedIndex = () => {
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold mb-1 text-white">Hey {userPreferences.preferredName}!</h2>
+                    <h2 className="text-xl font-bold mb-1 text-white">Hey {userName}!</h2>
                     <p className="text-white/90 text-sm">Your companions are online and ready to chat</p>
                   </div>
                 </div>
@@ -416,7 +433,7 @@ const EnhancedIndex = () => {
         </div>
 
         <div className="space-y-6">
-          {characters.map((character, index) => (
+          {CHARACTERS.map((character, index) => (
             <Card 
               key={character.id}
               className="group overflow-hidden bg-gradient-to-br from-background to-background/50 backdrop-blur-xl border-border/50 hover:border-primary/50 transition-all duration-500 cursor-pointer shadow-lg hover:shadow-2xl animate-fade-up"
