@@ -34,7 +34,7 @@ declare global {
 }
 
 export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: PaymentModalProps) => {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
@@ -136,6 +136,7 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
       );
 
       if (subscription?.id) {
+        try { await updateProfile({ plan: plan.id }); } catch {}
         toast({ title: 'Subscription active', description: `Welcome to ${plan.name}!` });
         onSuccess({ id: subscription.id, status: subscription.status || 'active', planId: plan.id });
         onClose();

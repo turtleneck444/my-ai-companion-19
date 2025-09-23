@@ -181,8 +181,39 @@ async function cancelSubscription(data, headers) {
 
 async function handleWebhook(event, headers) {
   try {
-    const webhookData = JSON.parse(event.body || '{}');
-    console.log('Square webhook received:', webhookData.type);
+    const sig = event.headers['x-square-hmacsha256-signature'];
+    const body = event.body || '';
+    // TODO: Optionally verify signature with your webhook signature key
+    // if (process.env.SQUARE_WEBHOOK_SIGNATURE_KEY) { /* verify HMAC */ }
+
+    const data = JSON.parse(body || '{}');
+    const type = data?.type || data?.event_type || 'unknown';
+    console.log('Square webhook received:', type);
+
+    // Attempt to map to user via customer referenceId if present
+    const customerId = data?.data?.object?.subscription?.customer_id || data?.data?.object?.payment?.customer_id;
+
+    // Determine plan status transitions
+    let newPlan = null;
+    if (type.includes('subscription.created') || type.includes('subscription.activated') || type.includes('invoice.paid')) {
+      // You may map subscription.plan_id back to app plan
+      newPlan = 'premium';
+    }
+    if (type.includes('subscription.canceled') || type.includes('invoice.payment_failed')) {
+      newPlan = 'free';
+    }
+
+    if (newPlan && process.env.SUPABASE_SERVICE_ROLE && process.env.SUPABASE_URL) {
+      try {
+        // Update user profile metadata via Supabase admin API if you store a mapping
+        // This requires you to know the user ID associated to the customer. You can store
+        // Square customerId alongside userId in your DB. Placeholder only:
+        console.log('Would update Supabase user plan to:', newPlan, 'for customer:', customerId);
+      } catch (e) {
+        console.warn('Failed to update Supabase from webhook', e);
+      }
+    }
+
     return { statusCode: 200, headers, body: JSON.stringify({ received: true }) };
   } catch (error) {
     console.error('Webhook handling failed:', error);
