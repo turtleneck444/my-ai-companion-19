@@ -93,6 +93,19 @@ export const VoiceCallInterface = ({
     } catch {}
   };
 
+  // Explicit start for recognition (some browsers require a user gesture)
+  const startListeningNow = async () => {
+    try {
+      await unlockAudio();
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+        recognitionRef.current.start();
+        setIsListening(true);
+        setCallConnected(true);
+      }
+    } catch {}
+  };
+
   // Initialize call duration timer
   useEffect(() => {
     const timer = setInterval(() => {
@@ -587,6 +600,13 @@ export const VoiceCallInterface = ({
               <p className="text-sm text-muted-foreground animate-pulse">
                 I'm listening! Say something and I'll respond when you pause 💕
               </p>
+            )}
+            {!isListening && !isAiSpeaking && !isMuted && (
+              <div className="flex items-center justify-center mt-2">
+                <button onClick={startListeningNow} className="text-sm px-3 py-1 rounded bg-primary/10 text-primary hover:bg-primary/15">
+                  Start Listening
+                </button>
+              </div>
             )}
             
             {isMuted && (
