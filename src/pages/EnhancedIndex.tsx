@@ -481,19 +481,27 @@ const EnhancedIndex = () => {
               </div>
 
               {/* Enhanced User Greeting Card */}
-              <Card className="bg-white/15 backdrop-blur-xl border-white/20 shadow-2xl animate-slide-in-left" style={{ animationDelay: '0.8s' }}>
-                <CardContent className="p-6">
+              <Card className="bg-white/15 backdrop-blur-xl border-white/20 shadow-2xl animate-slide-in-left relative overflow-hidden" style={{ animationDelay: '0.8s' }}>
+                {/* Subtle background glow */}
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-blue-500/10" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                
+                <CardContent className="p-6 relative z-10">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-white text-xl font-semibold">
+                      <h2 className="text-white text-xl font-semibold drop-shadow-2xl shadow-black/50" style={{ 
+                        textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(255,255,255,0.3), 0 0 40px rgba(168,85,247,0.4)'
+                      }}>
                         Hey {userName}! 👋
                       </h2>
-                      <p className="text-white/90 text-sm">
+                      <p className="text-white/95 text-sm drop-shadow-lg" style={{ 
+                        textShadow: '0 1px 4px rgba(0,0,0,0.7), 0 0 15px rgba(255,255,255,0.2)'
+                      }}>
                         Your companions missed you
                       </p>
                     </div>
-                    <Avatar className="w-12 h-12 border-2 border-white/30">
-                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white">
+                    <Avatar className="w-12 h-12 border-2 border-white/30 shadow-xl ring-2 ring-purple-400/20">
+                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white font-bold shadow-inner">
                         {user?.email?.charAt(0).toUpperCase() || userName.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
@@ -502,16 +510,28 @@ const EnhancedIndex = () => {
                   {/* Quick Stats */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="text-center">
-                      <p className="text-white text-2xl font-bold">3</p>
-                      <p className="text-white/80 text-xs">Available</p>
+                      <p className="text-white text-2xl font-bold drop-shadow-xl" style={{ 
+                        textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 0 25px rgba(255,255,255,0.4), 0 0 50px rgba(168,85,247,0.3)'
+                      }}>3</p>
+                      <p className="text-white/90 text-xs font-medium drop-shadow-lg" style={{ 
+                        textShadow: '0 1px 4px rgba(0,0,0,0.8), 0 0 12px rgba(255,255,255,0.25)'
+                      }}>Available</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-white text-2xl font-bold">{favorites.length}</p>
-                      <p className="text-white/80 text-xs">Favorites</p>
+                      <p className="text-white text-2xl font-bold drop-shadow-xl" style={{ 
+                        textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 0 25px rgba(255,255,255,0.4), 0 0 50px rgba(236,72,153,0.3)'
+                      }}>{favorites.length}</p>
+                      <p className="text-white/90 text-xs font-medium drop-shadow-lg" style={{ 
+                        textShadow: '0 1px 4px rgba(0,0,0,0.8), 0 0 12px rgba(255,255,255,0.25)'
+                      }}>Favorites</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-white text-2xl font-bold">2</p>
-                      <p className="text-white/80 text-xs">Online</p>
+                      <p className="text-white text-2xl font-bold drop-shadow-xl" style={{ 
+                        textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 0 25px rgba(255,255,255,0.4), 0 0 50px rgba(34,197,94,0.3)'
+                      }}>2</p>
+                      <p className="text-white/90 text-xs font-medium drop-shadow-lg" style={{ 
+                        textShadow: '0 1px 4px rgba(0,0,0,0.8), 0 0 12px rgba(255,255,255,0.25)'
+                      }}>Online</p>
                     </div>
                   </div>
                 </CardContent>
