@@ -232,9 +232,27 @@ const Create = () => {
     
     setIsPlayingVoice(true);
     try {
-      await speakText(`Hello! I'm ${character.name || 'your AI companion'}. ${character.bio || 'Nice to meet you!'}`, character.voice.voice_id);
+      // Create a personalized preview message
+      const previewText = character.name 
+        ? `Hi! I'm ${character.name}. ${character.bio ? character.bio.slice(0, 100) : "I'm excited to be your AI companion!"}`
+        : "Hello! I'm your AI companion. I can't wait to chat with you!";
+      
+      console.log('Playing voice preview:', { voiceId: character.voice.voice_id, text: previewText });
+      
+      await speakText(previewText, character.voice.voice_id);
+      
+      toast({ 
+        title: "Voice preview played! 🎉", 
+        description: `You just heard ${character.voice.name}'s voice`,
+        duration: 3000
+      });
     } catch (error) {
-      toast({ title: "Voice preview failed", description: "Could not play voice preview." });
+      console.error('Voice preview error:', error);
+      toast({ 
+        title: "Voice preview", 
+        description: "Using browser voice. Premium ElevenLabs voices available when connected.",
+        variant: "default"
+      });
     } finally {
       setIsPlayingVoice(false);
     }

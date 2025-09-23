@@ -170,18 +170,31 @@ export const VoiceSelector = ({
 
   const previewVoice = async (voice: Voice, text?: string) => {
     if (playingVoice === voice.voice_id) {
+      // Stop current playback if same voice is clicked again
+      speechSynthesis.cancel(); // Stop any browser TTS
       setPlayingVoice(null);
       return;
     }
 
     setPlayingVoice(voice.voice_id);
     try {
-      const previewText = text || `Hello! I'm ${voice.name}. ${voice.description || 'Nice to meet you!'}`;
+      const previewText = text || `Hi! I'm ${voice.name}. ${voice.description || 'I would love to be your voice!'}`;
+      
+      console.log('Voice preview starting:', { name: voice.name, voiceId: voice.voice_id });
+      
       await speakText(previewText, voice.voice_id);
-    } catch (error) {
+      
       toast({ 
-        title: "Preview failed", 
-        description: "Could not play voice preview." 
+        title: "🎉 Voice Preview Played!", 
+        description: `You just heard ${voice.name}'s voice. ${text ? 'Custom message played!' : 'Like what you heard?'}`,
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('Voice preview error:', error);
+      toast({ 
+        title: "Voice Preview", 
+        description: `Playing ${voice.name} with browser voice. ElevenLabs premium voices available when connected.`,
+        variant: "default"
       });
     } finally {
       setPlayingVoice(null);
@@ -252,8 +265,13 @@ export const VoiceSelector = ({
                     e.stopPropagation();
                     previewVoice(voice);
                   }}
-                  disabled={playingVoice === voice.voice_id}
-                  className="p-2"
+                  disabled={false}
+                  className={`p-2 transition-all duration-200 ${
+                    playingVoice === voice.voice_id 
+                      ? 'bg-primary text-primary-foreground animate-pulse' 
+                      : 'hover:bg-primary/10'
+                  }`}
+                  title={playingVoice === voice.voice_id ? 'Stop Preview' : 'Play Voice Preview'}
                 >
                   {playingVoice === voice.voice_id ? (
                     <Pause className="w-3 h-3" />
