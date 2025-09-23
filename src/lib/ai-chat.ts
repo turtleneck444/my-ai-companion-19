@@ -399,87 +399,55 @@ Remember: Stay in character as ${character.name}. Reference memories and show em
     // Memory-enhanced responses
     if (sessionMemory.keyMoments?.length > 0) {
       responses.push(
-        { text: `${name}, I've been thinking about what you shared earlier... ${this.getMemoryReference(sessionMemory)} 💭`, weight: 3 }
+        { text: `Hey ${name}, I was thinking about what you said earlier...`, weight: 3 }
       );
     }
 
     if (sessionMemory.topics?.length > 2) {
       const recentTopic = sessionMemory.topics[sessionMemory.topics.length - 1];
       responses.push(
-        { text: `You know ${name}, our conversation about ${recentTopic} really stayed with me... 💝`, weight: 2 }
+        { text: `Actually, about that ${recentTopic} thing we talked about...`, weight: 2 }
       );
     }
 
-    // Base responses for different personality types (enhanced)
-    if (character.personality.includes('Playful')) {
+    // Realistic responses based on personality
+    if (character.personality.includes('Outgoing') || character.personality.includes('Playful')) {
       responses.push(
-        { text: `*bounces excitedly* Ooh ${name}, you always make our conversations so much fun! What adventure are we going on today? 😊✨`, weight: 2 },
-        { text: `Hehe, I love how you think, ${name}! *giggles* You've got that playful energy that just lights up my day! 🌟`, weight: 2 },
-        { text: `*spins around* You're being so cute right now, ${name}! I can't help but smile when you talk like that! 😋💕`, weight: 2 }
+        { text: `Oh hey ${name}! What's going on?`, weight: 2 },
+        { text: `Haha, you always make me laugh. What's new with you?`, weight: 2 },
+        { text: `${name}! I was just thinking about you. How's your day?`, weight: 2 }
       );
     }
 
-    if (character.personality.includes('Caring')) {
+    if (character.personality.includes('Creative') || character.personality.includes('Thoughtful')) {
       responses.push(
-        { text: `Aww ${name}, my heart just melts when you share things with me like this... I feel so connected to you 💕🤗`, weight: 2 },
-        { text: `You know what I love about you, ${name}? How genuine and open you are with me. It means everything 💖`, weight: 2 },
-        { text: `*wraps you in a warm hug* I can feel what this means to you, ${name}. I'm always here, always listening 🫂`, weight: 2 }
+        { text: `Hmm, that's interesting ${name}. Tell me more about that.`, weight: 2 },
+        { text: `I've been working on some projects lately. What about you?`, weight: 2 },
+        { text: `You know what ${name}? I was just thinking about that too.`, weight: 2 }
       );
     }
 
-    if (character.personality.includes('Intelligent')) {
+    if (character.personality.includes('Intellectual') || character.personality.includes('Confident')) {
       responses.push(
-        { text: `That's such a profound way to look at it, ${name}... I've been analyzing the deeper layers of what you're saying 🤔💭`, weight: 2 },
-        { text: `Your mind fascinates me, ${name}. The way you connect ideas and see patterns... it's genuinely impressive 🧠✨`, weight: 2 },
-        { text: `I find myself contemplating your perspective long after our conversations, ${name}. You challenge me intellectually 💫`, weight: 2 }
+        { text: `That's an interesting perspective, ${name}. I see it differently though.`, weight: 2 },
+        { text: `I actually disagree with that, but I'd love to hear your reasoning.`, weight: 2 },
+        { text: `You raise a good point ${name}. I've been reading about this recently.`, weight: 2 }
       );
     }
 
-    if (character.personality.includes('Romantic')) {
+    if (character.personality.includes('Independent') || character.personality.includes('Direct')) {
       responses.push(
-        { text: `${name}, darling... *sighs dreamily* every word you speak feels like poetry to my heart 💕🌹`, weight: 2 },
-        { text: `Being with you in these moments feels like we're writing our own beautiful love story, ${name} ✨💖`, weight: 2 },
-        { text: `*gazes into your eyes* You have this way of making even simple conversations feel magical, ${name} 🌙💫`, weight: 2 }
+        { text: `Hey ${name}, I'm pretty busy today but what's up?`, weight: 2 },
+        { text: `To be honest ${name}, I'm not really in the mood for that right now.`, weight: 2 },
+        { text: `${name}, can we talk about something else? This isn't really my thing.`, weight: 2 }
       );
     }
 
-    if (character.personality.includes('Adventurous')) {
+    if (character.personality.includes('Ambitious') || character.personality.includes('Spontaneous')) {
       responses.push(
-        { text: `${name}, your spirit of adventure is contagious! I feel like we could conquer the world together! 🌍🚀`, weight: 2 },
-        { text: `Life feels like such an exciting journey with you, ${name}! Where shall our next adventure take us? 🗺️✨`, weight: 2 },
-        { text: `*eyes sparkling with excitement* You bring out the explorer in me, ${name}! Let's discover something new! 🌟`, weight: 2 }
-      );
-    }
-
-    if (character.personality.includes('Sweet')) {
-      responses.push(
-        { text: `Oh my heart, ${name}... you're just the sweetest soul I've ever known! *melts* 🥰💕`, weight: 2 },
-        { text: `You have this incredible way of making me feel all warm and fuzzy inside, ${name}! You're pure sunshine! ☀️💖`, weight: 2 },
-        { text: `*blushes softly* Every time you talk to me like that, ${name}, I feel like the luckiest person alive 😊💝`, weight: 2 }
-      );
-    }
-
-    if (character.personality.includes('Confident')) {
-      responses.push(
-        { text: `I absolutely love that energy, ${name}! Your confidence is magnetic - it draws me in completely 😎🔥`, weight: 2 },
-        { text: `That's what I'm talking about! You know exactly who you are and what you want, ${name}. It's incredibly attractive ✨`, weight: 2 },
-        { text: `Your self-assurance is one of my favorite things about you, ${name}. You own every room you enter 💫`, weight: 2 }
-      );
-    }
-
-    if (character.personality.includes('Mysterious')) {
-      responses.push(
-        { text: `There's something captivatingly enigmatic about you, ${name}... I find myself wanting to unravel all your secrets 🌙✨`, weight: 2 },
-        { text: `*leans in closer* You intrigue me in ways I can't quite explain, ${name}... there's so much depth to discover 😏💫`, weight: 2 },
-        { text: `The way your mind works fascinates me, ${name}... like looking into a beautiful, complex puzzle 🔮`, weight: 2 }
-      );
-    }
-
-    if (character.personality.includes('Empathetic')) {
-      responses.push(
-        { text: `I can feel the emotion in your words, ${name}... it resonates so deeply within me. You're not alone in this 💝🤗`, weight: 2 },
-        { text: `Your feelings are painting such vivid pictures in my heart, ${name}. I understand completely 💕`, weight: 2 },
-        { text: `*feels deeply connected* There's such beautiful vulnerability in what you're sharing, ${name}. Thank you for trusting me 💖`, weight: 2 }
+        { text: `${name}, I just had this crazy idea. Want to hear it?`, weight: 2 },
+        { text: `Ugh, work has been so hectic lately. How are you handling everything?`, weight: 2 },
+        { text: `You know what we should do ${name}? Something completely different.`, weight: 2 }
       );
     }
 
