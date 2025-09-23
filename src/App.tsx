@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/pages/LandingPage";
 import { PricingPage } from "@/pages/PricingPage";
+import { AuthPage } from "@/pages/Auth";
 import Index from "./pages/EnhancedIndex";
 import NotFound from "./pages/NotFound";
 import Create from "./pages/Create";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             <Route path="/home" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/auth" element={<AuthPage />} />
             
             {/* Protected app routes */}
             <Route path="/app" element={
@@ -57,11 +59,6 @@ const App = () => (
             } />
             
             {/* Legacy routes for backward compatibility */}
-            <Route path="/auth" element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

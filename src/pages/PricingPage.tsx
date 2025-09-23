@@ -15,7 +15,7 @@ import {
   Users,
   MessageSquare,
   Phone,
-  Video,
+
   Sparkles
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -32,12 +32,23 @@ export const PricingPage = () => {
 
   const handleSelectPlan = (planId: string) => {
     if (planId === 'free') {
-      // Free plan - redirect to app
-      navigate('/app');
+      // Free plan - check if user is logged in
+      if (user) {
+        // User is logged in, go to app
+        navigate('/app');
+      } else {
+        // User not logged in, redirect to home for signup/login
+        navigate('/?plan=free');
+      }
     } else {
-      // Paid plan - show payment modal
-      setSelectedPlan(planId);
-      setShowPaymentModal(true);
+      // Paid plan - check if user is logged in
+      if (user) {
+        setSelectedPlan(planId);
+        setShowPaymentModal(true);
+      } else {
+        // User not logged in, redirect to home for signup/login with plan info
+        navigate(`/?plan=${planId}`);
+      }
     }
   };
 
@@ -55,7 +66,7 @@ export const PricingPage = () => {
     },
     {
       icon: <Phone className="w-6 h-6" />,
-      title: "Voice & Video Calls",
+      title: "Voice Calls",
       description: "Experience natural voice interactions"
     },
     {

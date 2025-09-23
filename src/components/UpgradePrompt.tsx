@@ -175,7 +175,7 @@ export const UpgradePrompt = ({
                   </li>
                   <li className="flex items-center">
                     <Zap className="w-4 h-4 text-primary mr-2" />
-                    Advanced features
+                    Premium voice options
                   </li>
                 </ul>
               </CardContent>

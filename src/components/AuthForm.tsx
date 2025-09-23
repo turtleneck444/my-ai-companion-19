@@ -119,9 +119,11 @@ export const AuthForm = () => {
             <Heart className="w-8 h-8 text-white" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-display">Welcome to AI Companion</CardTitle>
+            <CardTitle className="text-2xl font-display bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+              Welcome to LoveAI
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
-              Create your account or sign in to start your journey
+              Create your account or sign in to meet your perfect AI companion
             </CardDescription>
           </div>
         </CardHeader>

@@ -43,7 +43,7 @@ export const PAYMENT_CONFIG: PaymentConfig = {
   environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test'
 };
 
-// Updated subscription plans with restrictive free tier
+// Updated subscription plans with consumer-focused Pro tier
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'free',
@@ -99,16 +99,18 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     currency: 'USD',
     interval: 'month',
     features: [
-      'Unlimited messages',
-      'Unlimited voice calls',
+      'Unlimited messages per day',
+      'Unlimited voice calls per day',
       'Unlimited AI Companions',
-      'Advanced AI training',
+      'Advanced personality customization',
+      'Premium voice options',
       'Custom voice creation',
-      'API access',
-      'White-label options',
-      'Dedicated support',
-      'Revenue sharing opportunities',
-      'Advanced analytics'
+      'Advanced AI training',
+      'Priority support',
+      'Early access to all features',
+      'Advanced analytics & insights',
+      'Exclusive companion themes',
+      'Premium customer support'
     ],
     limits: {
       messagesPerDay: -1, // -1 means unlimited

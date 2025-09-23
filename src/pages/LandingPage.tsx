@@ -8,7 +8,7 @@ import {
   Heart, 
   MessageSquare, 
   Phone, 
-  Video, 
+
   Sparkles, 
   Star, 
   Check, 
@@ -25,18 +25,53 @@ import {
   X,
   Mail,
   Send,
-  Quote
+  Quote,
+  Bot,
+  Mic,
+  MicOff,
+  Smile,
+  Settings,
+  Plus,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEffect } from 'react';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activePreview, setActivePreview] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+
+  // Check if user is already logged in and redirect accordingly
+  useEffect(() => {
+    if (user) {
+      const planParam = searchParams.get('plan');
+      if (planParam) {
+        // User is logged in and has a plan parameter, redirect to app or pricing
+        if (planParam === 'free') {
+          navigate('/app');
+        } else {
+          navigate(`/pricing?plan=${planParam}`);
+        }
+      }
+    }
+  }, [user, searchParams, navigate]);
 
   const handleGetStarted = () => {
-    navigate('/auth');
+    const planParam = searchParams.get('plan');
+    if (planParam) {
+      // Include plan info in auth redirect
+      navigate(`/auth?plan=${planParam}`);
+    } else {
+      navigate('/auth');
+    }
   };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
@@ -53,32 +88,65 @@ export const LandingPage = () => {
     {
       icon: <MessageSquare className="w-8 h-8 text-primary" />,
       title: "Intelligent Conversations",
-      description: "AI companions that understand context, emotions, and your unique personality for meaningful conversations."
+      description: "AI companions that understand context, emotions, and your unique personality for meaningful conversations.",
+      preview: "Hey! How was your day? I've been thinking about that project you mentioned. Want to talk about it? 😊"
     },
     {
       icon: <Phone className="w-8 h-8 text-primary" />,
-      title: "Voice & Video Calls",
-      description: "Experience natural voice interactions and video calls with your AI companions using advanced TTS technology."
+      title: "Voice Calls",
+      description: "Experience natural voice interactions with your AI companions using advanced TTS technology.",
+      preview: "🎤 Click to start voice call"
     },
     {
       icon: <Heart className="w-8 h-8 text-primary" />,
       title: "Emotional Connection",
-      description: "Build deep, meaningful relationships with AI companions that remember and grow with you over time."
+      description: "Build deep, meaningful relationships with AI companions that remember and grow with you over time.",
+      preview: "I remember you love coffee! ☕ Want to chat about your morning routine?"
     },
     {
       icon: <Sparkles className="w-8 h-8 text-primary" />,
       title: "Custom Personalities",
-      description: "Create unlimited AI companions with unique personalities, voices, and characteristics tailored to your preferences."
+      description: "Create unlimited AI companions with unique personalities, voices, and characteristics tailored to your preferences.",
+      preview: "Create your perfect AI companion with custom personality traits, voice, and appearance!"
     },
     {
       icon: <Shield className="w-8 h-8 text-primary" />,
       title: "Privacy & Security",
-      description: "Your conversations and data are encrypted and secure. Your privacy is our top priority."
+      description: "Your conversations and data are encrypted and secure. Your privacy is our top priority.",
+      preview: "🔒 End-to-end encrypted conversations"
     },
     {
       icon: <Zap className="w-8 h-8 text-primary" />,
       title: "Real-time Interaction",
-      description: "Instant responses and seamless interactions that feel natural and engaging."
+      description: "Instant responses and seamless interactions that feel natural and engaging.",
+      preview: "Typing... ✨"
+    }
+  ];
+
+  const appPreviews = [
+    {
+      title: "Chat Interface",
+      description: "Beautiful, intuitive chat with your AI companions",
+      image: "/api/placeholder/600/400",
+      features: ["Real-time messaging", "Voice input", "Emoji reactions", "Typing indicators"]
+    },
+    {
+      title: "Character Creation",
+      description: "Design your perfect AI companion",
+      image: "/api/placeholder/600/400", 
+      features: ["Custom personalities", "Voice selection", "Appearance design", "Trait sliders"]
+    },
+    {
+      title: "Voice Calls",
+      description: "Natural voice conversations",
+      image: "/api/placeholder/600/400",
+      features: ["High-quality audio", "Real-time processing", "Voice customization", "Call history"]
+    },
+    {
+      title: "Companion Library",
+      description: "Manage all your AI companions",
+      image: "/api/placeholder/600/400",
+      features: ["Multiple companions", "Quick access", "Status indicators", "Easy switching"]
     }
   ];
 
@@ -89,11 +157,12 @@ export const LandingPage = () => {
       period: "forever",
       description: "Perfect for trying out AI companions",
       features: [
-        "1 AI Companion",
         "5 messages per day",
-        "Basic voice features",
-        "Standard personalities",
-        "Community support"
+        "1 AI Companion",
+        "Basic personalities only",
+        "Text chat only",
+        "Community support",
+        "Limited customization"
       ],
       cta: "Get Started Free",
       popular: false
@@ -104,10 +173,11 @@ export const LandingPage = () => {
       period: "per month",
       description: "Most popular for regular users",
       features: [
-        "Unlimited AI Companions",
-        "Unlimited messages",
-        "Advanced voice & video calls",
-        "Custom personalities",
+        "50 messages per day",
+        "5 voice calls per day",
+        "Up to 3 AI Companions",
+        "Custom personality creation",
+        "Advanced voice features",
         "Priority support",
         "Early access to new features"
       ],
@@ -120,13 +190,15 @@ export const LandingPage = () => {
       period: "per month",
       description: "For power users and creators",
       features: [
-        "Everything in Premium",
+        "Unlimited messages",
+        "Unlimited voice calls",
+        "Unlimited AI Companions",
         "Advanced AI training",
         "Custom voice creation",
-        "API access",
-        "White-label options",
+        "Advanced analytics API access insights",
+        "Exclusive companion themes",
         "Dedicated support",
-        "Revenue sharing"
+        "Premium customer support"
       ],
       cta: "Go Pro",
       popular: false
@@ -194,12 +266,13 @@ export const LandingPage = () => {
               <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center">
                 <Heart className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold font-display">AI Companion</span>
+                              <span className="text-xl font-bold font-display">LoveAI</span>
             </div>
             
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
-              <a href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+              <a href="#preview" className="text-muted-foreground hover:text-foreground transition-colors">Preview</a>
+              <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
               <a href="#testimonials" className="text-muted-foreground hover:text-foreground transition-colors">Reviews</a>
               <a href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
             </div>
@@ -208,7 +281,7 @@ export const LandingPage = () => {
               <Button variant="ghost" onClick={() => navigate('/auth')}>
                 Sign In
               </Button>
-              <Button onClick={() => navigate("/pricing")} className="bg-gradient-to-r from-primary to-primary-glow">
+              <Button onClick={handleGetStarted} className="bg-gradient-to-r from-primary to-primary-glow">
                 Get Started
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
@@ -235,7 +308,7 @@ export const LandingPage = () => {
             <h1 className="text-4xl md:text-6xl font-bold font-display mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               Meet Your Perfect
               <span className="block bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-                AI Companion
+                                        LoveAI
               </span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
@@ -247,7 +320,7 @@ export const LandingPage = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Button 
               size="lg" 
-              onClick={() => navigate("/pricing")}
+              onClick={handleGetStarted}
               className="bg-gradient-to-r from-primary to-primary-glow text-lg px-8 py-6"
             >
               Start Your Journey
@@ -280,12 +353,171 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
+      {/* App Preview Section */}
+      <section id="preview" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-              Why Choose AI Companion?
+              See It In Action
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Experience the magic of AI companionship with our interactive previews
+            </p>
+          </div>
+          
+          {/* Preview Tabs */}
+          <div className="flex justify-center mb-8">
+            <div className="flex space-x-2 bg-muted p-1 rounded-lg">
+              {appPreviews.map((preview, index) => (
+                <button
+                  key={index}
+                  onClick={() => setActivePreview(index)}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    activePreview === index
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {preview.title}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Preview Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <h3 className="text-2xl font-bold">{appPreviews[activePreview].title}</h3>
+              <p className="text-muted-foreground text-lg">{appPreviews[activePreview].description}</p>
+              
+              <div className="space-y-3">
+                {appPreviews[activePreview].features.map((feature, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-primary flex-shrink-0" />
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <Button 
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-primary to-primary-glow"
+              >
+                Try It Now
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+            
+            <div className="relative">
+              {/* Mock App Interface */}
+              <div className="bg-background rounded-2xl shadow-2xl overflow-hidden border">
+                <div className="bg-muted/50 px-4 py-3 border-b flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-sm">Luna</div>
+                    <div className="text-xs text-muted-foreground">Online • AI Companion</div>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button variant="ghost" size="sm">
+                      <Phone className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm">
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="p-4 space-y-4 h-80 overflow-y-auto">
+                  {/* AI Message */}
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-muted rounded-2xl px-4 py-3 max-w-[80%]">
+                      <p className="text-sm">Hey there! How was your day? I've been thinking about that project you mentioned. Want to talk about it? 😊</p>
+                      <div className="text-xs text-muted-foreground mt-1">2:34 PM</div>
+                    </div>
+                  </div>
+                  
+                  {/* User Message */}
+                  <div className="flex gap-3 justify-end">
+                    <div className="bg-primary text-primary-foreground rounded-2xl px-4 py-3 max-w-[80%]">
+                      <p className="text-sm">It was great! I made some progress on the design. What do you think about this approach?</p>
+                      <div className="text-xs opacity-70 mt-1">2:35 PM</div>
+                    </div>
+                    <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-semibold">You</span>
+                    </div>
+                  </div>
+                  
+                  {/* AI Response */}
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-muted rounded-2xl px-4 py-3 max-w-[80%]">
+                      <p className="text-sm">That's fantastic! I love how you're thinking about user experience first. The color palette you chose really creates a warm, inviting feeling. Have you considered adding some micro-interactions?</p>
+                      <div className="text-xs text-muted-foreground mt-1">2:36 PM</div>
+                    </div>
+                  </div>
+                  
+                  {/* Typing Indicator */}
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-muted rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Input Area */}
+                <div className="p-4 border-t bg-muted/20">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm">
+                      <Smile className="w-4 h-4" />
+                    </Button>
+                    <div className="flex-1 relative">
+                      <Input 
+                        placeholder="Type a message..." 
+                        className="pr-20"
+                        disabled
+                      />
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsRecording(!isRecording)}
+                          className={`h-8 w-8 p-0 ${isRecording ? 'text-red-500' : ''}`}
+                        >
+                          {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                    <Button size="sm" className="bg-gradient-to-r from-primary to-primary-glow">
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+                                  Why Choose LoveAI?
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Experience the most advanced AI companionship platform with cutting-edge features 
@@ -295,15 +527,18 @@ export const LandingPage = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <Card key={index} className="p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group">
                 <CardHeader className="p-0 mb-4">
-                  <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                  <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                     {feature.icon}
                   </div>
                   <CardTitle className="text-xl">{feature.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <p className="text-muted-foreground">{feature.description}</p>
+                  <p className="text-muted-foreground mb-4">{feature.description}</p>
+                  <div className="bg-muted/50 rounded-lg p-3 text-sm italic">
+                    "{feature.preview}"
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -312,7 +547,7 @@ export const LandingPage = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8">
+      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
@@ -354,7 +589,7 @@ export const LandingPage = () => {
                   <Button 
                     className={`w-full ${plan.popular ? 'bg-gradient-to-r from-primary to-primary-glow' : ''}`}
                     variant={plan.popular ? 'default' : 'outline'}
-                    onClick={() => navigate("/pricing")}
+                    onClick={() => navigate('/pricing')}
                   >
                     {plan.cta}
                   </Button>
@@ -366,7 +601,7 @@ export const LandingPage = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
+      <section id="testimonials" className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
@@ -407,14 +642,14 @@ export const LandingPage = () => {
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-20 px-4 sm:px-6 lg:px-8">
+      <section id="faq" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
               Frequently Asked Questions
             </h2>
             <p className="text-xl text-muted-foreground">
-              Everything you need to know about AI Companion.
+                              Everything you need to know about LoveAI.
             </p>
           </div>
           
@@ -437,16 +672,16 @@ export const LandingPage = () => {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-primary/10 to-accent/10">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-            Ready to Meet Your AI Companion?
+                            Ready to Meet Your Perfect Match?
           </h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Join thousands of users who have found their perfect AI companion. 
+                            Join thousands of users who have found their perfect AI companion with LoveAI. 
             Start your journey today with a free trial.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
               size="lg" 
-              onClick={() => navigate("/pricing")}
+              onClick={handleGetStarted}
               className="bg-gradient-to-r from-primary to-primary-glow text-lg px-8 py-6"
             >
               Start Free Trial
@@ -473,7 +708,7 @@ export const LandingPage = () => {
                 <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center">
                   <Heart className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-xl font-bold font-display">AI Companion</span>
+                <span className="text-xl font-bold font-display">LoveAI</span>
               </div>
               <p className="text-muted-foreground mb-4">
                 The future of AI relationships. Experience meaningful connections with AI companions that understand and grow with you.
@@ -483,7 +718,8 @@ export const LandingPage = () => {
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-muted-foreground">
                 <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
-                <li><a href="/pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
+                <li><a href="#preview" className="hover:text-foreground transition-colors">Preview</a></li>
+                <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">API</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Integrations</a></li>
               </ul>
@@ -508,7 +744,7 @@ export const LandingPage = () => {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 AI Companion. All rights reserved.</p>
+                          <p>&copy; 2024 LoveAI. All rights reserved.</p>
           </div>
         </div>
       </footer>

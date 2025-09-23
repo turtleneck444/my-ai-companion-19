@@ -12,6 +12,7 @@ import { UserProfile } from "@/components/UserProfile";
 import { SwipeDiscovery } from "@/components/SwipeGestures";
 import { RelationshipStats, PremiumFeatures } from "@/components/AdvancedFeatures";
 import { BackendNotification } from "@/components/BackendNotification";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   MessageSquare, 
   Phone, 
@@ -64,6 +65,10 @@ interface Character {
   lastMessage?: string;
   unreadCount?: number;
   relationshipLevel?: number;
+  age?: number;
+  location?: string;
+  interests?: string[];
+  lastSeen?: string;
 }
 
 interface CallHistory {
@@ -356,7 +361,11 @@ const EnhancedIndex = () => {
       mood: 'content',
       lastMessage: "Hey, how was your day? I just finished this new design project",
       unreadCount: 2,
-      relationshipLevel: 4.2
+      relationshipLevel: 4.2,
+      age: 24,
+      location: 'San Francisco, CA',
+      interests: ['Photography', 'Stargazing', 'Indie Music', 'Digital Art', 'Poetry'],
+      lastSeen: 'Active now'
     },
     {
       id: '2',
@@ -369,7 +378,11 @@ const EnhancedIndex = () => {
       mood: 'excited',
       lastMessage: "omg you have to try this new coffee place I found",
       unreadCount: 1,
-      relationshipLevel: 3.8
+      relationshipLevel: 3.8,
+      age: 26,
+      location: 'New York, NY',
+      interests: ['Live Music', 'Food Tours', 'Dancing', 'Travel', 'Cocktails'],
+      lastSeen: 'Active now'
     },
     {
       id: '3',
@@ -382,7 +395,11 @@ const EnhancedIndex = () => {
       mood: 'focused',
       lastMessage: "I saw the most interesting exhibit today, reminded me of our conversation about modern art",
       unreadCount: 0,
-      relationshipLevel: 3.1
+      relationshipLevel: 3.1,
+      age: 29,
+      location: 'Los Angeles, CA',
+      interests: ['Art History', 'Wine Tasting', 'Classical Music', 'Museum Visits', 'Literature'],
+      lastSeen: '2 hours ago'
     },
     {
       id: '4',
@@ -395,7 +412,11 @@ const EnhancedIndex = () => {
       mood: 'relaxed',
       lastMessage: "just made the best pasta, wish you could taste it lol",
       unreadCount: 0,
-      relationshipLevel: 4.5
+      relationshipLevel: 4.5,
+      age: 27,
+      location: 'Austin, TX',
+      interests: ['Coding', 'Running', 'Podcasts', 'Cooking', 'Board Games'],
+      lastSeen: 'Active now'
     },
     {
       id: '5',
@@ -408,7 +429,11 @@ const EnhancedIndex = () => {
       mood: 'peaceful',
       lastMessage: "found this amazing trail today, perfect weather for it",
       unreadCount: 1,
-      relationshipLevel: 4.0
+      relationshipLevel: 4.0,
+      age: 25,
+      location: 'Denver, CO',
+      interests: ['Yoga', 'Photography', 'Hiking', 'Meditation', 'Nature'],
+      lastSeen: '30 minutes ago'
     }
   ];
 
@@ -536,22 +561,39 @@ const EnhancedIndex = () => {
 
   if (currentView === 'discover') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
-        <div className="sticky top-0 bg-card/95 backdrop-blur-xl border-b p-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
+      <div className="min-h-screen bg-gradient-to-br from-violet-50 via-pink-50 to-blue-50 relative overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-br from-pink-200 to-purple-200 rounded-full blur-3xl opacity-20 animate-pulse" />
+          <div className="absolute top-40 right-20 w-24 h-24 bg-gradient-to-br from-blue-200 to-cyan-200 rounded-full blur-2xl opacity-30 animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute bottom-40 left-1/4 w-20 h-20 bg-gradient-to-br from-violet-200 to-pink-200 rounded-full blur-xl opacity-25 animate-pulse" style={{ animationDelay: '2s' }} />
+        </div>
+
+        <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-white/20 p-4 flex items-center justify-between z-10 shadow-lg">
+          <div className="flex items-center gap-4">
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={handleBackToHome}
-              className="p-2"
+              className="p-2 hover:bg-white/50 transition-all duration-300"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="font-display text-xl font-semibold">Discover</h1>
+            <div>
+              <h1 className="font-display text-2xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+                Discover
+              </h1>
+              <p className="text-xs text-muted-foreground">Find your perfect match</p>
+            </div>
           </div>
-          <Button variant="ghost" size="sm">
-            <Filter className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+                         <div className="bg-gradient-to-r from-emerald-400 to-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-sm">
+               {characters.length} to discover
+             </div>
+            <Button variant="ghost" size="sm" className="hover:bg-white/50 transition-all duration-300">
+              <Filter className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         <div className="p-4">
@@ -560,8 +602,24 @@ const EnhancedIndex = () => {
             onMatch={handleMatch}
           />
           
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Swipe right to like • Swipe left to pass • Swipe up to super like</p>
+          <div className="mt-8 text-center space-y-3">
+            <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-emerald-400 rounded-full" />
+                <span>Like</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-red-400 rounded-full" />
+                <span>Pass</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-400 rounded-full" />
+                <span>Super Like</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground/70">
+              Swipe or use the buttons below
+            </p>
           </div>
         </div>
       </div>
@@ -979,7 +1037,7 @@ const EnhancedIndex = () => {
         {/* Quick Actions */}
         <div className="flex justify-between items-center">
           <h2 className="font-display text-xl font-semibold animate-fade-up">
-            Your AI Companions
+                                    Your LoveAI Companions
           </h2>
           <div className="flex gap-2">
             <Button 
