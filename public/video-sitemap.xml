@@ -4,12 +4,12 @@
 
   <!-- Demo Video -->
   <url>
-    <loc>https://my-ai-companion-19.netlify.app/</loc>
+    <loc>https://www.loveaicompanion.com/</loc>
     <video:video>
-      <video:thumbnail_loc>https://my-ai-companion-19.netlify.app/video-thumbnail.jpg</video:thumbnail_loc>
+      <video:thumbnail_loc>https://www.loveaicompanion.com/video-thumbnail.jpg</video:thumbnail_loc>
       <video:title>LoveAI - Meet Your Perfect AI Companion</video:title>
       <video:description>Experience the future of AI companionship with LoveAI. See how our emotional AI technology creates meaningful connections through realistic conversations, voice calls, and personalized interactions.</video:description>
-      <video:content_loc>https://my-ai-companion-19.netlify.app/demo-video.mp4</video:content_loc>
+      <video:content_loc>https://www.loveaicompanion.com/demo-video.mp4</video:content_loc>
       <video:duration>150</video:duration>
       <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
       <video:family_friendly>yes</video:family_friendly>
@@ -23,9 +23,9 @@
 
   <!-- Character Introduction Videos -->
   <url>
-    <loc>https://my-ai-companion-19.netlify.app/characters/luna</loc>
+    <loc>https://www.loveaicompanion.com/characters/luna</loc>
     <video:video>
-      <video:thumbnail_loc>https://my-ai-companion-19.netlify.app/avatar-luna.jpg</video:thumbnail_loc>
+      <video:thumbnail_loc>https://www.loveaicompanion.com/avatar-luna.jpg</video:thumbnail_loc>
       <video:title>Meet Luna - Your Warm and Caring AI Companion</video:title>
       <video:description>Get to know Luna, an AI companion with a warm personality who loves deep conversations and emotional connections.</video:description>
       <video:duration>60</video:duration>
@@ -39,9 +39,9 @@
 
   <!-- Feature Demo Videos -->
   <url>
-    <loc>https://my-ai-companion-19.netlify.app/features/voice-calls</loc>
+    <loc>https://www.loveaicompanion.com/features/voice-calls</loc>
     <video:video>
-      <video:thumbnail_loc>https://my-ai-companion-19.netlify.app/natalie.png</video:thumbnail_loc>
+      <video:thumbnail_loc>https://www.loveaicompanion.com/natalie.png</video:thumbnail_loc>
       <video:title>LoveAI Voice Calls - Natural AI Conversations</video:title>
       <video:description>Experience natural voice conversations with your AI companion using advanced speech synthesis and real-time processing.</video:description>
       <video:duration>90</video:duration>

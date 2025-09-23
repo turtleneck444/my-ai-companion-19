@@ -117,13 +117,13 @@ Crawl-delay: 1
 Request-rate: 1/1s
 
 # Sitemap locations for maximum discoverability
-Sitemap: https://my-ai-companion-19.netlify.app/sitemap.xml
-Sitemap: https://my-ai-companion-19.netlify.app/image-sitemap.xml
-Sitemap: https://my-ai-companion-19.netlify.app/video-sitemap.xml
-Sitemap: https://my-ai-companion-19.netlify.app/news-sitemap.xml
+Sitemap: https://www.loveaicompanion.com/sitemap.xml
+Sitemap: https://www.loveaicompanion.com/image-sitemap.xml
+Sitemap: https://www.loveaicompanion.com/video-sitemap.xml
+Sitemap: https://www.loveaicompanion.com/news-sitemap.xml
 
 # Host directive (for Yandex and others)
-Host: loveai.app
+Host: www.loveaicompanion.com
 
 # Clean-param directive to ignore tracking parameters
 Clean-param: utm_source&utm_medium&utm_campaign&utm_term&utm_content&fbclid&gclid&msclkid
@@ -131,4 +131,4 @@ Clean-param: utm_source&utm_medium&utm_campaign&utm_term&utm_content&fbclid&gcli
 # Comment with last updated timestamp
 # Last updated: 2024-01-15T00:00:00Z
 # Optimized for viral AI companion discovery
-# Contact: hello@loveai.app for SEO partnerships
+# Contact: hello@loveaicompanion.com for SEO partnerships
