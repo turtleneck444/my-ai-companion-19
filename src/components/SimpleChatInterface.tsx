@@ -435,7 +435,7 @@ export const SimpleChatInterface = ({
         </div>
       )}
 
-      {/* Enhanced Input Area */}
+      {/* Clean Mobile Input Area */}
       <div className="p-4 bg-background/95 backdrop-blur-xl border-t">
         {/* Emoji Picker */}
         {showEmojiPicker && (
@@ -447,14 +447,77 @@ export const SimpleChatInterface = ({
           </div>
         )}
         
-        <div className="flex items-end gap-2">
-          {/* Action Buttons */}
-          <div className="flex gap-1">
+        <div className="flex items-center gap-2">
+          {/* More Actions Button (Hidden on Desktop) */}
+          <div className="relative md:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`h-10 w-10 p-0 transition-all duration-200 ${
+                showEmojiPicker ? 'bg-primary/10 text-primary' : 'hover:bg-primary/10'
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+
+            {/* Mobile Actions Menu */}
+            {showEmojiPicker && (
+              <div className="absolute bottom-full left-0 mb-2 z-50">
+                <Card className="p-3 shadow-lg bg-background border">
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        toast({ title: "📷 Camera", description: "Photo sharing coming soon!" });
+                        setShowEmojiPicker(false);
+                      }}
+                      className="h-12 flex-col gap-1 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span className="text-xs">Photo</span>
+                    </Button>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowGames(true);
+                        setShowEmojiPicker(false);
+                      }}
+                      className="h-12 flex-col gap-1 text-purple-600 hover:bg-purple-50"
+                    >
+                      <Gamepad2 className="w-5 h-5" />
+                      <span className="text-xs">Games</span>
+                    </Button>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        toast({ title: "🎁 Gifts", description: "Virtual gifts coming soon!" });
+                        setShowEmojiPicker(false);
+                      }}
+                      className="h-12 flex-col gap-1 text-pink-600 hover:bg-pink-50"
+                    >
+                      <Gift className="w-5 h-5" />
+                      <span className="text-xs">Gift</span>
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Action Buttons (Visible on Desktop Only) */}
+          <div className="hidden md:flex gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
                   variant="ghost" 
                   size="sm"
+                  onClick={() => toast({ title: "📷 Camera", description: "Photo sharing coming soon!" })}
                   className="h-10 w-10 p-0 hover:bg-blue-500/10 text-blue-600"
                 >
                   <Camera className="w-5 h-5" />
@@ -468,12 +531,13 @@ export const SimpleChatInterface = ({
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="h-10 w-10 p-0 hover:bg-green-500/10 text-green-600"
+                  onClick={() => setShowGames(true)}
+                  className="h-10 w-10 p-0 hover:bg-purple-500/10 text-purple-600"
                 >
-                  <Image className="w-5 h-5" />
+                  <Gamepad2 className="w-5 h-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Send image</TooltipContent>
+              <TooltipContent>Play games</TooltipContent>
             </Tooltip>
             
             <Tooltip>
@@ -481,7 +545,8 @@ export const SimpleChatInterface = ({
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="h-10 w-10 p-0 hover:bg-purple-500/10 text-purple-600"
+                  onClick={() => toast({ title: "🎁 Gifts", description: "Virtual gifts coming soon!" })}
+                  className="h-10 w-10 p-0 hover:bg-pink-500/10 text-pink-600"
                 >
                   <Gift className="w-5 h-5" />
                 </Button>
@@ -498,7 +563,7 @@ export const SimpleChatInterface = ({
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${character.name}...`}
-              className="pr-20 h-10 bg-background/50 border-border/50 focus:border-primary/50 transition-all rounded-full"
+              className="pr-16 h-10 bg-background/50 border-border/50 focus:border-primary/50 transition-all rounded-full"
             />
             
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -506,7 +571,7 @@ export const SimpleChatInterface = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`h-6 w-6 p-0 transition-all duration-200 ${
+                className={`h-6 w-6 p-0 transition-all duration-200 md:inline-flex hidden ${
                   showEmojiPicker ? 'bg-primary/10 text-primary' : 'hover:bg-primary/10'
                 }`}
               >

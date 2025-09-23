@@ -175,17 +175,18 @@ export const VoiceCallInterface = ({
           console.log('🔇 Speech recognition ended');
           setIsListening(false);
           
-          // Auto-restart if call is still active and AI isn't speaking
-          if (callConnected && !isAiSpeaking) {
+          // Only auto-restart if call is active, AI isn't speaking, and user isn't muted
+          if (callConnected && !isAiSpeaking && !isMuted && !isProcessing) {
             setTimeout(() => {
-              if (recognitionRef.current) {
+              if (recognitionRef.current && callConnected && !isAiSpeaking && !isMuted) {
                 try {
                   recognitionRef.current.start();
+                  console.log('🎤 Auto-restarted speech recognition');
                 } catch (e) {
-                  console.log('Could not restart recognition');
+                  console.log('Could not restart recognition - likely already active');
                 }
               }
-            }, 500);
+            }, 1500); // Increased delay to give AI more time to finish speaking
           }
         };
 
@@ -416,16 +417,17 @@ export const VoiceCallInterface = ({
     
     setIsAiSpeaking(false);
     
-    // Resume listening after AI finishes speaking
+    // Resume listening after AI finishes speaking with proper delay
     setTimeout(() => {
-      if (recognitionRef.current && callConnected) {
+      if (recognitionRef.current && callConnected && !isMuted && !isProcessing) {
         try {
           recognitionRef.current.start();
+          console.log('🎤 Resumed listening after AI response');
         } catch (e) {
-          console.log('Could not restart recognition');
+          console.log('Could not restart recognition - may already be active');
         }
       }
-    }, 1000);
+    }, 2000); // Longer delay to allow AI speech to complete and user to process
   };
 
   // Toggle microphone
@@ -545,21 +547,42 @@ export const VoiceCallInterface = ({
         </div>
 
         {/* Status Display */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h2 className="text-2xl font-bold">{character.name}</h2>
-          <p className="text-muted-foreground">
-            {isAiSpeaking ? '🗣️ Speaking...' :
-             isProcessing ? '💭 Thinking...' :
-             isListening ? '👂 Listening...' :
-             isMuted ? '🔇 Muted' :
-             '📞 In call'}
-          </p>
+          <div className="space-y-1">
+            <p className="text-lg font-medium">
+              {isAiSpeaking ? '🗣️ Speaking...' :
+               isProcessing ? '💭 Thinking...' :
+               isListening ? '🎤 Your turn to speak!' :
+               isMuted ? '🔇 Muted' :
+               '📞 In call'}
+            </p>
+            
+            {/* Interactive guidance */}
+            {isListening && !isMuted && (
+              <p className="text-sm text-muted-foreground animate-pulse">
+                I'm listening! Say something and I'll respond when you pause 💕
+              </p>
+            )}
+            
+            {isMuted && (
+              <p className="text-sm text-yellow-600">
+                Unmute to start talking with me!
+              </p>
+            )}
+            
+            {isAiSpeaking && (
+              <p className="text-sm text-muted-foreground">
+                I'll listen again when I finish speaking...
+              </p>
+            )}
+          </div>
           
           {/* Real-time transcript */}
           {currentTranscript && (
             <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
               <p className="text-sm text-muted-foreground italic">
-                "{currentTranscript}"
+                You're saying: "{currentTranscript}"
               </p>
             </div>
           )}

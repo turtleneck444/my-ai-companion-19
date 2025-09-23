@@ -16,7 +16,8 @@ import {
   Loader2, User, Mail, Settings, LogOut, Heart, Star, Calendar, Crown, 
   Shield, Bell, Volume2, Eye, Trash2, Download, Upload, Camera,
   CreditCard, Zap, BarChart3, MessageSquare, Phone, Timer,
-  Edit, Save, X, Check, AlertTriangle, Gift, Sparkles, ChevronRight
+  Edit, Save, X, Check, AlertTriangle, Gift, Sparkles, ChevronRight,
+  Pause
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -622,6 +623,132 @@ export const UserProfile = () => {
                   Download Invoice
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Methods */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Payment Methods
+              </CardTitle>
+              <CardDescription>Manage your payment methods and billing details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-6 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-bold">
+                      VISA
+                    </div>
+                    <div>
+                      <p className="font-medium">•••• •••• •••• 4242</p>
+                      <p className="text-sm text-gray-600">Expires 12/25</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">Primary</Badge>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" disabled>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Add Payment Method
+                </Button>
+                <Button variant="outline" disabled>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
+
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Payment methods will be available when billing begins after launch week.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          {/* Billing History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Billing History
+              </CardTitle>
+              <CardDescription>View your past invoices and payments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="font-medium text-gray-900 mb-2">No billing history yet</h3>
+                <p className="text-gray-600 text-sm mb-4">
+                  Your billing history will appear here once your subscription begins.
+                </p>
+                <Button variant="outline" disabled>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download All Invoices
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Subscription Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Subscription Management
+              </CardTitle>
+              <CardDescription>Control your subscription settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h4 className="font-medium">Auto-renewal</h4>
+                  <p className="text-sm text-gray-600">Automatically renew your subscription</p>
+                </div>
+                <Switch checked={true} disabled />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h4 className="font-medium">Usage alerts</h4>
+                  <p className="text-sm text-gray-600">Get notified when approaching limits</p>
+                </div>
+                <Switch checked={true} disabled />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h4 className="font-medium">Billing reminders</h4>
+                  <p className="text-sm text-gray-600">Email reminders before billing</p>
+                </div>
+                <Switch checked={false} disabled />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full" disabled>
+                  <Pause className="w-4 h-4 mr-2" />
+                  Pause Subscription
+                </Button>
+                <Button variant="destructive" className="w-full" disabled>
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel Subscription
+                </Button>
+              </div>
+
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Subscription management will be available when billing begins after launch week.
+                  Contact support if you need assistance.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </TabsContent>
