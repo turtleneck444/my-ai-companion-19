@@ -480,83 +480,57 @@ const EnhancedIndex = () => {
                 </Button>
               </div>
 
-              {/* SPECTACULAR Animated User Greeting Card */}
-              <Card className="group bg-gradient-to-br from-purple-900/95 via-violet-800/90 to-pink-900/90 backdrop-blur-xl border-purple-400/40 shadow-2xl animate-slide-in-left relative overflow-hidden ring-2 ring-purple-300/20 hover:ring-purple-200/40 hover:ring-4 transition-all duration-700 hover:scale-[1.02] hover:shadow-purple-500/25 hover:shadow-[0_0_40px] cursor-pointer" style={{ animationDelay: '0.8s' }}>
-                
-                {/* Dreamy Cloud Pattern Background Layers */}
-                <div className="absolute inset-0 opacity-30">
-                  {/* Base cloud layer */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-600/30 via-violet-500/20 to-pink-600/30" />
-                  
-                  {/* Floating cloud patterns */}
-                  <div className="absolute top-0 left-0 w-full h-full">
-                    <div className="absolute top-2 left-4 w-16 h-8 bg-gradient-to-r from-purple-300/20 to-pink-300/20 rounded-full blur-sm animate-pulse" style={{ animationDelay: '0s', animationDuration: '4s' }} />
-                    <div className="absolute top-8 right-6 w-12 h-6 bg-gradient-to-r from-violet-300/15 to-purple-300/15 rounded-full blur-sm animate-pulse" style={{ animationDelay: '1s', animationDuration: '5s' }} />
-                    <div className="absolute bottom-6 left-8 w-20 h-10 bg-gradient-to-r from-pink-300/20 to-violet-300/20 rounded-full blur-sm animate-pulse" style={{ animationDelay: '2s', animationDuration: '6s' }} />
-                    <div className="absolute bottom-12 right-4 w-14 h-7 bg-gradient-to-r from-purple-300/15 to-pink-300/15 rounded-full blur-sm animate-pulse" style={{ animationDelay: '3s', animationDuration: '4.5s' }} />
-                  </div>
-                  
-                  {/* Swirling cloud movements */}
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(168,85,247,0.15)_0%,_transparent_50%)] animate-spin" style={{ animationDuration: '20s' }} />
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,_rgba(236,72,153,0.12)_0%,_transparent_50%)] animate-spin" style={{ animationDuration: '25s', animationDirection: 'reverse' }} />
-                </div>
-                
-                {/* Magical overlay gradients */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-purple-500/10 group-hover:from-black/20 transition-all duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-purple-400/5 to-pink-400/10 group-hover:via-purple-400/10 group-hover:to-pink-400/15 transition-all duration-700" />
-                
-                {/* Floating sparkles */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                  <div className="absolute top-4 left-6 w-1 h-1 bg-white rounded-full animate-ping" style={{ animationDelay: '0s', animationDuration: '3s' }} />
-                  <div className="absolute top-12 right-8 w-1 h-1 bg-purple-200 rounded-full animate-ping" style={{ animationDelay: '1s', animationDuration: '4s' }} />
-                  <div className="absolute bottom-8 left-12 w-1 h-1 bg-pink-200 rounded-full animate-ping" style={{ animationDelay: '2s', animationDuration: '3.5s' }} />
-                  <div className="absolute bottom-16 right-6 w-1 h-1 bg-white rounded-full animate-ping" style={{ animationDelay: '2.5s', animationDuration: '4.5s' }} />
-                </div>
+              {/* Enhanced User Greeting Card */}
+              <Card className="bg-gradient-to-br from-slate-900/95 via-purple-900/90 to-pink-900/90 backdrop-blur-xl border-purple-500/30 shadow-2xl animate-slide-in-left relative overflow-hidden ring-1 ring-white/10" style={{ animationDelay: '0.8s' }}>
+                {/* Beautiful layered background effects */}
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 via-pink-600/15 to-blue-600/20" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-400/10 via-transparent to-transparent" />
                 
                 <CardContent className="p-6 relative z-10">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="group-hover:translate-x-1 transition-transform duration-500">
-                      <h2 className="text-white text-xl font-bold drop-shadow-2xl group-hover:scale-105 transition-transform duration-500" style={{ 
+                    <div>
+                      <h2 className="text-white text-xl font-bold drop-shadow-2xl" style={{ 
                         textShadow: '0 4px 12px rgba(0,0,0,0.9), 0 0 40px rgba(255,255,255,0.5), 0 0 80px rgba(168,85,247,0.6), 0 0 120px rgba(236,72,153,0.3)'
                       }}>
                         Hey {userName}! 👋
                       </h2>
-                      <p className="text-white/95 text-sm font-medium drop-shadow-lg mt-1 group-hover:text-purple-100 transition-colors duration-500" style={{ 
+                      <p className="text-white/95 text-sm font-medium drop-shadow-lg mt-1" style={{ 
                         textShadow: '0 3px 8px rgba(0,0,0,0.8), 0 0 25px rgba(255,255,255,0.4), 0 0 50px rgba(168,85,247,0.3)'
                       }}>
                         Your companions missed you
                       </p>
                     </div>
-                    <Avatar className="w-14 h-14 border-2 border-purple-400/50 shadow-2xl ring-2 ring-purple-300/30 ring-offset-2 ring-offset-purple-900/50 group-hover:ring-purple-200/50 group-hover:ring-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 group-hover:shadow-purple-400/50 group-hover:shadow-[0_0_30px]">
-                      <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold text-lg shadow-inner group-hover:from-purple-400 group-hover:to-pink-400 transition-all duration-500">
+                    <Avatar className="w-14 h-14 border-2 border-purple-400/40 shadow-2xl ring-2 ring-purple-300/20 ring-offset-2 ring-offset-purple-900/50">
+                      <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold text-lg shadow-inner">
                         {user?.email?.charAt(0).toUpperCase() || userName.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                   
-                  {/* MAGICAL Enhanced Quick Stats */}
+                  {/* Enhanced Quick Stats */}
                   <div className="grid grid-cols-3 gap-4 mt-6">
-                    <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-purple-400/30 group-hover:bg-white/12 group-hover:border-purple-300/50 transition-all duration-500 hover:scale-105 hover:bg-purple-500/10 hover:shadow-lg hover:shadow-purple-500/20 cursor-pointer">
-                      <p className="text-white text-2xl font-bold drop-shadow-2xl mb-1 hover:scale-110 transition-transform duration-300" style={{ 
+                    <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-purple-400/30">
+                      <p className="text-white text-2xl font-bold drop-shadow-2xl mb-1" style={{ 
                         textShadow: '0 4px 12px rgba(0,0,0,1), 0 0 40px rgba(255,255,255,0.6), 0 0 80px rgba(168,85,247,0.5)'
                       }}>3</p>
-                      <p className="text-purple-100 text-xs font-semibold uppercase tracking-wide drop-shadow-lg hover:text-white transition-colors duration-300" style={{ 
+                      <p className="text-purple-100 text-xs font-semibold uppercase tracking-wide drop-shadow-lg" style={{ 
                         textShadow: '0 3px 8px rgba(0,0,0,0.9), 0 0 20px rgba(255,255,255,0.4)'
                       }}>Available</p>
                     </div>
-                    <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-pink-400/30 group-hover:bg-white/12 group-hover:border-pink-300/50 transition-all duration-500 hover:scale-105 hover:bg-pink-500/10 hover:shadow-lg hover:shadow-pink-500/20 cursor-pointer">
-                      <p className="text-white text-2xl font-bold drop-shadow-2xl mb-1 hover:scale-110 transition-transform duration-300" style={{ 
+                    <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-pink-400/30">
+                      <p className="text-white text-2xl font-bold drop-shadow-2xl mb-1" style={{ 
                         textShadow: '0 4px 12px rgba(0,0,0,1), 0 0 40px rgba(255,255,255,0.6), 0 0 80px rgba(236,72,153,0.5)'
                       }}>{favorites.length}</p>
-                      <p className="text-pink-100 text-xs font-semibold uppercase tracking-wide drop-shadow-lg hover:text-white transition-colors duration-300" style={{ 
+                      <p className="text-pink-100 text-xs font-semibold uppercase tracking-wide drop-shadow-lg" style={{ 
                         textShadow: '0 3px 8px rgba(0,0,0,0.9), 0 0 20px rgba(255,255,255,0.4)'
                       }}>Favorites</p>
                     </div>
-                    <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-violet-400/30 group-hover:bg-white/12 group-hover:border-violet-300/50 transition-all duration-500 hover:scale-105 hover:bg-violet-500/10 hover:shadow-lg hover:shadow-violet-500/20 cursor-pointer">
-                      <p className="text-white text-2xl font-bold drop-shadow-2xl mb-1 hover:scale-110 transition-transform duration-300" style={{ 
+                    <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-violet-400/30">
+                      <p className="text-white text-2xl font-bold drop-shadow-2xl mb-1" style={{ 
                         textShadow: '0 4px 12px rgba(0,0,0,1), 0 0 40px rgba(255,255,255,0.6), 0 0 80px rgba(139,92,246,0.5)'
                       }}>2</p>
-                      <p className="text-violet-100 text-xs font-semibold uppercase tracking-wide drop-shadow-lg hover:text-white transition-colors duration-300" style={{ 
+                      <p className="text-violet-100 text-xs font-semibold uppercase tracking-wide drop-shadow-lg" style={{ 
                         textShadow: '0 3px 8px rgba(0,0,0,0.9), 0 0 20px rgba(255,255,255,0.4)'
                       }}>Online</p>
                     </div>
