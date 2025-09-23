@@ -18,7 +18,8 @@ import {
   Plus,
   LogOut,
   Sparkles,
-  Home
+  Home,
+  Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -137,6 +138,7 @@ const EnhancedIndex = () => {
   const [userName, setUserName] = useState('there');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
   // Update user name only when user data changes
   useEffect(() => {
@@ -148,6 +150,14 @@ const EnhancedIndex = () => {
       setUserName(name);
     }
   }, [user?.user_metadata?.preferred_name, user?.user_metadata?.name, user?.email]);
+
+  // Live clock updater
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Plan handoff: if URL contains ?plan=, handle auto-upgrade or redirect to auth
   useEffect(() => {
@@ -547,6 +557,16 @@ const EnhancedIndex = () => {
                 <div className="absolute inset-0 bg-gradient-to-br from-pink-600/25 via-rose-600/20 to-purple-600/15" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-pink-400/15 via-transparent to-transparent" />
+                {/* Creative clock wedge */}
+                <div className="absolute -top-3 -right-3 rotate-6">
+                  <div className="relative">
+                    <div className="bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl text-white rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-pink-200" />
+                      <span className="text-[11px] font-semibold tracking-wide" aria-live="polite">{currentTime}</span>
+                    </div>
+                    <div className="absolute -bottom-1 left-2 w-8 h-2 bg-pink-500/40 blur-md" />
+                  </div>
+                </div>
                 
                 <CardContent className="p-6 relative z-10">
                   <div className="flex items-center justify-between mb-4">
@@ -650,6 +670,14 @@ const EnhancedIndex = () => {
                           <h3 className="font-bold text-lg group-hover:text-primary transition-colors duration-300">
                             {character.name}
                           </h3>
+                          {/* Vibe badges */}
+                          <div className="flex gap-1">
+                            {character.personality.slice(0,1).map((trait) => (
+                              <Badge key={trait} className="text-[10px] px-2 py-0 bg-primary/10 text-primary border-primary/20">
+                                {trait}
+                              </Badge>
+                            ))}
+                          </div>
                           {character.relationshipLevel && character.relationshipLevel > 4 && (
                             <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs">
                               Close Bond
