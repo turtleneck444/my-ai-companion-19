@@ -59,8 +59,8 @@ interface NewCharacter {
   avatarUrl?: string;
 }
 
-const steps = ["Basics", "Personality", "Voice", "Avatar", "Review"] as const;
-type Step = typeof steps[number];
+const steps: string[] = ["Basics", "Personality", "Voice", "Avatar", "Review"]; 
+type Step = string;
 
 const personalityOptions = [
   "Affectionate", "Playful", "Witty", "Caring", "Adventurous", 
@@ -420,7 +420,13 @@ const Create = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => navigate('/app')}
+                onClick={() => {
+                  if (window.history.length > 1) {
+                    navigate(-1);
+                  } else {
+                    navigate('/app');
+                  }
+                }}
                 className="p-2"
               >
                 <ArrowLeft className="w-4 h-4" />
