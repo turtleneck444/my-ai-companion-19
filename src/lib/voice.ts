@@ -1,24 +1,35 @@
 let playbackQueue: Promise<void> = Promise.resolve();
 
-export async function speakText(text: string, voiceId?: string): Promise<void> {
+export interface ElevenLabsSettings {
+  stability?: number;
+  similarity_boost?: number;
+  style?: number;
+  use_speaker_boost?: boolean;
+}
+
+export async function speakText(
+  text: string,
+  voiceId?: string,
+  options?: { modelId?: string; voiceSettings?: ElevenLabsSettings }
+): Promise<void> {
   const task = async () => {
     try {
-      // Try ElevenLabs TTS first
+      // Prefer ElevenLabs TTS
       const res = await fetch('/api/elevenlabs-tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           text, 
           voice_id: voiceId || 'default',
-          model_id: 'eleven_monolingual_v1',
+          model_id: options?.modelId || 'eleven_multilingual_v2',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.8,
-            style: 0.2,
-            use_speaker_boost: true
+            stability: options?.voiceSettings?.stability ?? 0.35,
+            similarity_boost: options?.voiceSettings?.similarity_boost ?? 0.9,
+            style: options?.voiceSettings?.style ?? 0.45,
+            use_speaker_boost: options?.voiceSettings?.use_speaker_boost ?? true
           }
         }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(12000)
       });
 
       if (res.ok) {
@@ -29,7 +40,7 @@ export async function speakText(text: string, voiceId?: string): Promise<void> {
         } finally {
           URL.revokeObjectURL(url);
         }
-        return; // Success, exit early
+        return; // Success
       }
     } catch (error) {
       console.warn('ElevenLabs TTS unavailable, using browser fallback:', error);
@@ -51,9 +62,9 @@ async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<voi
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.1;
-    utterance.volume = 0.8;
+    utterance.rate = 0.92;
+    utterance.pitch = 1.05;
+    utterance.volume = 0.85;
 
     // Map voice IDs to preferred voice characteristics
     const voicePreferences: Record<string, string[]> = {
@@ -71,11 +82,11 @@ async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<voi
       const preferences = voicePreferences[voiceId || ''] || ['female', 'woman', 'samantha'];
       
       // Try to find a voice that matches preferences
-      let selectedVoice = null;
+      let selectedVoice = null as SpeechSynthesisVoice | null;
       for (const preference of preferences) {
         selectedVoice = voices.find(voice => 
           voice.name.toLowerCase().includes(preference)
-        );
+        ) || null;
         if (selectedVoice) break;
       }
 
@@ -86,7 +97,7 @@ async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<voi
           voice.name.toLowerCase().includes('woman') ||
           voice.name.toLowerCase().includes('samantha') ||
           voice.name.toLowerCase().includes('karen')
-        );
+        ) || null;
       }
 
       if (selectedVoice) {
@@ -94,7 +105,7 @@ async function fallbackTextToSpeech(text: string, voiceId?: string): Promise<voi
       }
 
       utterance.onend = () => resolve();
-      utterance.onerror = (error) => reject(new Error('Speech synthesis failed'));
+      utterance.onerror = () => reject(new Error('Speech synthesis failed'));
       
       speechSynthesis.speak(utterance);
     };

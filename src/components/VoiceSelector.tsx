@@ -51,9 +51,9 @@ export const VoiceSelector = ({
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [voiceSettings, setVoiceSettings] = useState({
-    stability: 0.5,
-    similarity_boost: 0.5,
-    style: 0.0,
+    stability: 0.35,
+    similarity_boost: 0.9,
+    style: 0.45,
     use_speaker_boost: true
   });
 
@@ -76,83 +76,32 @@ export const VoiceSelector = ({
       
       if (response.ok) {
         const data = await response.json();
-        setVoices(data.voices || []);
+        // Prefer curated female/high-quality voices if present
+        const curated = (data.voices || []).filter((v: any) => {
+          const labelGender = (v.labels?.gender || '').toLowerCase();
+          return labelGender === 'female' || labelGender === 'woman' || v.category?.toLowerCase() === 'premade';
+        });
+        setVoices(curated.length ? curated : (data.voices || []));
       } else {
         throw new Error('API not available');
       }
     } catch (error) {
       console.warn('ElevenLabs API not available, using fallback voices:', error);
       
-      // Use fallback voices when API is not available
+      // Curated fallback voices with attractive profiles
       const fallbackVoices: Voice[] = [
-        {
-          voice_id: 'sarah',
-          name: 'Sarah',
-          category: 'Female',
-          description: 'Warm and friendly female voice',
-          preview_url: '',
-          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
-          suggestedPersonality: ['Caring', 'Sweet', 'Empathetic'],
-          characteristics: { warmth: 95, energy: 72, clarity: 88, depth: 85 }
-        },
-        {
-          voice_id: 'emma',
-          name: 'Emma',
-          category: 'Female',
-          description: 'Sweet and caring female voice',
-          preview_url: '',
-          labels: { accent: 'british', gender: 'female', age: 'young_adult' },
-          suggestedPersonality: ['Sweet', 'Caring', 'Intelligent'],
-          characteristics: { warmth: 92, energy: 68, clarity: 94, depth: 89 }
-        },
-        {
-          voice_id: 'lily',
-          name: 'Lily',
-          category: 'Female',
-          description: 'Playful and energetic female voice',
-          preview_url: '',
-          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
-          suggestedPersonality: ['Playful', 'Adventurous', 'Sweet'],
-          characteristics: { warmth: 85, energy: 96, clarity: 91, depth: 78 }
-        },
-        {
-          voice_id: 'sophia',
-          name: 'Sophia',
-          category: 'Female',
-          description: 'Elegant and sophisticated female voice',
-          preview_url: '',
-          labels: { accent: 'american', gender: 'female', age: 'middle_aged' },
-          suggestedPersonality: ['Intelligent', 'Confident', 'Romantic'],
-          characteristics: { warmth: 82, energy: 74, clarity: 97, depth: 93 }
-        },
-        {
-          voice_id: 'aria',
-          name: 'Aria',
-          category: 'Female',
-          description: 'Mysterious and alluring female voice',
-          preview_url: '',
-          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
-          suggestedPersonality: ['Mysterious', 'Romantic', 'Confident'],
-          characteristics: { warmth: 87, energy: 79, clarity: 90, depth: 95 }
-        },
-        {
-          voice_id: 'maya',
-          name: 'Maya',
-          category: 'Female',
-          description: 'Confident and charismatic female voice',
-          preview_url: '',
-          labels: { accent: 'american', gender: 'female', age: 'young_adult' },
-          suggestedPersonality: ['Confident', 'Adventurous', 'Playful'],
-          characteristics: { warmth: 88, energy: 91, clarity: 93, depth: 86 }
-        }
+        { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', category: 'Female', description: 'Warm, youthful, and expressive', preview_url: '', labels: { gender: 'female', accent: 'american' }, suggestedPersonality: ['Caring','Sweet','Playful'], characteristics: { warmth: 94, energy: 78, clarity: 92, depth: 86 } },
+        { voice_id: 'AZnzlk1XvdvUeBnXmlld', name: 'Bella', category: 'Female', description: 'Charming, intimate and confident', preview_url: '', labels: { gender: 'female', accent: 'american' }, suggestedPersonality: ['Romantic','Confident','Alluring'], characteristics: { warmth: 91, energy: 74, clarity: 95, depth: 90 } },
+        { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', category: 'Female', description: 'Soft, empathetic and soothing', preview_url: '', labels: { gender: 'female', accent: 'american' }, suggestedPersonality: ['Empathetic','Kind','Supportive'], characteristics: { warmth: 96, energy: 66, clarity: 93, depth: 88 } },
+        { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Emily', category: 'Female', description: 'Sweet, bright and intelligent', preview_url: '', labels: { gender: 'female', accent: 'british' }, suggestedPersonality: ['Sweet','Intelligent','Cheerful'], characteristics: { warmth: 90, energy: 80, clarity: 94, depth: 84 } },
+        { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Elli', category: 'Female', description: 'Expressive and modern', preview_url: '', labels: { gender: 'female', accent: 'american' }, suggestedPersonality: ['Modern','Witty','Confident'], characteristics: { warmth: 88, energy: 82, clarity: 96, depth: 83 } },
       ];
       
       setVoices(fallbackVoices);
       
-      // Show a less alarming message to users
       toast({ 
         title: "Voice Selection Available", 
-        description: "Using built-in voice options. Premium voices will be available when connected to ElevenLabs.",
+        description: "Using curated voices. Premium voices will expand when connected to ElevenLabs.",
         variant: "default"
       });
     } finally {
@@ -170,8 +119,7 @@ export const VoiceSelector = ({
 
   const previewVoice = async (voice: Voice, text?: string) => {
     if (playingVoice === voice.voice_id) {
-      // Stop current playback if same voice is clicked again
-      speechSynthesis.cancel(); // Stop any browser TTS
+      speechSynthesis.cancel();
       setPlayingVoice(null);
       return;
     }
@@ -179,21 +127,20 @@ export const VoiceSelector = ({
     setPlayingVoice(voice.voice_id);
     try {
       const previewText = text || `Hi! I'm ${voice.name}. ${voice.description || 'I would love to be your voice!'}`;
-      
-      console.log('Voice preview starting:', { name: voice.name, voiceId: voice.voice_id });
-      
-      await speakText(previewText, voice.voice_id);
-      
+      await speakText(previewText, voice.voice_id, {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: voiceSettings
+      });
       toast({ 
         title: "🎉 Voice Preview Played!", 
-        description: `You just heard ${voice.name}'s voice. ${text ? 'Custom message played!' : 'Like what you heard?'}`,
-        duration: 3000
+        description: `You just heard ${voice.name}.`,
+        duration: 2500
       });
     } catch (error) {
       console.error('Voice preview error:', error);
       toast({ 
-        title: "Voice Preview", 
-        description: `Playing ${voice.name} with browser voice. ElevenLabs premium voices available when connected.`,
+        title: "Voice Preview",
+        description: `Playing ${voice.name} with browser voice.`,
         variant: "default"
       });
     } finally {
@@ -338,7 +285,7 @@ export const VoiceSelector = ({
                 onValueChange={([value]) => setVoiceSettings(prev => ({ ...prev, stability: value }))}
                 min={0}
                 max={1}
-                step={0.1}
+                step={0.05}
                 className="w-full"
               />
             </div>
@@ -353,7 +300,22 @@ export const VoiceSelector = ({
                 onValueChange={([value]) => setVoiceSettings(prev => ({ ...prev, similarity_boost: value }))}
                 min={0}
                 max={1}
-                step={0.1}
+                step={0.05}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <Label>Style</Label>
+                <span>{Math.round(voiceSettings.style * 100)}%</span>
+              </div>
+              <Slider
+                value={[voiceSettings.style]}
+                onValueChange={([value]) => setVoiceSettings(prev => ({ ...prev, style: value }))}
+                min={0}
+                max={1}
+                step={0.05}
                 className="w-full"
               />
             </div>
