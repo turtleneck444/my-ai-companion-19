@@ -2,6 +2,8 @@ import { ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthForm } from "@/components/AuthForm";
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { AgeGate, isAgeVerified } from '@/components/AgeGate';
+import { Navigate } from 'react-router-dom';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -25,8 +27,10 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!user) {
-    return <AuthForm />;
+    return <Navigate to="/auth" replace />;
   }
-
-  return <>{children}</>;
+  if (!isAgeVerified()) {
+    return <AgeGate />;
+  }
+  return children;
 };
