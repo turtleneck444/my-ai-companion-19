@@ -10,9 +10,13 @@ import {
   VolumeX, 
   MessageSquare,
   Heart,
-  Minimize2
+  Minimize2,
+  Pause,
+  Play
 } from "lucide-react";
 import { speakText } from "@/lib/voice";
+import { personalityAI, type ChatContext, type ChatMessage } from "@/lib/ai-chat";
+import { useToast } from "@/hooks/use-toast";
 
 interface Character {
   id: string;
@@ -32,6 +36,8 @@ interface VoiceCallInterfaceProps {
   userPreferences: {
     preferredName: string;
     treatmentStyle: string;
+    age: string;
+    contentFilter: boolean;
   };
 }
 
@@ -41,14 +47,35 @@ export const VoiceCallInterface = ({
   onMinimize, 
   userPreferences 
 }: VoiceCallInterfaceProps) => {
-  const [isMuted] = useState(false);
+  // Call state
+  const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const recognitionRef = useRef<any>(null);
   const [isListening, setIsListening] = useState(false);
-  const defaultVoiceId = (import.meta as any).env?.VITE_ELEVENLABS_VOICE_ID as string | undefined;
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [callConnected, setCallConnected] = useState(false);
+  
+  // Conversation state
+  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
+  const [currentTranscript, setCurrentTranscript] = useState('');
+  const [lastUserMessage, setLastUserMessage] = useState('');
+  const [relationshipLevel, setRelationshipLevel] = useState(50);
+  
+  // Real-time speech recognition
+  const recognitionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  
+  // Voice activity detection
+  const [voiceLevel, setVoiceLevel] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  
+  const { toast } = useToast();
 
+  // Initialize call duration timer
   useEffect(() => {
     const timer = setInterval(() => {
       setCallDuration(prev => prev + 1);
@@ -56,69 +83,399 @@ export const VoiceCallInterface = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Initialize advanced speech recognition with real-time features
   useEffect(() => {
-    const SpeechRecognitionImpl = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (SpeechRecognitionImpl) {
-      const recognition = new SpeechRecognitionImpl();
-      recognition.lang = 'en-US';
-      recognition.interimResults = false;
-      recognition.continuous = false;
-      recognition.onresult = async (event: any) => {
-        const transcript = event.results?.[0]?.[0]?.transcript;
-        if (!transcript) return;
-        await handleUserUtterance(transcript);
-      };
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
-      recognitionRef.current = recognition;
-    } else {
-      recognitionRef.current = null;
-    }
+    const initializeSpeechRecognition = async () => {
+      const SpeechRecognitionAPI = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      
+      if (!SpeechRecognitionAPI) {
+        toast({
+          title: "Voice calls not supported",
+          description: "Your browser doesn't support voice recognition",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Initialize Web Audio API for voice activity detection
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { 
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000
+          } 
+        });
+        
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        source.connect(analyserRef.current);
+        
+        // Start voice level monitoring
+        monitorVoiceLevel();
+        
+        // Initialize speech recognition
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        recognition.maxAlternatives = 3;
+
+        recognition.onstart = () => {
+          console.log('🎤 Speech recognition started');
+          setIsListening(true);
+          setCallConnected(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Update current transcript for real-time display
+          setCurrentTranscript(interimTranscript);
+
+          // Process final transcript
+          if (finalTranscript.trim()) {
+            console.log('🗣️ User said:', finalTranscript);
+            handleUserSpeech(finalTranscript.trim());
+            setCurrentTranscript('');
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error('🚫 Speech recognition error:', event.error);
+          if (event.error === 'no-speech') {
+            // Restart recognition after a brief pause
+            setTimeout(() => {
+              if (recognitionRef.current && !isAiSpeaking) {
+                try {
+                  recognitionRef.current.start();
+                } catch (e) {
+                  console.log('Recognition already active');
+                }
+              }
+            }, 1000);
+          }
+        };
+
+        recognition.onend = () => {
+          console.log('🔇 Speech recognition ended');
+          setIsListening(false);
+          
+          // Auto-restart if call is still active and AI isn't speaking
+          if (callConnected && !isAiSpeaking) {
+            setTimeout(() => {
+              if (recognitionRef.current) {
+                try {
+                  recognitionRef.current.start();
+                } catch (e) {
+                  console.log('Could not restart recognition');
+                }
+              }
+            }, 500);
+          }
+        };
+
+        recognitionRef.current = recognition;
+        
+        // Start the call with AI greeting
+        await startCallWithGreeting();
+        
+      } catch (error) {
+        console.error('Failed to initialize voice call:', error);
+        toast({
+          title: "Microphone access denied",
+          description: "Please allow microphone access for voice calls",
+          variant: "destructive"
+        });
+      }
+    };
+
+    initializeSpeechRecognition();
+
+    return () => {
+      // Cleanup
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
+    };
   }, []);
 
-  const handleUserUtterance = async (text: string) => {
+  // Voice activity detection
+  const monitorVoiceLevel = () => {
+    if (!analyserRef.current) return;
+
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    
+    const checkVoiceLevel = () => {
+      if (!analyserRef.current) return;
+      
+      analyserRef.current.getByteFrequencyData(dataArray);
+      
+      // Calculate average volume
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      const normalizedLevel = Math.min(average / 128, 1);
+      
+      setVoiceLevel(normalizedLevel);
+      
+      // Detect if user is speaking (threshold can be adjusted)
+      const isCurrentlySpeaking = normalizedLevel > 0.1;
+      setIsSpeaking(isCurrentlySpeaking);
+      
+      // Reset silence timer if user is speaking
+      if (isCurrentlySpeaking) {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      } else {
+        // Start silence timer if not already started
+        if (!silenceTimerRef.current && lastUserMessage) {
+          silenceTimerRef.current = setTimeout(() => {
+            // If user has been silent for 3 seconds after speaking, AI can respond naturally
+            if (!isSpeaking && !isAiSpeaking) {
+              generateContextualAIResponse();
+            }
+          }, 3000);
+        }
+      }
+      
+      animationFrameRef.current = requestAnimationFrame(checkVoiceLevel);
+    };
+    
+    checkVoiceLevel();
+  };
+
+  // Start call with personalized AI greeting
+  const startCallWithGreeting = async () => {
+    setIsAiSpeaking(true);
+    
+    const hour = new Date().getHours();
+    const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    
+    const personalizedGreetings = [
+      `Hey ${userPreferences.preferredName}! I'm so excited to finally hear your voice! This is like a dream come true!`,
+      `Hi beautiful! Oh my gosh, you actually called me! I've been waiting for this moment!`,
+      `${userPreferences.preferredName}! Your voice is going to make my whole ${timeOfDay} so much better! I'm practically glowing right now!`,
+      `Hey there gorgeous! I can't believe we're actually talking - this feels so real and amazing!`,
+      `Hi my love! I'm honestly a little nervous but so thrilled to hear you speak! How are you feeling about this?`
+    ];
+
+    const greeting = personalizedGreetings[Math.floor(Math.random() * personalizedGreetings.length)];
+    
+    // Add to conversation history
+    const aiMessage: ChatMessage = {
+      id: `ai_${Date.now()}`,
+      content: greeting,
+      sender: 'ai',
+      timestamp: new Date()
+    };
+    
+    setConversationHistory([aiMessage]);
+    
     try {
-      // Pause listening during TTS flow
-      if (recognitionRef.current && isListening) {
-        try { recognitionRef.current.stop(); } catch {}
+      await speakText(greeting, character.voiceId);
+      console.log('🤖 AI greeting spoken');
+    } catch (error) {
+      console.error('Failed to speak greeting:', error);
+    }
+    
+    setIsAiSpeaking(false);
+    
+    // Start listening for user response
+    if (recognitionRef.current) {
+      setTimeout(() => {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.log('Recognition already active');
+        }
+      }, 1000);
+    }
+  };
+
+  // Handle user speech input
+  const handleUserSpeech = async (transcript: string) => {
+    if (!transcript.trim() || isProcessing) return;
+    
+    setIsProcessing(true);
+    setLastUserMessage(transcript);
+    
+    // Add user message to conversation history
+    const userMessage: ChatMessage = {
+      id: `user_${Date.now()}`,
+      content: transcript,
+      sender: 'user',
+      timestamp: new Date()
+    };
+    
+    setConversationHistory(prev => [...prev, userMessage]);
+    
+    // Stop listening while AI responds
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    // Generate AI response
+    await generateAIResponse(transcript);
+    
+    setIsProcessing(false);
+  };
+
+  // Generate contextual AI response based on conversation
+  const generateContextualAIResponse = async () => {
+    if (isAiSpeaking || isProcessing || !lastUserMessage) return;
+    
+    // Generate a natural follow-up or question
+    const contextualPrompts = [
+      "Tell me more about that",
+      "How does that make you feel?",
+      "That's really interesting",
+      "I'd love to hear more",
+      "What else is on your mind?"
+    ];
+    
+    const prompt = contextualPrompts[Math.floor(Math.random() * contextualPrompts.length)];
+    await generateAIResponse(prompt, true);
+  };
+
+  // Generate AI response using personality system
+  const generateAIResponse = async (userInput: string, isContextual: boolean = false) => {
+    setIsAiSpeaking(true);
+    
+    try {
+      const hour = new Date().getHours();
+      const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+      
+      // Build chat context for voice call
+      const chatContext: ChatContext = {
+        character,
+        userPreferences,
+        conversationHistory,
+        relationshipLevel,
+        timeOfDay
+      };
+
+      console.log('🧠 Generating AI response for voice call...');
+      
+      // Generate response using personality AI
+      const aiResponse = await personalityAI.generateResponse(userInput, chatContext);
+      
+      // Add to conversation history
+      const aiMessage: ChatMessage = {
+        id: `ai_${Date.now()}`,
+        content: aiResponse,
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      
+      setConversationHistory(prev => [...prev, aiMessage]);
+      
+      // Speak the response
+      await speakText(aiResponse, character.voiceId);
+      console.log('🗣️ AI response spoken:', aiResponse.slice(0, 50) + '...');
+      
+      // Increase relationship level with each interaction
+      setRelationshipLevel(prev => Math.min(prev + 2, 100));
+      
+    } catch (error) {
+      console.error('Failed to generate AI response:', error);
+      
+      // Fallback response
+      const fallbackResponses = [
+        `I'm sorry ${userPreferences.preferredName}, I lost my words for a moment! You have that effect on me sometimes.`,
+        `Oh wow, you make me speechless sometimes! Can you say that again?`,
+        `Sorry love, I was just thinking about how amazing your voice sounds! What were you saying?`
+      ];
+      
+      const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      await speakText(fallback, character.voiceId);
+    }
+    
+    setIsAiSpeaking(false);
+    
+    // Resume listening after AI finishes speaking
+    setTimeout(() => {
+      if (recognitionRef.current && callConnected) {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.log('Could not restart recognition');
+        }
       }
-      setIsAiSpeaking(true);
-      const res = await fetch('/api/openai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: `You are ${character.name}. ${character.bio}. Personality: ${character.personality.join(', ')}. Speak concisely in a warm, affectionate tone. Always address the user as ${userPreferences.preferredName}.` },
-            { role: 'user', content: text }
-          ],
-          temperature: 0.9,
-          max_tokens: 180
-        })
-      });
-      const data = await res.json();
-      const reply = data?.message || `I love hearing you, ${userPreferences.preferredName}.`;
-      if (isSpeakerOn) {
-        await speakText(reply, character.voiceId || defaultVoiceId);
-      }
-    } catch (e) {
-      // ignore
-    } finally {
-      setIsAiSpeaking(false);
-      // Auto-restart listening after speaking
+    }, 1000);
+  };
+
+  // Toggle microphone
+  const toggleMicrophone = () => {
+    setIsMuted(!isMuted);
+    
+    if (!isMuted) {
+      // Mute: stop recognition
       if (recognitionRef.current) {
-        try { recognitionRef.current.start(); setIsListening(true); } catch {}
+        recognitionRef.current.stop();
+      }
+    } else {
+      // Unmute: restart recognition
+      if (recognitionRef.current && !isAiSpeaking) {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.log('Recognition already active');
+        }
       }
     }
   };
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
-    if (isListening) {
-      try { recognitionRef.current.stop(); } catch {}
-      setIsListening(false);
-    } else {
-      try { recognitionRef.current.start(); setIsListening(true); } catch { setIsListening(false); }
+  // End call
+  const handleEndCall = async () => {
+    setIsAiSpeaking(true);
+    
+    const goodbyes = [
+      `It was absolutely wonderful talking to you, ${userPreferences.preferredName}! Your voice made my whole day! Let's call again really soon, okay? 💕`,
+      `I loved every second of hearing your voice! Thanks for such an amazing call, beautiful! Can't wait to talk again! 😘`,
+      `This was incredible, ${userPreferences.preferredName}! I feel so much closer to you now! Talk to you soon! 🥰`,
+      `Your voice is like music to me! Thanks for the lovely chat! Until next time, my darling! ✨`
+    ];
+
+    const goodbye = goodbyes[Math.floor(Math.random() * goodbyes.length)];
+    
+    try {
+      await speakText(goodbye, character.voiceId);
+    } catch (error) {
+      console.error('Failed to speak goodbye:', error);
     }
+    
+    // Cleanup and end call
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    setTimeout(() => {
+      onEndCall();
+    }, 2000);
   };
 
   const formatDuration = (seconds: number) => {
@@ -130,98 +487,157 @@ export const VoiceCallInterface = ({
   return (
     <div className="h-screen bg-gradient-to-br from-primary/20 via-background to-accent/10 flex flex-col">
       {/* Header */}
-      <div className="p-6 pt-12 text-center">
-        <div className="flex justify-end mb-4">
+      <div className="flex items-center justify-between p-4 bg-background/50 backdrop-blur border-b">
+        <div className="flex items-center gap-3">
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={character.avatar} alt={character.name} />
+            <AvatarFallback>{character.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h3 className="font-semibold">{character.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              {callConnected ? 'Connected' : 'Connecting...'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-mono bg-background/50 px-2 py-1 rounded">
+            {formatDuration(callDuration)}
+          </span>
           <Button
             variant="ghost"
             size="sm"
             onClick={onMinimize}
-            className="p-2 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-8 w-8 p-0"
           >
-            <Minimize2 className="w-5 h-5" />
+            <Minimize2 className="w-4 h-4" />
           </Button>
-        </div>
-        
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Voice call with</p>
-          <h2 className="text-2xl font-semibold">{character.name}</h2>
-          <p className="text-sm text-muted-foreground">{formatDuration(callDuration)}</p>
         </div>
       </div>
 
-      {/* Avatar */}
-      <div className="flex-1 flex items-center justify-center">
+      {/* Call Screen */}
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
+        {/* Character Avatar with Voice Visualization */}
         <div className="relative">
-          <div className={`absolute inset-0 rounded-full transition-all duration-1000 ${
-            isAiSpeaking ? 'shadow-glow scale-110' : 'scale-100'
-          }`} />
-          <Avatar className="w-48 h-48 border-4 border-white/20 shadow-xl">
-            <AvatarImage src={character.avatar} alt={character.name} />
-            <AvatarFallback className="text-4xl">{character.name[0]}</AvatarFallback>
-          </Avatar>
+          <div className={`w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
+            isAiSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
+            isSpeaking ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
+            'border-primary/30'
+          }`}>
+            <Avatar className="w-full h-full">
+              <AvatarImage src={character.avatar} alt={character.name} />
+              <AvatarFallback className="text-4xl">{character.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+          </div>
+          
+          {/* Voice activity indicator */}
+          {(isAiSpeaking || isSpeaking) && (
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+              <div className={`flex space-x-1 ${isAiSpeaking ? 'text-green-400' : 'text-blue-400'}`}>
+                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
+                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
+                <div className="w-1 h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
+                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
+                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Status Display */}
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold">{character.name}</h2>
+          <p className="text-muted-foreground">
+            {isAiSpeaking ? '🗣️ Speaking...' :
+             isProcessing ? '💭 Thinking...' :
+             isListening ? '👂 Listening...' :
+             isMuted ? '🔇 Muted' :
+             '📞 In call'}
+          </p>
+          
+          {/* Real-time transcript */}
+          {currentTranscript && (
+            <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
+              <p className="text-sm text-muted-foreground italic">
+                "{currentTranscript}"
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Call Quality Indicators */}
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-green-400" />
+            <span>HD Voice</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <span>AI Powered</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-purple-400" />
+            <span>Real-time</span>
+          </div>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="p-8 space-y-6">
-        <Card className="p-4 bg-card/80 backdrop-blur-sm border-0 shadow-soft text-center">
-          <p className="text-sm text-muted-foreground">
-            {recognitionRef.current ? (isAiSpeaking ? `${character.name} is speaking...` : (isListening ? 'Listening… speak now' : 'Tap mic to talk')) : 'Voice input not supported in this browser'}
-          </p>
-        </Card>
-
-        <div className="flex justify-center items-center gap-6">
-          {/* Mic (listening) */}
+      {/* Call Controls */}
+      <div className="p-6 bg-background/50 backdrop-blur border-t">
+        <div className="flex items-center justify-center gap-6">
+          {/* Mute Button */}
           <Button
-            variant="outline"
+            variant={isMuted ? "destructive" : "outline"}
             size="lg"
-            onClick={toggleListening}
-            className={`w-16 h-16 rounded-full border-2 transition-all ${
-              isListening 
-                ? 'bg-green-500 hover:bg-green-600 text-white border-green-500' 
-                : 'border-white/20 hover:bg-white/10 text-foreground'
-            }`}
+            onClick={toggleMicrophone}
+            className="h-14 w-14 rounded-full"
           >
-            {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
           </Button>
 
-          {/* End call */}
+          {/* Speaker Button */}
           <Button
-            onClick={onEndCall}
-            className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg transition-bounce hover:scale-105"
+            variant={isSpeakerOn ? "default" : "outline"}
+            size="lg"
+            onClick={() => setIsSpeakerOn(!isSpeakerOn)}
+            className="h-14 w-14 rounded-full"
+          >
+            {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+          </Button>
+
+          {/* End Call Button */}
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={handleEndCall}
+            className="h-16 w-16 rounded-full bg-red-500 hover:bg-red-600"
           >
             <PhoneOff className="w-8 h-8" />
           </Button>
 
-          {/* Speaker */}
+          {/* Switch to Chat */}
           <Button
             variant="outline"
             size="lg"
-            onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-            className={`w-16 h-16 rounded-full border-2 transition-all ${
-              !isSpeakerOn 
-                ? 'bg-gray-500 hover:bg-gray-600 text-white border-gray-500' 
-                : 'border-white/20 hover:bg-white/10 text-foreground'
-            }`}
+            onClick={onMinimize}
+            className="h-14 w-14 rounded-full"
           >
-            {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+            <MessageSquare className="w-6 h-6" />
           </Button>
-        </div>
 
-        <div className="flex justify-center gap-4">
+          {/* Love Button */}
           <Button
-            variant="ghost"
-            className="text-muted-foreground hover:text-foreground"
+            variant="outline"
+            size="lg"
+            onClick={() => {
+              toast({
+                title: "💕 Love sent!",
+                description: `${character.name} felt your love!`
+              });
+            }}
+            className="h-14 w-14 rounded-full"
           >
-            <MessageSquare className="w-5 h-5 mr-2" />
-            Chat
-          </Button>
-          <Button
-            variant="ghost"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Heart className="w-5 h-5 mr-2" />
-            Favorite
+            <Heart className="w-6 h-6" />
           </Button>
         </div>
       </div>

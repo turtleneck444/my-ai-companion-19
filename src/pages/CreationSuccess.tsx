@@ -134,7 +134,9 @@ const CreationSuccess = () => {
         onMinimize={() => setCurrentView('chat')}
         userPreferences={{
           preferredName: 'Darling',
-          treatmentStyle: 'affectionate'
+          treatmentStyle: 'affectionate',
+          age: '25',
+          contentFilter: true
         }}
       />
     );

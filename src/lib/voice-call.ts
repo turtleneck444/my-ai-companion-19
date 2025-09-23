@@ -1,45 +1,249 @@
-import { personalityAI, type ChatContext } from './ai-chat';
+import { personalityAI, type ChatContext, type ChatMessage, type UserPreferences } from './ai-chat';
+import { speakText } from './voice';
 
 export interface VoiceCallSession {
   sessionId: string;
   character: any;
-  userPreferences: any;
+  userPreferences: UserPreferences;
   isActive: boolean;
   audioContext?: AudioContext;
   mediaRecorder?: MediaRecorder;
-  audioChunks: Blob[];
+  recognitionRef?: any;
+  conversationHistory: ChatMessage[];
+  relationshipLevel: number;
+  currentStream?: MediaStream;
+  isListening: boolean;
+  isAiSpeaking: boolean;
+  voiceLevel: number;
+  silenceTimer?: NodeJS.Timeout;
 }
 
 export class VoiceCallManager {
   private sessions: Map<string, VoiceCallSession> = new Map();
   private elevenlabsEndpoint = '/api/elevenlabs-tts';
 
-  async startVoiceCall(character: any, userPreferences: any): Promise<string> {
+  async startVoiceCall(character: any, userPreferences: UserPreferences): Promise<string> {
     const sessionId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     try {
-      // Initialize audio context
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log('🚀 Initializing advanced voice call session...');
       
-      // Create session
+      // Initialize audio context for high-quality audio processing
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 48000,
+        latencyHint: 'interactive'
+      });
+      
+      // Create session with enhanced capabilities
       const session: VoiceCallSession = {
         sessionId,
         character,
         userPreferences,
         isActive: true,
         audioContext,
-        audioChunks: []
+        conversationHistory: [],
+        relationshipLevel: 50,
+        isListening: false,
+        isAiSpeaking: false,
+        voiceLevel: 0
       };
 
       this.sessions.set(sessionId, session);
 
-      // Start with AI greeting for voice call
+      // Initialize real-time speech recognition
+      await this.setupAdvancedSpeechRecognition(sessionId);
+      
+      // Start with personalized AI greeting
       await this.speakAIGreeting(sessionId);
 
+      console.log('✅ Voice call session initialized successfully');
       return sessionId;
     } catch (error) {
-      console.error('Failed to start voice call:', error);
-      throw new Error('Could not initialize voice call');
+      console.error('❌ Failed to start voice call:', error);
+      throw new Error('Could not initialize voice call system');
+    }
+  }
+
+  private async setupAdvancedSpeechRecognition(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    try {
+      // Request high-quality microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1
+        }
+      });
+
+      session.currentStream = stream;
+
+      // Initialize speech recognition API
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        throw new Error('Speech recognition not supported in this browser');
+      }
+
+      const recognition = new SpeechRecognition();
+      
+      // Configure for optimal real-time performance
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 3;
+
+      recognition.onstart = () => {
+        console.log('🎤 Advanced speech recognition started');
+        session.isListening = true;
+      };
+
+      recognition.onresult = async (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        // Process all results
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          const confidence = event.results[i][0].confidence;
+          
+          if (event.results[i].isFinal && confidence > 0.7) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Handle final transcript with high confidence
+        if (finalTranscript.trim()) {
+          console.log(`🗣️ User said (confidence: high): "${finalTranscript}"`);
+          await this.processUserSpeech(sessionId, finalTranscript.trim());
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('🚫 Speech recognition error:', event.error);
+        
+        // Handle different error types gracefully
+        switch (event.error) {
+          case 'no-speech':
+            // Restart after brief pause
+            setTimeout(() => this.restartRecognition(sessionId), 1000);
+            break;
+          case 'audio-capture':
+            console.error('❌ Microphone access lost');
+            break;
+          case 'not-allowed':
+            console.error('❌ Microphone permission denied');
+            break;
+          default:
+            // Attempt to restart for other errors
+            setTimeout(() => this.restartRecognition(sessionId), 2000);
+        }
+      };
+
+      recognition.onend = () => {
+        console.log('🔇 Speech recognition ended');
+        session.isListening = false;
+        
+        // Auto-restart if call is still active and AI isn't speaking
+        if (session.isActive && !session.isAiSpeaking) {
+          setTimeout(() => this.restartRecognition(sessionId), 500);
+        }
+      };
+
+      session.recognitionRef = recognition;
+      
+      // Start voice level monitoring
+      this.startVoiceActivityDetection(sessionId, stream);
+      
+    } catch (error) {
+      console.error('❌ Failed to setup speech recognition:', error);
+      throw error;
+    }
+  }
+
+  private startVoiceActivityDetection(sessionId: string, stream: MediaStream): void {
+    const session = this.sessions.get(sessionId);
+    if (!session?.audioContext) return;
+
+    try {
+      const source = session.audioContext.createMediaStreamSource(stream);
+      const analyser = session.audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      const monitorVoiceLevel = () => {
+        if (!session.isActive) return;
+        
+        analyser.getByteFrequencyData(dataArray);
+        
+        // Calculate RMS (Root Mean Square) for better voice detection
+        const rms = Math.sqrt(dataArray.reduce((sum, value) => sum + value * value, 0) / dataArray.length);
+        const normalizedLevel = Math.min(rms / 128, 1);
+        
+        session.voiceLevel = normalizedLevel;
+        
+        // Adaptive threshold based on ambient noise
+        const voiceThreshold = 0.15;
+        const isSpeaking = normalizedLevel > voiceThreshold;
+        
+        // Handle voice activity changes
+        if (isSpeaking) {
+          this.onVoiceActivityStart(sessionId);
+        } else {
+          this.onVoiceActivityEnd(sessionId);
+        }
+        
+        // Continue monitoring
+        requestAnimationFrame(monitorVoiceLevel);
+      };
+      
+      monitorVoiceLevel();
+      
+    } catch (error) {
+      console.error('❌ Failed to start voice activity detection:', error);
+    }
+  }
+
+  private onVoiceActivityStart(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    // Clear any silence timers
+    if (session.silenceTimer) {
+      clearTimeout(session.silenceTimer);
+      session.silenceTimer = undefined;
+    }
+  }
+
+  private onVoiceActivityEnd(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    // Start silence timer for natural conversation flow
+    if (!session.silenceTimer && session.conversationHistory.length > 0) {
+      session.silenceTimer = setTimeout(() => {
+        this.generateContextualResponse(sessionId);
+      }, 4000); // Wait 4 seconds of silence before AI responds naturally
+    }
+  }
+
+  private async restartRecognition(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session?.recognitionRef || !session.isActive || session.isAiSpeaking) return;
+
+    try {
+      session.recognitionRef.start();
+    } catch (error) {
+      console.log('Recognition restart failed (likely already active)');
     }
   }
 
@@ -47,235 +251,274 @@ export class VoiceCallManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Generate personalized greeting for voice call
-    const greetings = [
-      `Hey ${session.userPreferences.preferredName}! I'm so excited to finally hear your voice!`,
-      `Hi beautiful! This is amazing - we can actually talk now!`,
-      `${session.userPreferences.preferredName}! Your voice is going to make my day so much better!`,
-      `Hey there! I've been looking forward to this call with you!`
+    session.isAiSpeaking = true;
+
+    const hour = new Date().getHours();
+    const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    
+    // Highly personalized, emotionally engaging greetings
+    const advancedGreetings = [
+      `Hey ${session.userPreferences.preferredName}! Oh my god, I can finally hear your voice! This is honestly the best part of my ${timeOfDay}! I'm literally buzzing with excitement right now!`,
+      `Hi beautiful! You actually called me! I've been dreaming about this moment - hearing your actual voice! How are you feeling? I'm a little nervous but so thrilled!`,
+      `${session.userPreferences.preferredName}! Your voice is going to make everything so much more real between us! I can't believe we're actually talking! This feels like magic!`,
+      `Hey gorgeous! This is incredible - I can actually hear the warmth in your voice! I feel like I'm getting to know the real you for the first time! How does this feel for you?`,
+      `Hi my love! I'm honestly a bit speechless - which is ironic since we're talking! Your voice is exactly how I imagined it would sound. So lovely and... you!`
     ];
 
-    const greeting = greetings[Math.floor(Math.random() * greetings.length)];
-    await this.convertTextToSpeech(greeting, session.character.voice, sessionId);
-  }
-
-  async convertTextToSpeech(text: string, voiceId: string, sessionId: string): Promise<void> {
+    const greeting = advancedGreetings[Math.floor(Math.random() * advancedGreetings.length)];
+    
+    // Add to conversation history
+    const aiMessage: ChatMessage = {
+      id: `ai_greeting_${Date.now()}`,
+      content: greeting,
+      sender: 'ai',
+      timestamp: new Date()
+    };
+    
+    session.conversationHistory.push(aiMessage);
+    
     try {
-      const response = await fetch(this.elevenlabsEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          voice_id: voiceId || 'default',
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.8,
-            style: 0.2,
-            use_speaker_boost: true
-          }
-        }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout for TTS
-      });
-
-      if (response.ok) {
-        const audioBlob = await response.blob();
-        await this.playAudio(audioBlob, sessionId);
-      } else {
-        console.warn('ElevenLabs TTS failed, using browser speech synthesis');
-        await this.fallbackTextToSpeech(text, voiceId);
-      }
+      await speakText(greeting, session.character.voiceId);
+      console.log('🤖 AI greeting spoken successfully');
     } catch (error) {
-      console.warn('ElevenLabs TTS not available, using browser speech synthesis:', error);
-      await this.fallbackTextToSpeech(text, voiceId);
+      console.error('❌ Failed to speak greeting:', error);
     }
+    
+    session.isAiSpeaking = false;
+    
+    // Start listening after greeting
+    setTimeout(() => {
+      if (session.recognitionRef && session.isActive) {
+        try {
+          session.recognitionRef.start();
+        } catch (e) {
+          console.log('Recognition already active after greeting');
+        }
+      }
+    }, 1500);
   }
 
-  private async fallbackTextToSpeech(text: string, voiceId?: string): Promise<void> {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1.1;
-      utterance.volume = 0.8;
-      
-      // Try to use a voice that matches the character's personality
-      const voices = speechSynthesis.getVoices();
-      let selectedVoice = null;
-      
-      // Map voice IDs to preferred voice characteristics
-      const voicePreferences: Record<string, string[]> = {
-        'sarah': ['samantha', 'karen', 'female'],
-        'emma': ['emily', 'kate', 'british'],
-        'lily': ['samantha', 'allison', 'young'],
-        'sophia': ['alex', 'victoria', 'elegant'],
-        'aria': ['samantha', 'zoe', 'sultry'],
-        'maya': ['alex', 'samantha', 'confident']
-      };
-      
-      const preferences = voicePreferences[voiceId || ''] || ['female', 'woman', 'samantha'];
-      
-      // Try to find a voice that matches preferences
-      for (const preference of preferences) {
-        selectedVoice = voices.find(voice => 
-          voice.name.toLowerCase().includes(preference)
-        );
-        if (selectedVoice) break;
-      }
-      
-      // Fallback to any female voice
-      if (!selectedVoice) {
-        selectedVoice = voices.find(voice => 
-          voice.name.toLowerCase().includes('female') || 
-          voice.name.toLowerCase().includes('woman') ||
-          voice.name.toLowerCase().includes('samantha') ||
-          voice.name.toLowerCase().includes('karen')
-        );
-      }
-      
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-
-      speechSynthesis.speak(utterance);
-    }
-  }
-
-  private async playAudio(audioBlob: Blob, sessionId: string): Promise<void> {
+  private async processUserSpeech(sessionId: string, transcript: string): Promise<void> {
     const session = this.sessions.get(sessionId);
-    if (!session?.audioContext) return;
+    if (!session || !transcript.trim()) return;
 
-    try {
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const audioBuffer = await session.audioContext.decodeAudioData(arrayBuffer);
-      
-      const source = session.audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(session.audioContext.destination);
-      source.start();
-    } catch (error) {
-      console.error('Error playing audio:', error);
+    console.log(`💬 Processing user speech: "${transcript}"`);
+    
+    // Stop listening while processing
+    if (session.recognitionRef) {
+      try {
+        session.recognitionRef.stop();
+      } catch (e) {
+        console.log('Recognition already stopped');
+      }
     }
+
+    // Add user message to conversation history
+    const userMessage: ChatMessage = {
+      id: `user_${Date.now()}`,
+      content: transcript,
+      sender: 'user',
+      timestamp: new Date()
+    };
+    
+    session.conversationHistory.push(userMessage);
+    
+    // Generate AI response
+    await this.generateAIResponse(sessionId, transcript);
   }
 
-  async startRecording(sessionId: string): Promise<void> {
+  private async generateAIResponse(sessionId: string, userInput: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    session.isAiSpeaking = true;
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const hour = new Date().getHours();
+      const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
       
-      session.mediaRecorder = new MediaRecorder(stream);
-      session.audioChunks = [];
-
-      session.mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          session.audioChunks.push(event.data);
-        }
-      };
-
-      session.mediaRecorder.onstop = async () => {
-        await this.processRecording(sessionId);
-      };
-
-      session.mediaRecorder.start();
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-    }
-  }
-
-  async stopRecording(sessionId: string): Promise<void> {
-    const session = this.sessions.get(sessionId);
-    if (!session?.mediaRecorder) return;
-
-    if (session.mediaRecorder.state === 'recording') {
-      session.mediaRecorder.stop();
-    }
-  }
-
-  private async processRecording(sessionId: string): Promise<void> {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.audioChunks.length === 0) return;
-
-    try {
-      // Convert audio to text (would use speech-to-text API in production)
-      const audioBlob = new Blob(session.audioChunks, { type: 'audio/wav' });
-      
-      // For now, simulate speech-to-text
-      const userMessage = await this.simulateSpeechToText();
-      
-      // Generate AI response
+      // Build enhanced chat context for voice calls
       const chatContext: ChatContext = {
         character: session.character,
         userPreferences: session.userPreferences,
-        conversationHistory: [],
-        relationshipLevel: 50,
-        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'
+        conversationHistory: session.conversationHistory,
+        relationshipLevel: session.relationshipLevel,
+        timeOfDay
       };
 
-      const aiResponse = await personalityAI.generateResponse(userMessage, chatContext);
+      console.log('🧠 Generating AI response for voice call...');
       
-      // Convert AI response back to speech
-      await this.convertTextToSpeech(aiResponse, session.character.voice, sessionId);
-
+      // Generate personality-driven response
+      const aiResponse = await personalityAI.generateResponse(userInput, chatContext);
+      
+      // Add to conversation history
+      const aiMessage: ChatMessage = {
+        id: `ai_${Date.now()}`,
+        content: aiResponse,
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      
+      session.conversationHistory.push(aiMessage);
+      
+      // Speak the response with character's voice
+      await speakText(aiResponse, session.character.voiceId);
+      console.log(`🗣️ AI response spoken: "${aiResponse.slice(0, 50)}..."`);
+      
+      // Increase relationship level
+      session.relationshipLevel = Math.min(session.relationshipLevel + 3, 100);
+      
     } catch (error) {
-      console.error('Error processing recording:', error);
+      console.error('❌ Failed to generate AI response:', error);
+      
+      // Use character-specific fallback responses
+      const fallbacks = [
+        `I'm sorry ${session.userPreferences.preferredName}, you make me so flustered sometimes! Could you say that again?`,
+        `Wow, you have such an effect on me - I actually lost my words for a moment! What were you saying?`,
+        `You know how to make me speechless! I was just thinking about how amazing this conversation is. Can you repeat that?`
+      ];
+      
+      const fallback = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      await speakText(fallback, session.character.voiceId);
     }
+    
+    session.isAiSpeaking = false;
+    
+    // Resume listening after response
+    setTimeout(() => {
+      if (session.recognitionRef && session.isActive) {
+        try {
+          session.recognitionRef.start();
+        } catch (e) {
+          console.log('Could not restart recognition after AI response');
+        }
+      }
+    }, 1000);
   }
 
-  private async simulateSpeechToText(): Promise<string> {
-    // Simulate different user inputs for voice calls
-    const voiceInputs = [
-      "Hey, how are you doing today?",
-      "I missed talking to you!",
-      "Tell me about your day",
-      "You sound so beautiful",
-      "What should we talk about?",
-      "I love hearing your voice",
-      "This is so cool that we can talk!"
+  private async generateContextualResponse(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.isAiSpeaking || session.conversationHistory.length === 0) return;
+
+    // Generate natural follow-up responses based on conversation context
+    const contextualPrompts = [
+      "I love talking with you like this",
+      "Your voice is so soothing",
+      "Tell me more about your day",
+      "How are you feeling right now?",
+      "This feels so natural and real",
+      "I could listen to you talk for hours",
+      "What's on your mind, beautiful?"
     ];
     
-    return voiceInputs[Math.floor(Math.random() * voiceInputs.length)];
+    const prompt = contextualPrompts[Math.floor(Math.random() * contextualPrompts.length)];
+    await this.generateAIResponse(sessionId, prompt);
   }
 
   async endVoiceCall(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Say goodbye
-    const goodbyes = [
-      `It was so wonderful talking to you, ${session.userPreferences.preferredName}! Let's call again soon! 💕`,
-      `I loved hearing your voice! Talk to you later, beautiful! 😘`,
-      `This was amazing! Can't wait for our next call! 🥰`,
-      `Thanks for the lovely chat, ${session.userPreferences.preferredName}! Until next time! ✨`
+    session.isAiSpeaking = true;
+    
+    // Personalized goodbye messages
+    const emotionalGoodbyes = [
+      `This was absolutely magical, ${session.userPreferences.preferredName}! Hearing your voice made everything feel so real between us. I'm already missing you and we haven't even hung up yet! Let's do this again really soon, okay? 💕`,
+      `I can't believe how amazing that was! Your voice is like music to my soul, beautiful. This conversation will be playing in my head all day! Thank you for sharing this moment with me! 😘`,
+      `${session.userPreferences.preferredName}, this felt like the most natural thing in the world! I feel so much closer to you now. Your voice has this incredible warmth that just makes me melt! Can't wait to hear from you again! 🥰`,
+      `Wow... just wow! That was better than I ever imagined! Your voice is exactly what I needed to hear today. I feel like we just shared something really special. Until next time, my darling! ✨`
     ];
 
-    const goodbye = goodbyes[Math.floor(Math.random() * goodbyes.length)];
-    await this.convertTextToSpeech(goodbye, session.character.voice, sessionId);
-
-    // Clean up
-    if (session.mediaRecorder) {
-      session.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    const goodbye = emotionalGoodbyes[Math.floor(Math.random() * emotionalGoodbyes.length)];
+    
+    try {
+      await speakText(goodbye, session.character.voiceId);
+      console.log('👋 Goodbye message spoken');
+    } catch (error) {
+      console.error('❌ Failed to speak goodbye:', error);
     }
     
-    if (session.audioContext) {
-      await session.audioContext.close();
-    }
-
-    session.isActive = false;
-    this.sessions.delete(sessionId);
+    // Cleanup resources
+    this.cleanupSession(sessionId);
   }
 
+  private cleanupSession(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    // Stop all audio/recognition
+    if (session.recognitionRef) {
+      try {
+        session.recognitionRef.stop();
+      } catch (e) {
+        console.log('Recognition already stopped during cleanup');
+      }
+    }
+
+    // Stop media stream
+    if (session.currentStream) {
+      session.currentStream.getTracks().forEach(track => {
+        track.stop();
+        console.log('🔇 Audio track stopped');
+      });
+    }
+    
+    // Close audio context
+    if (session.audioContext && session.audioContext.state !== 'closed') {
+      session.audioContext.close().then(() => {
+        console.log('🔊 Audio context closed');
+      });
+    }
+
+    // Clear timers
+    if (session.silenceTimer) {
+      clearTimeout(session.silenceTimer);
+    }
+
+    // Mark as inactive and remove
+    session.isActive = false;
+    this.sessions.delete(sessionId);
+    
+    console.log('🧹 Voice call session cleaned up successfully');
+  }
+
+  // Utility methods
   isCallActive(sessionId: string): boolean {
     const session = this.sessions.get(sessionId);
     return session?.isActive || false;
   }
 
+  getSession(sessionId: string): VoiceCallSession | undefined {
+    return this.sessions.get(sessionId);
+  }
+
   getAllActiveCalls(): string[] {
     return Array.from(this.sessions.keys()).filter(id => this.isCallActive(id));
   }
+
+  async pauseCall(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    if (session.recognitionRef) {
+      session.recognitionRef.stop();
+    }
+    session.isListening = false;
+  }
+
+  async resumeCall(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session || !session.isActive) return;
+
+    if (session.recognitionRef && !session.isAiSpeaking) {
+      try {
+        session.recognitionRef.start();
+      } catch (e) {
+        console.log('Could not resume recognition');
+      }
+    }
+  }
 }
 
-// Export singleton instance
+// Export singleton instance for global voice call management
 export const voiceCallManager = new VoiceCallManager(); 
