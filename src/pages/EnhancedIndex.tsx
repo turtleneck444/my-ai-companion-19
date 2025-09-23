@@ -200,38 +200,37 @@ const EnhancedIndex = () => {
     return () => clearTimeout(timeoutId);
   }, [userActivity]);
 
-  // Generate smart greeting (only on mount and time change, not on every userActivity change)
+  // Generate smart greeting (simplified to prevent re-render loops)
   useEffect(() => {
-    // Simple greeting without complex async operations
+    // Simple greeting without any dependencies that could change
     const hour = new Date().getHours();
     let greeting;
     
     if (hour < 12) {
       greeting = {
-        main: `Good morning, ${userPreferences.preferredName}! ☀️`,
+        main: `Good morning! ☀️`,
         sub: "Ready to start your day together?"
       };
     } else if (hour < 17) {
       greeting = {
-        main: `Good afternoon, ${userPreferences.preferredName}! 🌞`,
+        main: `Good afternoon! 🌞`,
         sub: "Hope you're having a wonderful day!"
       };
     } else {
       greeting = {
-        main: `Good evening, ${userPreferences.preferredName}! 🌙`,
+        main: `Good evening! 🌙`,
         sub: "Perfect time to relax and chat!"
       };
     }
     
     setCurrentGreeting(greeting);
     setIsGeneratingGreeting(false);
-  }, [timeOfDay, userPreferences.preferredName]);
+  }, [timeOfDay]); // Only depend on timeOfDay
 
   const handleRefreshGreeting = () => {
-    // Simple refresh without complex async operations
-    const hour = new Date().getHours();
+    // Simple refresh without any state dependencies
     const greetings = [
-      { main: `Hey ${userPreferences.preferredName}! 👋`, sub: "Great to see you again!" },
+      { main: `Hey there! 👋`, sub: "Great to see you again!" },
       { main: `Welcome back! ✨`, sub: "Your AI companions missed you!" },
       { main: `Hi there! 💕`, sub: "Ready for some quality time together?" },
       { main: `Hello beautiful! 🌟`, sub: "What would you like to do today?" }
