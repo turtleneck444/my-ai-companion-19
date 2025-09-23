@@ -191,14 +191,15 @@ const Create = () => {
     if (!isSupabaseConfigured) return undefined;
     const file = character.avatarFile;
     const path = `avatars/${Date.now()}-${file.name}`;
+    const bucket = (import.meta.env.VITE_SUPABASE_STORAGE_BUCKET as string) || 'public';
     const { data, error } = await supabase.storage
-      .from("public")
+      .from(bucket)
       .upload(path, file, { upsert: false });
     if (error) {
       toast({ title: "Upload failed", description: error.message });
       return undefined;
     }
-    const { data: pub } = supabase.storage.from("public").getPublicUrl(data.path);
+    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(data.path);
     return pub?.publicUrl;
   };
 

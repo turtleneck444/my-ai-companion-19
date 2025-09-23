@@ -108,8 +108,9 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
       return;
     }
 
-    if (!isPaymentConfigured()) {
-      toast({ title: 'Payments not configured', description: 'Provider keys missing. Using demo success.', variant: 'destructive' });
+    // Allow demo fallback when not configured or when SDK init failed
+    if (!isPaymentConfigured() || paymentsError) {
+      toast({ title: 'Demo mode', description: 'Payments not fully configured; simulating success.', variant: 'destructive' });
       onSuccess({ id: `demo_${Date.now()}`, status: 'active', planId: plan.id });
       onClose();
       return;
@@ -265,8 +266,15 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <Button variant="outline" onClick={onClose} className="flex-1" disabled={isLoading}>Cancel</Button>
-            <Button onClick={handlePayment} disabled={isLoading || !sdkReady} className="flex-1 bg-gradient-to-r from-primary to-primary-glow">
-              {isLoading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>) : (<><Lock className="w-4 h-4 mr-2" />Pay {formatPrice(plan.price)}</>)}
+            <Button onClick={handlePayment} disabled={isLoading || (!sdkReady && isPaymentConfigured() && !paymentsError)} className="flex-1 bg-gradient-to-r from-primary to-primary-glow">
+              {isLoading ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  {isPaymentConfigured() && !paymentsError ? `Pay ${formatPrice(plan.price)}` : `Complete (Demo) ${formatPrice(plan.price)}`}
+                </>
+              )}
             </Button>
           </div>
         </div>
