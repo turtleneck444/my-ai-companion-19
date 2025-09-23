@@ -17,7 +17,8 @@ import {
   Star,
   Plus,
   LogOut,
-  Sparkles
+  Sparkles,
+  Home
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -43,7 +44,7 @@ interface Character {
   relationshipLevel?: number;
 }
 
-type View = 'home' | 'chats' | 'calls' | 'favorites' | 'profile' | 'chat' | 'call';
+type View = 'home' | 'chats' | 'favorites' | 'profile' | 'chat' | 'call';
 
 // Static character data to prevent re-creation
 const CHARACTERS: Character[] = [
@@ -815,6 +816,21 @@ const EnhancedIndex = () => {
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/50 shadow-2xl">
         <div className="grid grid-cols-4 max-w-md mx-auto">
           <Button
+            variant={currentView === 'home' ? 'default' : 'ghost'}
+            onClick={() => setCurrentView('home')}
+            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
+              currentView === 'home' 
+                ? 'bg-gradient-to-t from-primary/20 to-primary/10 text-primary shadow-inner' 
+                : 'hover:bg-primary/5 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Home className={`w-6 h-6 transition-all ${currentView === 'home' ? 'scale-110' : ''}`} />
+            <span className={`text-xs font-medium ${currentView === 'home' ? 'text-primary' : ''}`}>
+              Home
+            </span>
+          </Button>
+
+          <Button
             variant={currentView === 'chats' ? 'default' : 'ghost'}
             onClick={() => setCurrentView('chats')}
             className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
@@ -831,21 +847,6 @@ const EnhancedIndex = () => {
             </div>
             <span className={`text-xs font-medium ${currentView === 'chats' ? 'text-primary' : ''}`}>
               Chats
-            </span>
-          </Button>
-
-          <Button
-            variant={currentView === 'calls' ? 'default' : 'ghost'}
-            onClick={() => setCurrentView('calls')}
-            className={`flex flex-col items-center gap-1 p-4 h-auto rounded-none border-0 transition-all duration-300 ${
-              currentView === 'calls' 
-                ? 'bg-gradient-to-t from-green-500/20 to-green-500/10 text-green-600 shadow-inner' 
-                : 'hover:bg-green-500/5 text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Phone className={`w-6 h-6 transition-all ${currentView === 'calls' ? 'scale-110' : ''}`} />
-            <span className={`text-xs font-medium ${currentView === 'calls' ? 'text-green-600' : ''}`}>
-              Calls
             </span>
           </Button>
 
