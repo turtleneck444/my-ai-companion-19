@@ -1,10 +1,11 @@
 // Netlify function for payment processing with Square integration
 import { Client, Environment } from 'square';
+import crypto from 'crypto';
 
 export const handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-square-hmacsha256-signature',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
   };
 
@@ -91,8 +92,6 @@ async function confirmPayment(data, headers) {
 
 // Helpers for subscriptions
 function resolvePlanVariationId(planId) {
-  // Map app plan ids to Square catalog subscription plan variation ids via env
-  // e.g. SQUARE_PLAN_PREMIUM_ID, SQUARE_PLAN_PRO_ID
   const map = {
     premium: process.env.SQUARE_PLAN_PREMIUM_ID,
     pro: process.env.SQUARE_PLAN_PRO_ID,
@@ -100,23 +99,29 @@ function resolvePlanVariationId(planId) {
   return map[planId];
 }
 
-async function getOrCreateCustomer(client, { email, givenName }) {
+async function getOrCreateCustomer(client, { email, givenName, referenceId }) {
   const customers = client.customersApi;
   if (!email) throw new Error('Email required for subscription');
   try {
-    // Search by email
     const search = await customers.searchCustomers({
       query: { filter: { emailAddress: { exact: email } } }
     });
     const found = search?.result?.customers?.[0];
-    if (found) return found;
+    if (found) {
+      // Ensure referenceId is set for webhook mapping
+      if (!found.referenceId && referenceId) {
+        try { await customers.updateCustomer(found.id, { referenceId }); } catch {}
+      }
+      return found;
+    }
   } catch (e) {
     // continue to create
   }
   const resp = await customers.createCustomer({
     idempotencyKey: `cust_${Date.now()}_${Math.random().toString(36).slice(2)}`,
     emailAddress: email,
-    givenName: givenName || 'Customer'
+    givenName: givenName || 'Customer',
+    referenceId
   });
   return resp.result.customer;
 }
@@ -133,7 +138,7 @@ async function createCardOnFile(client, { customerId, sourceId }) {
 
 async function createSubscription(data, headers) {
   try {
-    const { planId, email, name, paymentMethodId } = data; // paymentMethodId is sourceId from SDK
+    const { planId, email, name, paymentMethodId, userId } = data; // paymentMethodId is sourceId from SDK
     if (!planId || !paymentMethodId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing plan or payment source' }) };
 
     const planVariationId = resolvePlanVariationId(planId);
@@ -141,8 +146,8 @@ async function createSubscription(data, headers) {
 
     const client = getSquareClient();
 
-    // 1) Ensure customer
-    const customer = await getOrCreateCustomer(client, { email, givenName: name });
+    // 1) Ensure customer; store app userId in referenceId for webhooks
+    const customer = await getOrCreateCustomer(client, { email, givenName: name, referenceId: userId });
 
     // 2) Create card on file from sourceId
     const card = await createCardOnFile(client, { customerId: customer.id, sourceId: paymentMethodId });
@@ -155,7 +160,6 @@ async function createSubscription(data, headers) {
       planVariationId: planVariationId,
       customerId: customer.id,
       cardId: card.id,
-      // start immediately, monthly by catalog plan
     });
     const subscription = resp.result.subscription;
 
@@ -179,39 +183,71 @@ async function cancelSubscription(data, headers) {
   }
 }
 
+function verifySquareSignature(event) {
+  try {
+    const signatureKeyBase64 = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+    const notificationUrl = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL; // must exactly match Square config
+    if (!signatureKeyBase64 || !notificationUrl) return true; // skip if not configured
+    const signatureHeader = event.headers['x-square-hmacsha256-signature'];
+    if (!signatureHeader) return false;
+    const hmacKey = Buffer.from(signatureKeyBase64, 'base64');
+    const message = notificationUrl + (event.body || '');
+    const digest = crypto.createHmac('sha256', hmacKey).update(message).digest('base64');
+    return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signatureHeader));
+  } catch (e) {
+    console.warn('Webhook signature verify failed:', e);
+    return false;
+  }
+}
+
+async function updateSupabaseUserPlanByUserId(userId, plan) {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE;
+    if (!url || !key || !userId) return;
+    await fetch(`${url}/auth/v1/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ user_metadata: { plan } })
+    });
+  } catch (e) {
+    console.warn('Supabase plan update failed:', e);
+  }
+}
+
 async function handleWebhook(event, headers) {
   try {
-    const sig = event.headers['x-square-hmacsha256-signature'];
-    const body = event.body || '';
-    // TODO: Optionally verify signature with your webhook signature key
-    // if (process.env.SQUARE_WEBHOOK_SIGNATURE_KEY) { /* verify HMAC */ }
+    if (!verifySquareSignature(event)) {
+      return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid signature' }) };
+    }
 
+    const body = event.body || '';
     const data = JSON.parse(body || '{}');
     const type = data?.type || data?.event_type || 'unknown';
-    console.log('Square webhook received:', type);
 
-    // Attempt to map to user via customer referenceId if present
-    const customerId = data?.data?.object?.subscription?.customer_id || data?.data?.object?.payment?.customer_id;
+    const client = getSquareClient();
+    let customerId = data?.data?.object?.subscription?.customer_id || data?.data?.object?.payment?.customer_id;
+    let userId = null;
 
-    // Determine plan status transitions
+    if (customerId) {
+      try {
+        const resp = await client.customersApi.retrieveCustomer(customerId);
+        userId = resp?.result?.customer?.referenceId || null;
+      } catch (e) {
+        console.warn('Could not retrieve customer for webhook mapping', e);
+      }
+    }
+
     let newPlan = null;
     if (type.includes('subscription.created') || type.includes('subscription.activated') || type.includes('invoice.paid')) {
-      // You may map subscription.plan_id back to app plan
       newPlan = 'premium';
     }
     if (type.includes('subscription.canceled') || type.includes('invoice.payment_failed')) {
       newPlan = 'free';
     }
 
-    if (newPlan && process.env.SUPABASE_SERVICE_ROLE && process.env.SUPABASE_URL) {
-      try {
-        // Update user profile metadata via Supabase admin API if you store a mapping
-        // This requires you to know the user ID associated to the customer. You can store
-        // Square customerId alongside userId in your DB. Placeholder only:
-        console.log('Would update Supabase user plan to:', newPlan, 'for customer:', customerId);
-      } catch (e) {
-        console.warn('Failed to update Supabase from webhook', e);
-      }
+    if (newPlan && userId) {
+      await updateSupabaseUserPlanByUserId(userId, newPlan);
     }
 
     return { statusCode: 200, headers, body: JSON.stringify({ received: true }) };
