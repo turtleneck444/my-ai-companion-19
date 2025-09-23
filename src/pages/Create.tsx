@@ -17,6 +17,7 @@ import { generateAvatarImage, validateImagePrompt, examplePrompts } from "@/lib/
 import { useNavigate } from "react-router-dom";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
+import { PaymentModal } from "@/components/PaymentModal";
 import { 
   Upload, 
   X, 
@@ -83,6 +84,8 @@ const Create = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { currentPlan, setCurrentPlan } = useUsageTracking();
+  const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
+  const [showPayment, setShowPayment] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
@@ -539,8 +542,9 @@ const Create = () => {
                             {currentPlan === 'free' ? (
                               <div className="text-sm text-muted-foreground p-3 border rounded-md">
                                 Personality fine-tuning is available on Premium and Pro plans.
+                                <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span>
                                 <div className="mt-2">
-                                  <Button size="sm" onClick={() => navigate('/pricing?plan=premium')}>Upgrade to Unlock</Button>
+                                  <Button size="sm" onClick={() => { setUpgradePlan('premium'); setShowPayment(true); }}>Upgrade to Unlock</Button>
                                 </div>
                               </div>
                             ) : (
@@ -597,8 +601,8 @@ const Create = () => {
                           >
                             {currentPlan === 'free' ? (
                               <div className="space-y-2">
-                                <p className="text-sm text-muted-foreground">Custom avatar upload is a Premium feature.</p>
-                                <Button onClick={() => navigate('/pricing?plan=premium')}>Upgrade to Unlock</Button>
+                                <p className="text-sm text-muted-foreground">Custom avatar upload is a Premium feature. <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span></p>
+                                <Button onClick={() => { setUpgradePlan('premium'); setShowPayment(true); }}>Upgrade to Unlock</Button>
                               </div>
                             ) : character.avatarUrl ? (
                               <div className="space-y-4">
@@ -743,6 +747,21 @@ const Create = () => {
           )}
         </div>
       </div>
+
+      {/* Inline Payment Modal for Upgrades */}
+      {upgradePlan && (
+        <PaymentModal
+          isOpen={showPayment}
+          onClose={() => { setShowPayment(false); setUpgradePlan(null); }}
+          selectedPlan={upgradePlan}
+          onSuccess={() => {
+            setShowPayment(false);
+            setUpgradePlan(null);
+            setCurrentPlan(upgradePlan);
+            toast({ title: 'Upgraded!', description: 'Premium features unlocked. Enjoy!' });
+          }}
+        />
+      )}
     </div>
   );
 };
