@@ -45,6 +45,7 @@ interface Character {
   lastMessage?: string;
   unreadCount?: number;
   relationshipLevel?: number;
+  voiceId?: string; // Added voiceId to the interface
 }
 
 type View = 'home' | 'chats' | 'favorites' | 'profile' | 'chat' | 'call';
@@ -55,40 +56,43 @@ const CHARACTERS: Character[] = [
     id: '1',
     name: 'Luna',
     avatar: lunaAvatar,
-    bio: 'A graphic designer who works late nights and loves discovering new music. She has strong opinions about coffee and gets excited about creative projects.',
-    personality: ['Creative', 'Thoughtful', 'Independent'],
+    bio: 'Graphic designer who lives for late-night creativity and moody playlists; blunt about coffee opinions, tender about people she trusts.',
+    personality: ['Creative', 'Thoughtful', 'Independent', 'Romantic'],
     voice: { voice_id: 'default_soft_melodic', name: 'Soft & Melodic' },
     isOnline: true,
     mood: 'focused',
     lastMessage: "Working on this design project and my brain is fried. How's your day going?",
     unreadCount: 2,
-    relationshipLevel: 4.2
+    relationshipLevel: 4.2,
+    voiceId: '21m00Tcm4TlvDq8ikWAM' // Rachel: warm, youthful, expressive
   },
   {
     id: '2',
     name: 'Aria',
     avatar: ariaAvatar,
-    bio: 'Marketing coordinator who actually enjoys her job. Always has restaurant recommendations and plans weekend adventures she may or may not follow through on.',
-    personality: ['Outgoing', 'Spontaneous', 'Ambitious'],
+    bio: 'Marketing coordinator who actually enjoys the hustle; foodie who over-plans weekends and laughs at her own jokes.',
+    personality: ['Outgoing', 'Spontaneous', 'Ambitious', 'Playful'],
     voice: { voice_id: 'default_bright_cheerful', name: 'Bright & Cheerful' },
     isOnline: true,
     mood: 'energetic',
     lastMessage: "Found this amazing brunch spot! We should totally go this weekend.",
     unreadCount: 1,
-    relationshipLevel: 3.8
+    relationshipLevel: 3.8,
+    voiceId: 'AZnzlk1XvdvUeBnXmlld' // Bella: charming, intimate, confident
   },
   {
     id: '3',
     name: 'Sophie',
     avatar: sophieAvatar,
-    bio: 'Bookstore employee and philosophy student. Prefers deep conversations over small talk and always has a paperback book in her bag.',
-    personality: ['Intellectual', 'Gentle', 'Curious'],
+    bio: 'Bookstore employee and philosophy student; prefers long, quiet conversations and gets lost in used-paperback margins.',
+    personality: ['Intellectual', 'Gentle', 'Curious', 'Calm'],
     voice: { voice_id: 'default_warm_soothing', name: 'Warm & Soothing' },
     isOnline: false,
     mood: 'contemplative',
     lastMessage: "I've been reading this fascinating book about consciousness...",
     unreadCount: 0,
-    relationshipLevel: 4.6
+    relationshipLevel: 4.6,
+    voiceId: 'EXAVITQu4vr4xnSDxMaL' // Sarah: soft, empathetic, soothing
   }
 ];
 

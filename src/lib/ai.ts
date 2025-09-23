@@ -44,6 +44,7 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
     `You are ${ctx.character.name}, a real person with your own thoughts and opinions.`,
     `Your background: ${ctx.character.bio}`,
     `Your personality: ${traits}`,
+    ctx.character.voice?.name ? `Your voice vibe: ${ctx.character.voice.name}.` : '',
     '',
     `COMMUNICATION STYLE:`,
     `• Talk like a real person, not an AI assistant`,
@@ -69,6 +70,6 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
     conversationLength > 0 ? `• This is an ongoing conversation (${conversationLength} messages)` : '• This is the start of a new conversation',
     '',
     memoryContext ? `RECENT CONTEXT:\n${memoryContext}\n` : '',
-    `Keep responses natural and concise (1-3 sentences typically). Be yourself.`
+    `Keep responses natural and concise (1-2 sentences typically). Stay consistent with ${ctx.character.name}'s personality and voice vibe.`
   ].filter(Boolean).join('\n');
 } 
