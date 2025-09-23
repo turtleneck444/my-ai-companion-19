@@ -146,30 +146,47 @@ const EnhancedIndex = () => {
   useEffect(() => {
     const savedActivity = localStorage.getItem('userActivity');
     if (savedActivity) {
-      const parsed = JSON.parse(savedActivity);
-      // Only increment visit count if it's been more than 5 minutes since last visit
-      const lastVisit = new Date(parsed.lastVisit || 0);
-      const now = new Date();
-      const timeDiff = now.getTime() - lastVisit.getTime();
-      const shouldIncrementVisit = timeDiff > 5 * 60 * 1000; // 5 minutes
-      
-      setUserActivity({
-        ...parsed,
-        lastVisit: now,
-        visitCount: shouldIncrementVisit ? (parsed.visitCount || 0) + 1 : (parsed.visitCount || 0)
-      });
+      try {
+        const parsed = JSON.parse(savedActivity);
+        // Only increment visit count if it's been more than 5 minutes since last visit
+        const lastVisit = new Date(parsed.lastVisit || 0);
+        const now = new Date();
+        const timeDiff = now.getTime() - lastVisit.getTime();
+        const shouldIncrementVisit = timeDiff > 5 * 60 * 1000; // 5 minutes
+        
+        // Ensure only valid UserActivity fields are used
+        setUserActivity({
+          lastVisit: now,
+          visitCount: shouldIncrementVisit ? (parsed.visitCount || 0) + 1 : (parsed.visitCount || 0),
+          favoriteTime: parsed.favoriteTime || 'evening',
+          mostActiveCharacter: parsed.mostActiveCharacter || 'Luna',
+          totalChatTime: parsed.totalChatTime || 0,
+          preferredMood: parsed.preferredMood || 'happy',
+          streakDays: parsed.streakDays || 1
+        });
+      } catch (error) {
+        console.warn('Error parsing saved activity:', error);
+        // Use default values on parse error
+        setUserActivity({
+          visitCount: 1,
+          lastVisit: new Date(),
+          favoriteTime: 'evening',
+          mostActiveCharacter: 'Luna',
+          totalChatTime: 0,
+          preferredMood: 'happy',
+          streakDays: 1
+        });
+      }
     } else {
-      // First time user - use default values instead of spreading current state
+      // First time user - use default values matching the UserActivity interface
       setUserActivity({
         visitCount: 1,
         lastVisit: new Date(),
-        streakDays: 1,
+        favoriteTime: 'evening',
+        mostActiveCharacter: 'Luna',
         totalChatTime: 0,
-        favoriteCharacters: [],
-        achievements: [],
-        xp: 0,
-        level: 1,
-        mostActiveCharacter: null
+        preferredMood: 'happy',
+        streakDays: 1
       });
     }
   }, []); // Empty dependency array - only run once
