@@ -42,7 +42,7 @@ function getSquareClient() {
 
 async function createPaymentIntent(data, headers) {
   try {
-    const { amount, currency = 'USD', planId, userId } = data;
+    const { amount, currency = 'USD' } = data;
     if (!amount || amount <= 0) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid amount' }) };
 
     const paymentIntent = {
@@ -89,21 +89,90 @@ async function confirmPayment(data, headers) {
   }
 }
 
+// Helpers for subscriptions
+function resolvePlanVariationId(planId) {
+  // Map app plan ids to Square catalog subscription plan variation ids via env
+  // e.g. SQUARE_PLAN_PREMIUM_ID, SQUARE_PLAN_PRO_ID
+  const map = {
+    premium: process.env.SQUARE_PLAN_PREMIUM_ID,
+    pro: process.env.SQUARE_PLAN_PRO_ID,
+  };
+  return map[planId];
+}
+
+async function getOrCreateCustomer(client, { email, givenName }) {
+  const customers = client.customersApi;
+  if (!email) throw new Error('Email required for subscription');
+  try {
+    // Search by email
+    const search = await customers.searchCustomers({
+      query: { filter: { emailAddress: { exact: email } } }
+    });
+    const found = search?.result?.customers?.[0];
+    if (found) return found;
+  } catch (e) {
+    // continue to create
+  }
+  const resp = await customers.createCustomer({
+    idempotencyKey: `cust_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    emailAddress: email,
+    givenName: givenName || 'Customer'
+  });
+  return resp.result.customer;
+}
+
+async function createCardOnFile(client, { customerId, sourceId }) {
+  const cards = client.cardsApi;
+  const resp = await cards.createCard({
+    idempotencyKey: `card_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    sourceId,
+    card: { customerId }
+  });
+  return resp.result.card;
+}
+
 async function createSubscription(data, headers) {
   try {
-    const { planId, customerId, paymentMethodId } = data;
-    const subscription = { id: `sub_${Date.now()}`, status: 'active', planId, customerId, currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) };
-    return { statusCode: 200, headers, body: JSON.stringify(subscription) };
+    const { planId, email, name, paymentMethodId } = data; // paymentMethodId is sourceId from SDK
+    if (!planId || !paymentMethodId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing plan or payment source' }) };
+
+    const planVariationId = resolvePlanVariationId(planId);
+    if (!planVariationId) return { statusCode: 400, headers, body: JSON.stringify({ error: `Missing Square plan mapping for ${planId}` }) };
+
+    const client = getSquareClient();
+
+    // 1) Ensure customer
+    const customer = await getOrCreateCustomer(client, { email, givenName: name });
+
+    // 2) Create card on file from sourceId
+    const card = await createCardOnFile(client, { customerId: customer.id, sourceId: paymentMethodId });
+
+    // 3) Create subscription
+    const subs = client.subscriptionsApi;
+    const resp = await subs.createSubscription({
+      idempotencyKey: `sub_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      locationId: process.env.SQUARE_LOCATION_ID,
+      planVariationId: planVariationId,
+      customerId: customer.id,
+      cardId: card.id,
+      // start immediately, monthly by catalog plan
+    });
+    const subscription = resp.result.subscription;
+
+    return { statusCode: 200, headers, body: JSON.stringify({ id: subscription.id, status: subscription.status, customerId: customer.id }) };
   } catch (error) {
     console.error('Subscription creation failed:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create subscription' }) };
+    const message = error?.message || 'Failed to create subscription';
+    return { statusCode: 500, headers, body: JSON.stringify({ error: message }) };
   }
 }
 
 async function cancelSubscription(data, headers) {
   try {
     const { subscriptionId } = data;
-    return { statusCode: 200, headers, body: JSON.stringify({ id: subscriptionId, status: 'canceled', canceledAt: new Date().toISOString() }) };
+    const client = getSquareClient();
+    const resp = await client.subscriptionsApi.cancelSubscription(subscriptionId);
+    return { statusCode: 200, headers, body: JSON.stringify({ id: subscriptionId, status: resp.result.subscription?.status || 'CANCELED' }) };
   } catch (error) {
     console.error('Subscription cancellation failed:', error);
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to cancel subscription' }) };

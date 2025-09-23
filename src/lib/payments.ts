@@ -181,7 +181,7 @@ export class PaymentProcessor {
     return await response.json();
   }
 
-  async createSubscription(planId: string, userId: string, paymentMethodId: string): Promise<any> {
+  async createSubscription(planId: string, userId: string, paymentMethodId: string, customer?: { email?: string; name?: string; }): Promise<any> {
     const response = await fetch(`${API_BASE}/create-subscription`, {
       method: 'POST',
       headers: {
@@ -189,8 +189,11 @@ export class PaymentProcessor {
       },
       body: JSON.stringify({
         planId,
+        // userId kept for backward compatibility but not required for Square
         userId,
         paymentMethodId,
+        email: customer?.email,
+        name: customer?.name,
         provider: this.config.provider
       })
     });

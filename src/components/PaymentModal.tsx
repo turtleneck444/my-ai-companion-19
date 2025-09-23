@@ -127,23 +127,20 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
       }
       const sourceId = tokenResult.token;
 
-      // 1) Create intent (amount for plan)
-      const intent = await paymentProcessor.createPaymentIntent(plan.id, user.id);
-
-      // 2) Confirm payment with sourceId
-      const result = await paymentProcessor.confirmPayment({
-        paymentIntentId: intent.id,
+      // Create subscription using sourceId
+      const subscription = await paymentProcessor.createSubscription(
+        plan.id,
+        (user as any).id,
         sourceId,
-        amount: plan.price,
-        currency: plan.currency
-      });
+        { email: (user as any).email, name: (user as any)?.user_metadata?.preferred_name || (user as any)?.user_metadata?.name }
+      );
 
-      if (result.status === 'COMPLETED' || result.status === 'succeeded') {
-        toast({ title: 'Payment successful', description: `Welcome to ${plan.name}!` });
-        onSuccess({ id: result.id, status: 'active', planId: plan.id, receiptUrl: result.receiptUrl });
+      if (subscription?.id) {
+        toast({ title: 'Subscription active', description: `Welcome to ${plan.name}!` });
+        onSuccess({ id: subscription.id, status: subscription.status || 'active', planId: plan.id });
         onClose();
       } else {
-        throw new Error('Payment not completed');
+        throw new Error('Subscription not completed');
       }
     } catch (error: any) {
       toast({ title: 'Payment failed', description: error?.message || 'Please try again.', variant: 'destructive' });
