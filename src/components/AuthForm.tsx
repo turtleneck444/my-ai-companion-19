@@ -6,12 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Eye, EyeOff, Mail, Lock, User, Heart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 export const AuthForm = () => {
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -60,6 +62,7 @@ export const AuthForm = () => {
           title: "Welcome back! 💕",
           description: "Great to see you again! Your AI companions missed you.",
         });
+        navigate('/app');
       }
     } catch (error) {
       toast({
@@ -125,6 +128,7 @@ export const AuthForm = () => {
           title: "Account created! 🎉",
           description: "Welcome to LoveAI! You can now start creating your AI companion.",
         });
+        navigate('/app');
       }
     } catch (error) {
       toast({

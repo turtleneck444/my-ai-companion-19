@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface AuthContextType {
@@ -59,10 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session?.user ?? null);
           setLoading(false);
           
-          // Redirect to /app after successful sign in
+          // Note: Navigation is handled by the component that calls signIn
           if (event === 'SIGNED_IN' && session?.user) {
-            console.log('✅ User signed in, redirecting to /app');
-            window.location.href = '/app';
+            console.log('✅ User signed in successfully');
           }
         }
       );
@@ -90,14 +90,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store demo user in localStorage
       localStorage.setItem('loveai-demo-user', JSON.stringify(demoUser));
       
-      // Simulate user state update
-      setTimeout(() => {
-        setUser({
-          id: demoUser.id,
-          email: demoUser.email,
-          user_metadata: userData
-        } as User);
-      }, 100);
+      // Simulate user state update immediately (no timeout)
+      setUser({
+        id: demoUser.id,
+        email: demoUser.email,
+        user_metadata: userData
+      } as User);
       
       return { error: null };
     }
@@ -136,27 +134,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (demoUserData) {
         const demoUser = JSON.parse(demoUserData);
         if (demoUser.email === email) {
-          // Simulate user state update
-          setTimeout(() => {
-            setUser({
-              id: demoUser.id,
-              email: demoUser.email,
-              user_metadata: {
-                preferred_name: demoUser.preferred_name,
-                treatment_style: demoUser.treatment_style
-              },
-              app_metadata: {},
-              aud: 'authenticated',
-              created_at: new Date().toISOString()
-            } as unknown as User);
-            
-            // Redirect to /app after demo sign in
-            console.log('✅ Demo user signed in, redirecting to /app');
-            setTimeout(() => {
-              window.location.href = '/app';
-            }, 100);
-          }, 100);
-         
+          // Immediately update user state (no timeout or redirect here)
+          setUser({
+            id: demoUser.id,
+            email: demoUser.email,
+            user_metadata: {
+              preferred_name: demoUser.preferred_name,
+              treatment_style: demoUser.treatment_style
+            },
+            app_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString()
+          } as unknown as User);
+          
+          console.log('✅ Demo user signed in successfully');
           return { error: null };
         }
       }
