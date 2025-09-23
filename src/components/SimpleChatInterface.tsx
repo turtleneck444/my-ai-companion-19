@@ -226,14 +226,29 @@ export const SimpleChatInterface = ({
     };
 
     try {
-      // Add realistic "thinking" delay
-      const thinkingTime = Math.max(2000, Math.min(8000, currentInput.length * 100 + Math.random() * 3000));
+      // Thinking delay
+      const thinkingTime = Math.max(1200, Math.min(6000, currentInput.length * 80 + Math.random() * 2500));
       await new Promise(resolve => setTimeout(resolve, thinkingTime));
 
-      // Generate AI response
-      const aiResponse = await personalityAI.generateResponse(currentInput, chatContext);
+      // Timeout guard for AI generation (8s)
+      const withTimeout = <T,>(p: Promise<T>, ms: number) => new Promise<T>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('timeout')), ms);
+        p.then(v => { clearTimeout(t); resolve(v); }).catch(e => { clearTimeout(t); reject(e); });
+      });
+
+      let aiResponse = '';
+      try {
+        aiResponse = await withTimeout(personalityAI.generateResponse(currentInput, chatContext), 8000) as unknown as string;
+      } catch (e) {
+        console.warn('AI response timed out, using fallback');
+      }
+
+      // Ensure non-empty, meaningful content
+      if (!aiResponse || aiResponse.trim().length < 2) {
+        const name = userPreferences.preferredName;
+        aiResponse = `I’m here with you, ${name}. From what you said, it sounds important—tell me a bit more and I’ll share something real about how I see it.`;
+      }
       
-      // Create and add AI message instantly (like iPhone/Android)
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: aiResponse,
@@ -242,30 +257,18 @@ export const SimpleChatInterface = ({
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      // Persist AI message
       persistMessage(aiMessage);
-      
-      console.log('✅ AI message sent instantly (no typing animation)');
-      
-      // Increase relationship level slightly with each interaction
       setRelationshipLevel(prev => Math.min(prev + 1, 100));
-      
     } catch (error) {
       console.error('💥 Error generating AI response:', error);
-      
-      // Add realistic delay even for error
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Fallback response
+      await new Promise(resolve => setTimeout(resolve, 1200));
       const fallbackMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: `I'm having trouble thinking right now, ${userPreferences.preferredName}. Can you say that again? 💕`,
+        content: `I’m still here. I was thinking about that… could you share one more detail so I can give you something thoughtful? 💕`,
         sender: 'ai',
         timestamp: new Date()
       };
-      
       setMessages(prev => [...prev, fallbackMessage]);
-      console.log('🔄 Used fallback response due to error');
     } finally {
       setIsAiTyping(false);
     }
