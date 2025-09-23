@@ -117,6 +117,11 @@ const Create = () => {
 
   // AI Image generation handler
   const generateAvatar = async () => {
+    if (currentPlan === 'free') {
+      toast({ title: 'Upgrade required', description: 'AI avatar generation is included with Premium and Pro plans.', variant: 'destructive' });
+      navigate('/pricing?plan=premium');
+      return;
+    }
     const validation = validateImagePrompt(imagePrompt);
     if (!validation.isValid) {
       toast({
@@ -251,12 +256,19 @@ const Create = () => {
   };
 
   const togglePersonality = (trait: string) => {
-    setCharacter(prev => ({
-      ...prev,
-      personality: prev.personality.includes(trait)
-        ? prev.personality.filter(p => p !== trait)
-        : [...prev.personality, trait]
-    }));
+    setCharacter(prev => {
+      const has = prev.personality.includes(trait);
+      if (!has && currentPlan === 'free' && prev.personality.length >= 3) {
+        toast({ title: 'Upgrade for more traits', description: 'Free plan allows up to 3 personality traits. Upgrade to add more.', variant: 'destructive' });
+        return prev;
+      }
+      return ({
+        ...prev,
+        personality: has
+          ? prev.personality.filter(p => p !== trait)
+          : [...prev.personality, trait]
+      });
+    });
   };
 
   const updatePersonalityTrait = (key: string, value: number[]) => {
@@ -505,7 +517,7 @@ const Create = () => {
                       )}
 
                       {stepName === "Personality" && (
-                        <Card className="p-6 space-y-6">
+                        <Card className="p-6 space-y-6 relative">
                           <div>
                             <Label className="text-base font-medium mb-4 block">Personality Traits</Label>
                             <div className="flex flex-wrap gap-2">
@@ -524,22 +536,31 @@ const Create = () => {
                           
                           <div className="space-y-4">
                             <Label className="text-base font-medium">Fine-tune Personality</Label>
-                            {personalityTraitSliders.map((trait) => (
-                              <div key={trait.key} className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                  <span>{trait.label}</span>
-                                  <span>{character.personalityTraits[trait.key]}%</span>
+                            {currentPlan === 'free' ? (
+                              <div className="text-sm text-muted-foreground p-3 border rounded-md">
+                                Personality fine-tuning is available on Premium and Pro plans.
+                                <div className="mt-2">
+                                  <Button size="sm" onClick={() => navigate('/pricing?plan=premium')}>Upgrade to Unlock</Button>
                                 </div>
-                                <Slider
-                                  value={[character.personalityTraits[trait.key]]}
-                                  onValueChange={(value) => updatePersonalityTrait(trait.key, value)}
-                                  min={trait.min}
-                                  max={trait.max}
-                                  step={1}
-                                  className="w-full"
-                                />
                               </div>
-                            ))}
+                            ) : (
+                              personalityTraitSliders.map((trait) => (
+                                <div key={trait.key} className="space-y-2">
+                                  <div className="flex justify-between text-sm">
+                                    <span>{trait.label}</span>
+                                    <span>{character.personalityTraits[trait.key]}%</span>
+                                  </div>
+                                  <Slider
+                                    value={[character.personalityTraits[trait.key]]}
+                                    onValueChange={(value) => updatePersonalityTrait(trait.key, value)}
+                                    min={trait.min}
+                                    max={trait.max}
+                                    step={1}
+                                    className="w-full"
+                                  />
+                                </div>
+                              ))
+                            )}
                           </div>
                         </Card>
                       )}
