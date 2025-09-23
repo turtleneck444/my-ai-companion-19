@@ -4,10 +4,29 @@ export default async function handler(req, res) {
     return;
   }
   try {
-    const { messages, model, temperature, max_tokens } = req.body || {};
+    const { 
+      messages, 
+      model, 
+      temperature, 
+      max_tokens, 
+      character, 
+      user_preferences, 
+      relationship_level, 
+      session_memory,
+      presence_penalty,
+      frequency_penalty,
+      top_p
+    } = req.body || {};
+    
+    // Enhanced model selection for personality AI
     const resolvedModel = model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    const resolvedTemp = typeof temperature === 'number' ? temperature : 0.8;
-    const resolvedMax = typeof max_tokens === 'number' ? max_tokens : 220;
+    
+    // Optimized settings for personality-driven responses
+    const resolvedTemp = typeof temperature === 'number' ? temperature : 0.9; // Higher for creativity
+    const resolvedMax = typeof max_tokens === 'number' ? max_tokens : 250; // Increased for detailed responses
+    const resolvedPresence = typeof presence_penalty === 'number' ? presence_penalty : 0.6; // Encourage new topics
+    const resolvedFrequency = typeof frequency_penalty === 'number' ? frequency_penalty : 0.3; // Reduce repetition
+    const resolvedTopP = typeof top_p === 'number' ? top_p : 0.95; // High quality responses
 
     if (!process.env.OPENAI_API_KEY) {
       res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
@@ -18,29 +37,59 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Enhanced request payload for personality AI
+    const requestPayload = {
+      model: resolvedModel,
+      messages,
+      temperature: resolvedTemp,
+      max_tokens: resolvedMax,
+      presence_penalty: resolvedPresence,
+      frequency_penalty: resolvedFrequency,
+      top_p: resolvedTopP,
+      // Add user context for better responses
+      user: user_preferences?.preferredName || 'User'
+    };
+
+    // Add character context in system message if available
+    if (character) {
+      console.log(`🎭 Generating response for character: ${character}`);
+    }
+    
+    if (relationship_level) {
+      console.log(`💕 Relationship level: ${relationship_level}`);
+    }
+
+    if (session_memory && Object.keys(session_memory).length > 0) {
+      console.log(`🧠 Using session memory with ${session_memory.topics?.length || 0} topics`);
+    }
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({
-        model: resolvedModel,
-        messages,
-        temperature: resolvedTemp,
-        max_tokens: resolvedMax,
-      }),
+      body: JSON.stringify(requestPayload),
     });
 
     if (!response.ok) {
       const error = await response.text();
+      console.error(`OpenAI API error: ${response.status} - ${error}`);
       res.status(response.status).send(error);
       return;
     }
 
     const data = await response.json();
-    res.status(200).json({ message: data.choices?.[0]?.message?.content ?? '' });
+    const responseContent = data.choices?.[0]?.message?.content ?? '';
+    
+    // Log successful personality response
+    if (character && responseContent) {
+      console.log(`✨ Generated personality response for ${character}: ${responseContent.slice(0, 50)}...`);
+    }
+
+    res.status(200).json({ message: responseContent });
   } catch (err) {
+    console.error('OpenAI proxy error:', err);
     res.status(500).json({ error: 'OpenAI proxy error', details: String(err) });
   }
 }

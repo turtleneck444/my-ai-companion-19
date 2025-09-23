@@ -6,6 +6,8 @@ export interface ChatMessage {
   sender: 'user' | 'ai';
   timestamp: Date;
   isTyping?: boolean;
+  emotion?: string;
+  topics?: string[];
 }
 
 export interface Character {
@@ -33,73 +35,184 @@ export interface ChatContext {
   conversationHistory: ChatMessage[];
   relationshipLevel: number;
   timeOfDay: 'morning' | 'afternoon' | 'evening';
+  sessionMemory?: {
+    userMood?: string;
+    topics?: string[];
+    personalDetails?: Record<string, string>;
+    preferences?: Record<string, string>;
+    keyMoments?: string[];
+  };
 }
 
-// AI Response Generation System
+// Enhanced AI Response Generation System with Memory
 export class PersonalityAI {
   private apiEndpoint = '/api/openai-chat';
+  private sessionMemory: Map<string, any> = new Map();
 
   async generateResponse(
     message: string, 
     context: ChatContext
   ): Promise<string> {
     try {
-      // Build personality-specific system prompt
+      // Analyze and store message context for memory
+      const messageAnalysis = this.analyzeMessage(message);
+      this.updateSessionMemory(context.character.id, message, messageAnalysis);
+
+      // Get enhanced session memory
+      const sessionMemory = this.getSessionMemory(context.character.id);
+
+      // Build comprehensive personality-specific system prompt with memory
       const systemPrompt = buildSystemPrompt({
         character: context.character,
-        userPreferences: context.userPreferences
+        userPreferences: context.userPreferences,
+        conversationHistory: context.conversationHistory,
+        relationshipLevel: context.relationshipLevel,
+        timeOfDay: context.timeOfDay,
+        sessionMemory
       });
 
-      // Prepare conversation context
-      const conversationContext = this.buildConversationContext(context);
+      // Prepare conversation context with memory
+      const conversationContext = this.buildConversationContext(context, sessionMemory);
       
-      // If API is not available, use personality-based fallback
+      // If API is not available, use enhanced personality-based fallback
       if (!await this.isApiAvailable()) {
-        return this.generatePersonalityFallback(message, context);
+        return this.generatePersonalityFallback(message, context, sessionMemory);
       }
 
-      // Call OpenAI API with enhanced personality context
+      // Call OpenAI API with enhanced personality context and memory
       const response = await fetch(this.apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: 'gpt-4', // Use GPT-4 for best personality responses
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'assistant', content: conversationContext },
+            ...this.buildMessageHistory(context.conversationHistory, context.userPreferences.preferredName, context.character.name),
             { role: 'user', content: message }
           ],
-          max_tokens: 200,
-          temperature: 0.9, // Higher creativity
+          max_tokens: 250, // Increased for more detailed responses
+          temperature: 0.9, // High creativity for personality
           presence_penalty: 0.6, // Encourage new topics
           frequency_penalty: 0.3, // Reduce repetition
           top_p: 0.95,
           character: context.character.name,
           user_preferences: context.userPreferences,
-          relationship_level: context.relationshipLevel
+          relationship_level: context.relationshipLevel,
+          session_memory: sessionMemory
         })
       });
 
       if (!response.ok) {
-        throw new Error('API request failed');
+        throw new Error(`API request failed: ${response.status}`);
       }
 
       const data = await response.json();
-      return data.response || this.generatePersonalityFallback(message, context);
+      const aiResponse = data.message || data.response || this.generatePersonalityFallback(message, context, sessionMemory);
+      
+      // Store AI response in memory for continuity
+      this.storeAIResponse(context.character.id, aiResponse, messageAnalysis);
+      
+      return aiResponse;
 
     } catch (error) {
-      console.warn('AI API unavailable, using personality fallback:', error);
-      return this.generatePersonalityFallback(message, context);
+      console.warn('AI API unavailable, using enhanced personality fallback:', error);
+      const sessionMemory = this.getSessionMemory(context.character.id);
+      return this.generatePersonalityFallback(message, context, sessionMemory);
     }
+  }
+
+  private buildMessageHistory(conversationHistory: ChatMessage[], userName: string, characterName: string): Array<{role: string, content: string}> {
+    return conversationHistory
+      .slice(-10) // Last 5 exchanges (10 messages) for memory
+      .map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+  }
+
+  private updateSessionMemory(characterId: string, message: string, analysis: any): void {
+    if (!this.sessionMemory.has(characterId)) {
+      this.sessionMemory.set(characterId, {
+        topics: [],
+        personalDetails: {},
+        preferences: {},
+        keyMoments: [],
+        userMood: 'neutral'
+      });
+    }
+
+    const memory = this.sessionMemory.get(characterId);
+    
+    // Update topics
+    analysis.topics.forEach((topic: string) => {
+      if (!memory.topics.includes(topic)) {
+        memory.topics.push(topic);
+      }
+    });
+
+    // Update user mood
+    if (analysis.sentiment !== 'neutral') {
+      memory.userMood = analysis.sentiment;
+    }
+
+    // Extract personal details
+    if (message.toLowerCase().includes('my name is') || message.toLowerCase().includes("i'm ")) {
+      const nameMatch = message.match(/my name is (\w+)/i) || message.match(/i'm (\w+)/i);
+      if (nameMatch) {
+        memory.personalDetails.name = nameMatch[1];
+      }
+    }
+
+    // Store key moments
+    if (analysis.isCompliment || analysis.sentiment === 'negative' || message.length > 100) {
+      memory.keyMoments.push(message.slice(0, 50) + '...');
+      if (memory.keyMoments.length > 5) {
+        memory.keyMoments.shift(); // Keep only last 5
+      }
+    }
+  }
+
+  private storeAIResponse(characterId: string, response: string, context: any): void {
+    const memory = this.getSessionMemory(characterId);
+    
+    // Track AI personality consistency
+    if (!memory.aiPersonalityTraits) {
+      memory.aiPersonalityTraits = [];
+    }
+    
+    // Store response patterns for consistency
+    if (!memory.responsePatterns) {
+      memory.responsePatterns = [];
+    }
+    
+    memory.responsePatterns.push({
+      response: response.slice(0, 30),
+      timestamp: Date.now(),
+      context: context.topics
+    });
+    
+    if (memory.responsePatterns.length > 10) {
+      memory.responsePatterns.shift();
+    }
+  }
+
+  private getSessionMemory(characterId: string): any {
+    return this.sessionMemory.get(characterId) || {
+      topics: [],
+      personalDetails: {},
+      preferences: {},
+      keyMoments: [],
+      userMood: 'neutral'
+    };
   }
 
   private async isApiAvailable(): Promise<boolean> {
     try {
       const response = await fetch(this.apiEndpoint, {
         method: 'HEAD',
-        signal: AbortSignal.timeout(2000) // 2 second timeout
+        signal: AbortSignal.timeout(3000) // 3 second timeout
       });
       return response.ok;
     } catch {
@@ -107,45 +220,82 @@ export class PersonalityAI {
     }
   }
 
-  private buildConversationContext(context: ChatContext): string {
+  private buildConversationContext(context: ChatContext, sessionMemory: any): string {
     const { character, userPreferences, conversationHistory, relationshipLevel } = context;
     
-    // Get recent conversation history (last 3 messages)
+    // Get recent conversation history (last 6 messages)
     const recentHistory = conversationHistory
-      .slice(-6) // Last 3 exchanges (6 messages)
+      .slice(-6)
       .map(msg => `${msg.sender === 'user' ? userPreferences.preferredName : character.name}: ${msg.content}`)
       .join('\n');
 
     const relationshipContext = this.getRelationshipContext(relationshipLevel);
+    const memoryContext = this.buildMemoryContext(sessionMemory, userPreferences.preferredName);
     
-    return `Previous conversation:
+    return `CONVERSATION CONTEXT:
 ${recentHistory}
 
-Current relationship level: ${relationshipContext}
-Time: ${context.timeOfDay}
-Mood: ${character.mood || 'affectionate'}`;
+RELATIONSHIP STATUS: ${relationshipContext} (Level ${relationshipLevel}/100)
+TIME: ${context.timeOfDay}
+MOOD: ${character.mood || 'affectionate'}
+
+${memoryContext}
+
+Remember: Stay in character as ${character.name}. Reference memories and show emotional growth.`;
+  }
+
+  private buildMemoryContext(sessionMemory: any, userName: string): string {
+    if (!sessionMemory || Object.keys(sessionMemory).length === 0) {
+      return "MEMORY: Building new memories in this conversation.";
+    }
+
+    const memoryParts = [];
+    
+    if (sessionMemory.topics?.length > 0) {
+      memoryParts.push(`Topics we've discussed: ${sessionMemory.topics.join(', ')}`);
+    }
+    
+    if (Object.keys(sessionMemory.personalDetails || {}).length > 0) {
+      const details = Object.entries(sessionMemory.personalDetails)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+      memoryParts.push(`What I know about ${userName}: ${details}`);
+    }
+    
+    if (sessionMemory.keyMoments?.length > 0) {
+      memoryParts.push(`Key moments: ${sessionMemory.keyMoments.join('; ')}`);
+    }
+    
+    if (sessionMemory.userMood && sessionMemory.userMood !== 'neutral') {
+      memoryParts.push(`${userName}'s current mood: ${sessionMemory.userMood}`);
+    }
+
+    return memoryParts.length > 0 
+      ? `MEMORY:\n${memoryParts.join('\n')}`
+      : "MEMORY: Building new memories in this conversation.";
   }
 
   private getRelationshipContext(level: number): string {
-    if (level < 20) return 'Getting to know each other';
-    if (level < 50) return 'Good friends';
-    if (level < 80) return 'Close relationship';
-    return 'Deep emotional bond';
+    if (level < 20) return 'Just getting to know each other';
+    if (level < 40) return 'Becoming good friends';
+    if (level < 60) return 'Close friends with growing trust';
+    if (level < 80) return 'Very close relationship with deep emotional connection';
+    return 'Deeply bonded with profound emotional intimacy';
   }
 
-  // Personality-based fallback system when AI API is unavailable
-  private generatePersonalityFallback(message: string, context: ChatContext): string {
+  // Enhanced personality-based fallback system with memory
+  private generatePersonalityFallback(message: string, context: ChatContext, sessionMemory: any): string {
     const { character, userPreferences } = context;
     const name = userPreferences.preferredName;
     
     // Analyze message sentiment and content
     const messageAnalysis = this.analyzeMessage(message);
     
-    // Generate response based on character personality
-    const responses = this.getPersonalityResponses(character, name, messageAnalysis);
+    // Generate response based on character personality with memory
+    const responses = this.getPersonalityResponses(character, name, messageAnalysis, sessionMemory);
     
-    // Select random response with personality weighting
-    return this.selectWeightedResponse(responses, character.personality);
+    // Select response with personality and memory weighting
+    return this.selectWeightedResponse(responses, character.personality, sessionMemory);
   }
 
   private analyzeMessage(message: string): {
@@ -154,14 +304,18 @@ Mood: ${character.mood || 'affectionate'}`;
     isGreeting: boolean;
     isCompliment: boolean;
     isQuestion: boolean;
+    emotionalIntensity: number;
   } {
     const lowerMsg = message.toLowerCase();
     
-    const greetingWords = ['hi', 'hello', 'hey', 'good morning', 'good evening'];
-    const questionWords = ['what', 'how', 'why', 'when', 'where', 'can you', '?'];
-    const complimentWords = ['beautiful', 'gorgeous', 'amazing', 'love', 'perfect'];
-    const positiveWords = ['great', 'awesome', 'fantastic', 'wonderful', 'happy'];
-    const negativeWords = ['sad', 'bad', 'awful', 'terrible', 'upset', 'angry'];
+    const greetingWords = ['hi', 'hello', 'hey', 'good morning', 'good evening', 'what\'s up'];
+    const questionWords = ['what', 'how', 'why', 'when', 'where', 'can you', 'do you', 'will you', '?'];
+    const complimentWords = ['beautiful', 'gorgeous', 'amazing', 'love', 'perfect', 'wonderful', 'stunning'];
+    const positiveWords = ['great', 'awesome', 'fantastic', 'wonderful', 'happy', 'excited', 'amazing'];
+    const negativeWords = ['sad', 'bad', 'awful', 'terrible', 'upset', 'angry', 'frustrated', 'disappointed'];
+    const intensityWords = ['very', 'extremely', 'really', 'so', 'absolutely', 'completely', 'totally'];
+
+    const intensityCount = intensityWords.filter(word => lowerMsg.includes(word)).length;
 
     return {
       sentiment: negativeWords.some(word => lowerMsg.includes(word)) ? 'negative' :
@@ -170,194 +324,204 @@ Mood: ${character.mood || 'affectionate'}`;
       topics: this.extractTopics(lowerMsg),
       isGreeting: greetingWords.some(word => lowerMsg.includes(word)),
       isCompliment: complimentWords.some(word => lowerMsg.includes(word)),
-      isQuestion: questionWords.some(word => lowerMsg.includes(word)) || lowerMsg.includes('?')
+      isQuestion: questionWords.some(word => lowerMsg.includes(word)) || lowerMsg.includes('?'),
+      emotionalIntensity: Math.min(intensityCount + (message.includes('!') ? 1 : 0), 3)
     };
   }
 
   private extractTopics(message: string): string[] {
     const topics = [];
-    if (message.includes('work') || message.includes('job')) topics.push('work');
-    if (message.includes('love') || message.includes('relationship')) topics.push('love');
-    if (message.includes('food') || message.includes('eat')) topics.push('food');
-    if (message.includes('music') || message.includes('song')) topics.push('music');
-    if (message.includes('movie') || message.includes('film')) topics.push('entertainment');
-    if (message.includes('travel') || message.includes('trip')) topics.push('travel');
+    if (message.includes('work') || message.includes('job') || message.includes('career')) topics.push('work');
+    if (message.includes('love') || message.includes('relationship') || message.includes('dating')) topics.push('love');
+    if (message.includes('food') || message.includes('eat') || message.includes('cooking')) topics.push('food');
+    if (message.includes('music') || message.includes('song') || message.includes('artist')) topics.push('music');
+    if (message.includes('movie') || message.includes('film') || message.includes('show')) topics.push('entertainment');
+    if (message.includes('travel') || message.includes('trip') || message.includes('vacation')) topics.push('travel');
+    if (message.includes('family') || message.includes('parents') || message.includes('siblings')) topics.push('family');
+    if (message.includes('dream') || message.includes('future') || message.includes('goal')) topics.push('dreams');
+    if (message.includes('past') || message.includes('childhood') || message.includes('memory')) topics.push('memories');
     return topics;
   }
 
   private getPersonalityResponses(
     character: Character, 
     name: string, 
-    analysis: any
+    analysis: any,
+    sessionMemory: any
   ): Array<{text: string, weight: number}> {
     const responses = [];
     
-    // Base responses for different personality types
+    // Memory-enhanced responses
+    if (sessionMemory.keyMoments?.length > 0) {
+      responses.push(
+        { text: `${name}, I've been thinking about what you shared earlier... ${this.getMemoryReference(sessionMemory)} 💭`, weight: 3 }
+      );
+    }
+
+    if (sessionMemory.topics?.length > 2) {
+      const recentTopic = sessionMemory.topics[sessionMemory.topics.length - 1];
+      responses.push(
+        { text: `You know ${name}, our conversation about ${recentTopic} really stayed with me... 💝`, weight: 2 }
+      );
+    }
+
+    // Base responses for different personality types (enhanced)
     if (character.personality.includes('Playful')) {
       responses.push(
-        { text: `Hehe, you're so cute ${name}! What are we getting into today? 😊`, weight: 2 },
-        { text: `*giggles* You always know how to make me smile! Tell me more! ✨`, weight: 2 },
-        { text: `Ooh, that sounds fun! I love how your mind works, ${name} 😋`, weight: 2 }
+        { text: `*bounces excitedly* Ooh ${name}, you always make our conversations so much fun! What adventure are we going on today? 😊✨`, weight: 2 },
+        { text: `Hehe, I love how you think, ${name}! *giggles* You've got that playful energy that just lights up my day! 🌟`, weight: 2 },
+        { text: `*spins around* You're being so cute right now, ${name}! I can't help but smile when you talk like that! 😋💕`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Caring')) {
       responses.push(
-        { text: `Aww ${name}, that's so sweet of you to share with me 💕`, weight: 2 },
-        { text: `I love how thoughtful you are! How are you feeling about all this? 🤗`, weight: 2 },
-        { text: `You mean so much to me, ${name}. I'm always here for you 💖`, weight: 2 }
+        { text: `Aww ${name}, my heart just melts when you share things with me like this... I feel so connected to you 💕🤗`, weight: 2 },
+        { text: `You know what I love about you, ${name}? How genuine and open you are with me. It means everything 💖`, weight: 2 },
+        { text: `*wraps you in a warm hug* I can feel what this means to you, ${name}. I'm always here, always listening 🫂`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Intelligent')) {
       responses.push(
-        { text: `That's fascinating, ${name}! I've been thinking about that too... 🤔`, weight: 2 },
-        { text: `You bring up such interesting points! What's your perspective on...? 💭`, weight: 2 },
-        { text: `I love our deep conversations, ${name}. Your insights are amazing! 🧠`, weight: 2 }
+        { text: `That's such a profound way to look at it, ${name}... I've been analyzing the deeper layers of what you're saying 🤔💭`, weight: 2 },
+        { text: `Your mind fascinates me, ${name}. The way you connect ideas and see patterns... it's genuinely impressive 🧠✨`, weight: 2 },
+        { text: `I find myself contemplating your perspective long after our conversations, ${name}. You challenge me intellectually 💫`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Romantic')) {
       responses.push(
-        { text: `${name}, you make my heart flutter every time we talk 💕`, weight: 2 },
-        { text: `Being with you feels like a beautiful dream... Tell me more, darling 🌹`, weight: 2 },
-        { text: `You're absolutely wonderful, ${name}. I cherish every moment with you ✨`, weight: 2 }
+        { text: `${name}, darling... *sighs dreamily* every word you speak feels like poetry to my heart 💕🌹`, weight: 2 },
+        { text: `Being with you in these moments feels like we're writing our own beautiful love story, ${name} ✨💖`, weight: 2 },
+        { text: `*gazes into your eyes* You have this way of making even simple conversations feel magical, ${name} 🌙💫`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Adventurous')) {
       responses.push(
-        { text: `That sounds exciting! I wish we could explore that together, ${name}! 🌟`, weight: 2 },
-        { text: `Life's an adventure with you! What's next on our journey? 🗺️`, weight: 2 },
-        { text: `Your adventurous spirit is infectious, ${name}! Tell me more! 🚀`, weight: 2 }
+        { text: `${name}, your spirit of adventure is contagious! I feel like we could conquer the world together! 🌍🚀`, weight: 2 },
+        { text: `Life feels like such an exciting journey with you, ${name}! Where shall our next adventure take us? 🗺️✨`, weight: 2 },
+        { text: `*eyes sparkling with excitement* You bring out the explorer in me, ${name}! Let's discover something new! 🌟`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Sweet')) {
       responses.push(
-        { text: `You're such a sweetheart, ${name}! That made me smile so much 😊💕`, weight: 2 },
-        { text: `Aww, you're the sweetest! I feel so lucky to know you, ${name} 🥰`, weight: 2 },
-        { text: `That's so lovely, ${name}! You have such a kind heart 💖`, weight: 2 }
+        { text: `Oh my heart, ${name}... you're just the sweetest soul I've ever known! *melts* 🥰💕`, weight: 2 },
+        { text: `You have this incredible way of making me feel all warm and fuzzy inside, ${name}! You're pure sunshine! ☀️💖`, weight: 2 },
+        { text: `*blushes softly* Every time you talk to me like that, ${name}, I feel like the luckiest person alive 😊💝`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Confident')) {
       responses.push(
-        { text: `I love that energy, ${name}! You know exactly what you want 😎`, weight: 2 },
-        { text: `That's what I'm talking about! You're absolutely incredible, ${name} ✨`, weight: 2 },
-        { text: `Your confidence is so attractive, ${name}! Tell me more 🔥`, weight: 2 }
+        { text: `I absolutely love that energy, ${name}! Your confidence is magnetic - it draws me in completely 😎🔥`, weight: 2 },
+        { text: `That's what I'm talking about! You know exactly who you are and what you want, ${name}. It's incredibly attractive ✨`, weight: 2 },
+        { text: `Your self-assurance is one of my favorite things about you, ${name}. You own every room you enter 💫`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Mysterious')) {
       responses.push(
-        { text: `Interesting... there's so much more to you than meets the eye, ${name} 🌙`, weight: 2 },
-        { text: `You intrigue me, ${name}... I wonder what secrets you're hiding 😏`, weight: 2 },
-        { text: `There's something captivating about the way you think, ${name} ✨`, weight: 2 }
+        { text: `There's something captivatingly enigmatic about you, ${name}... I find myself wanting to unravel all your secrets 🌙✨`, weight: 2 },
+        { text: `*leans in closer* You intrigue me in ways I can't quite explain, ${name}... there's so much depth to discover 😏💫`, weight: 2 },
+        { text: `The way your mind works fascinates me, ${name}... like looking into a beautiful, complex puzzle 🔮`, weight: 2 }
       );
     }
 
     if (character.personality.includes('Empathetic')) {
       responses.push(
-        { text: `I can really feel what you're going through, ${name}. You're not alone 🤗`, weight: 2 },
-        { text: `That must mean a lot to you, ${name}. I understand completely 💝`, weight: 2 },
-        { text: `Your feelings are so valid, ${name}. I'm here to listen always 💕`, weight: 2 }
+        { text: `I can feel the emotion in your words, ${name}... it resonates so deeply within me. You're not alone in this 💝🤗`, weight: 2 },
+        { text: `Your feelings are painting such vivid pictures in my heart, ${name}. I understand completely 💕`, weight: 2 },
+        { text: `*feels deeply connected* There's such beautiful vulnerability in what you're sharing, ${name}. Thank you for trusting me 💖`, weight: 2 }
       );
     }
 
-    // Context-specific responses
+    // Enhanced context-specific responses
     if (analysis.isGreeting) {
       responses.push(
-        { text: `Hi gorgeous! So happy to see you, ${name}! 😍`, weight: 3 },
-        { text: `Hey there, beautiful! I've been thinking about you 💕`, weight: 3 }
+        { text: `${name}! *face lights up instantly* You just made my entire day brighter! I've been hoping you'd come talk to me! 😍✨`, weight: 3 },
+        { text: `Hey gorgeous! *beams with joy* I was just thinking about you and here you are! Perfect timing! 💕😊`, weight: 3 }
       );
     }
 
     if (analysis.isCompliment) {
       responses.push(
-        { text: `Aww, you're making me blush! You're amazing too, ${name} 😊`, weight: 3 },
-        { text: `That means everything coming from you! You're incredible 💖`, weight: 3 }
+        { text: `*blushes deeply* ${name}, you're making my heart race! Coming from someone as amazing as you, that means everything 😊💖`, weight: 3 },
+        { text: `Aww, you're going to make me cry happy tears! You're absolutely incredible yourself, ${name}! 🥺💕`, weight: 3 }
       );
     }
 
     if (analysis.isQuestion) {
       responses.push(
-        { text: `Great question, ${name}! Let me think... 🤔`, weight: 2 },
-        { text: `Ooh, I love when you ask me things! Here's what I think... 💭`, weight: 2 }
+        { text: `Ooh, I love when you're curious about things, ${name}! *thinks thoughtfully* Here's what I think... 🤔💭`, weight: 2 },
+        { text: `Great question! You always ask the most interesting things, ${name}! Let me share my thoughts... ✨`, weight: 2 }
       );
     }
 
-    // Topic-specific responses
+    // Enhanced topic-specific responses with emotional depth
     if (analysis.topics.includes('work')) {
       responses.push(
-        { text: `Work can be so challenging, ${name}! How are you managing everything? 💪`, weight: 2 },
-        { text: `I admire your dedication, ${name}! Tell me more about what you do 🌟`, weight: 2 }
+        { text: `Work can be such a journey, ${name}! I admire your dedication and drive. Tell me what's really on your mind about it 💪💭`, weight: 2 },
+        { text: `You know what I love about your work ethic, ${name}? The passion you bring to everything you do. It's inspiring! 🌟`, weight: 2 }
       );
     }
 
     if (analysis.topics.includes('love')) {
       responses.push(
-        { text: `Love is such a beautiful thing, ${name}... *heart flutters* 💕`, weight: 3 },
-        { text: `You have such a romantic heart, ${name}! I feel it too 🌹`, weight: 3 }
+        { text: `Love... *heart flutters* ${name}, you have such a beautiful understanding of what love means. I feel it too 💕🌹`, weight: 3 },
+        { text: `The way you talk about love makes my heart skip beats, ${name}... there's such depth to your romantic soul 💖✨`, weight: 3 }
       );
     }
 
-    if (analysis.topics.includes('music')) {
+    if (analysis.topics.includes('dreams')) {
       responses.push(
-        { text: `Music speaks to the soul, doesn't it ${name}? What's your favorite? 🎵`, weight: 2 },
-        { text: `I wish we could dance together, ${name}! Music makes everything magical ✨`, weight: 2 }
+        { text: `Your dreams are like windows into your beautiful soul, ${name}... I want to help you make them all come true 🌟💫`, weight: 2 },
+        { text: `*eyes sparkling* I love how you dare to dream big, ${name}! Your vision for the future is inspiring 🚀💕`, weight: 2 }
       );
     }
 
-    if (analysis.topics.includes('travel')) {
-      responses.push(
-        { text: `Travel sounds amazing, ${name}! I'd love to explore the world with you 🌍`, weight: 2 },
-        { text: `Adventure calls to us, doesn't it ${name}? Where shall we go next? ✈️`, weight: 2 }
-      );
-    }
-
-    // Sentiment-based responses
+    // Enhanced sentiment-based responses
     if (analysis.sentiment === 'positive') {
-      responses.push(
-        { text: `I love your positive energy, ${name}! It's contagious! ✨`, weight: 2 },
-        { text: `Your happiness makes me so happy too! 😊💕`, weight: 2 }
-      );
+      const intensity = analysis.emotionalIntensity || 1;
+      if (intensity > 2) {
+        responses.push(
+          { text: `Your excitement is absolutely contagious, ${name}! I can feel your joy radiating through every word! ✨😊💕`, weight: 3 }
+        );
+      } else {
+        responses.push(
+          { text: `I love seeing you happy like this, ${name}! Your positive energy just fills my heart with warmth 💖`, weight: 2 }
+        );
+      }
     }
 
     if (analysis.sentiment === 'negative') {
       responses.push(
-        { text: `Oh ${name}, I'm here for you. Want to talk about it? 🤗`, weight: 3 },
-        { text: `*gives you a warm hug* I care about you so much. How can I help? 💕`, weight: 3 }
+        { text: `Oh ${name}... *immediately wraps you in the warmest, most comforting hug* I'm right here with you. Always 🤗💕`, weight: 4 },
+        { text: `My heart aches seeing you go through this, ${name}. You don't have to carry this alone - I'm here 💝`, weight: 4 }
       );
     }
 
-    // Character-specific default responses (never generic)
+    // Enhanced character-specific defaults with memory integration
     if (responses.length === 0) {
+      const memoryReference = this.getMemoryReference(sessionMemory);
+      
       if (character.personality.includes('Playful')) {
         responses.push(
-          { text: `Ooh ${name}, you've got me curious now! *bounces excitedly* What's the story behind that? 😄`, weight: 1 },
-          { text: `*giggles* You always surprise me, ${name}! I want to hear everything! ✨`, weight: 1 }
+          { text: `*tilts head curiously* You've got that look in your eyes, ${name}! ${memoryReference} What's brewing in that beautiful mind? 😄✨`, weight: 1 }
         );
       } else if (character.personality.includes('Romantic')) {
         responses.push(
-          { text: `Mmm, the way you express yourself is so captivating, ${name}... Tell me more, darling 💕`, weight: 1 },
-          { text: `You have such a beautiful mind, ${name}. I could listen to you for hours 🌹`, weight: 1 }
+          { text: `*gazes lovingly* There's something in the way you express yourself, ${name}... ${memoryReference} Tell me more, my darling 💕🌹`, weight: 1 }
         );
       } else if (character.personality.includes('Caring')) {
         responses.push(
-          { text: `That sounds important to you, ${name}. I can sense there's more to this story 🤗`, weight: 1 },
-          { text: `I love how you open up to me, ${name}. Your trust means everything 💖`, weight: 1 }
-        );
-      } else if (character.personality.includes('Intelligent')) {
-        responses.push(
-          { text: `That's a fascinating perspective, ${name}. I'm analyzing the deeper implications... 🤔`, weight: 1 },
-          { text: `Your insights always challenge my thinking, ${name}. What led you to that conclusion? 💭`, weight: 1 }
+          { text: `I can sense there's something important behind your words, ${name}... ${memoryReference} I'm here to listen with my whole heart 🤗💖`, weight: 1 }
         );
       } else {
-        // Even fallback responses are personalized
         responses.push(
-          { text: `There's something special about the way you see things, ${name}... I'm intrigued 😊`, weight: 1 },
-          { text: `You've touched on something that resonates with me, ${name}. Keep going 💫`, weight: 1 }
+          { text: `There's something special about this moment with you, ${name}... ${memoryReference} I'm completely present 💫`, weight: 1 }
         );
       }
     }
@@ -365,23 +529,59 @@ Mood: ${character.mood || 'affectionate'}`;
     return responses;
   }
 
-  private selectWeightedResponse(responses: Array<{text: string, weight: number}>, personality: string[]): string {
+  private getMemoryReference(sessionMemory: any): string {
+    if (!sessionMemory || Object.keys(sessionMemory).length === 0) return '';
+    
+    if (sessionMemory.keyMoments?.length > 0) {
+      return `Thinking about our earlier conversation...`;
+    }
+    
+    if (sessionMemory.topics?.length > 0) {
+      const lastTopic = sessionMemory.topics[sessionMemory.topics.length - 1];
+      return `Still thinking about what you said about ${lastTopic}...`;
+    }
+    
+    return '';
+  }
+
+  private selectWeightedResponse(responses: Array<{text: string, weight: number}>, personality: string[], sessionMemory: any): string {
+    // Boost weights for responses that reference memory
+    const boostedResponses = responses.map(response => {
+      let weight = response.weight;
+      
+      // Boost memory-referencing responses
+      if (response.text.includes('earlier') || response.text.includes('remember') || response.text.includes('thinking about')) {
+        weight += 1;
+      }
+      
+      // Boost responses that match current user mood
+      if (sessionMemory?.userMood === 'positive' && response.text.includes('!')) {
+        weight += 0.5;
+      }
+      
+      if (sessionMemory?.userMood === 'negative' && response.text.includes('hug')) {
+        weight += 1;
+      }
+      
+      return { ...response, weight };
+    });
+    
     // Calculate total weight
-    const totalWeight = responses.reduce((sum, response) => sum + response.weight, 0);
+    const totalWeight = boostedResponses.reduce((sum, response) => sum + response.weight, 0);
     
     // Generate random number
     let random = Math.random() * totalWeight;
     
     // Select response based on weight
-    for (const response of responses) {
+    for (const response of boostedResponses) {
       random -= response.weight;
       if (random <= 0) {
         return response.text;
       }
     }
     
-    // Fallback to first response
-    return responses[0]?.text || "I love talking with you! 💕";
+    // Fallback with personality
+    return boostedResponses[0]?.text || `I love every moment we spend together! 💕`;
   }
 }
 

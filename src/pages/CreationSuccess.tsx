@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { EnhancedChatInterface } from "@/components/EnhancedChatInterface";
+import { SimpleChatInterface } from "@/components/SimpleChatInterface";
 import { VoiceCallInterface } from "@/components/VoiceCallInterface";
 import { 
   MessageSquare, 
@@ -134,9 +134,7 @@ const CreationSuccess = () => {
         onMinimize={() => setCurrentView('chat')}
         userPreferences={{
           preferredName: 'Darling',
-          treatmentStyle: 'affectionate',
-          age: '25',
-          contentFilter: true
+          treatmentStyle: 'affectionate'
         }}
       />
     );
@@ -144,7 +142,7 @@ const CreationSuccess = () => {
 
   if (currentView === 'chat') {
     return (
-      <EnhancedChatInterface 
+      <SimpleChatInterface 
         character={character}
         onBack={() => setCurrentView('success')}
         onStartCall={handleStartCall}
