@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Stepper } from "@/components/ui/stepper";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VoiceSelector } from "@/components/VoiceSelector";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { speakText } from "@/lib/voice";
+import { generateAvatarImage, validateImagePrompt, examplePrompts } from "@/lib/image-generation";
 import { useNavigate } from "react-router-dom";
 import { 
   Upload, 
@@ -24,7 +26,11 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Mic
+  Mic,
+  Wand2,
+  Loader2,
+  RefreshCw,
+  ImageIcon
 } from "lucide-react";
 
 interface Voice {
@@ -77,6 +83,10 @@ const Create = () => {
   const [saving, setSaving] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [imageStyle, setImageStyle] = useState('realistic');
+  const [avatarMethod, setAvatarMethod] = useState('upload'); // 'upload' or 'generate'
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [character, setCharacter] = useState<NewCharacter>({
     name: "",
@@ -94,6 +104,69 @@ const Create = () => {
 
   const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
   const prev = () => setStepIdx((i) => Math.max(i - 1, 0));
+
+  // AI Image generation handler
+  const generateAvatar = async () => {
+    const validation = validateImagePrompt(imagePrompt);
+    if (!validation.isValid) {
+      toast({
+        title: "Invalid prompt",
+        description: validation.message,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    
+    try {
+      toast({
+        title: "Generating avatar...",
+        description: "Creating your AI companion's image. This may take 30-60 seconds.",
+      });
+
+      const result = await generateAvatarImage({
+        prompt: imagePrompt,
+        style: imageStyle as any,
+        quality: 'standard',
+        size: '1024x1024'
+      });
+
+      if (result) {
+        setCharacter(prev => ({
+          ...prev,
+          avatarUrl: result.url,
+          avatarFile: null // Clear file since we're using generated image
+        }));
+
+        toast({
+          title: "Avatar generated!",
+          description: `Created by ${result.provider}. You can regenerate if you want to try again.`,
+        });
+      } else {
+        toast({
+          title: "Generation failed",
+          description: "Could not generate avatar. Please try a different description or upload an image instead.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Avatar generation error:', error);
+      toast({
+        title: "Generation error",
+        description: "Something went wrong. Please try again or upload an image instead.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  // Get a random example prompt
+  const useExamplePrompt = () => {
+    const randomPrompt = examplePrompts[Math.floor(Math.random() * examplePrompts.length)];
+    setImagePrompt(randomPrompt);
+  };
 
   const handleUpload = async (): Promise<string | undefined> => {
     if (!character.avatarFile) return character.avatarUrl;
