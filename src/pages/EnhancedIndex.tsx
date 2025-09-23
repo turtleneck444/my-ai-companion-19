@@ -15,9 +15,13 @@ import {
   User,
   ArrowLeft,
   Star,
-  Plus
+  Plus,
+  LogOut,
+  Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 // Import avatar images
 import lunaAvatar from "@/assets/avatar-luna.jpg";
@@ -65,7 +69,7 @@ const CHARACTERS: Character[] = [
     voice: 'Bright & Cheerful',
     isOnline: true,
     mood: 'energetic',
-    lastMessage: "Found this hole-in-the-wall place that serves the best ramen. You free this weekend?",
+    lastMessage: "Found this amazing brunch spot! We should totally go this weekend.",
     unreadCount: 1,
     relationshipLevel: 3.8
   },
@@ -73,14 +77,14 @@ const CHARACTERS: Character[] = [
     id: '3',
     name: 'Sophie',
     avatar: sophieAvatar,
-    bio: 'Museum curator with strong opinions about art and wine. She can talk for hours about things she\'s passionate about and isn\'t afraid to disagree.',
-    personality: ['Intellectual', 'Confident', 'Direct'],
-    voice: 'Warm & Confident',
+    bio: 'Bookstore employee and philosophy student. Prefers deep conversations over small talk and always has a paperback book in her bag.',
+    personality: ['Intellectual', 'Gentle', 'Curious'],
+    voice: 'Warm & Soothing',
     isOnline: false,
     mood: 'contemplative',
-    lastMessage: "That exhibit we talked about was actually disappointing. The curation felt lazy.",
+    lastMessage: "I've been reading this fascinating book about consciousness...",
     unreadCount: 0,
-    relationshipLevel: 3.1
+    relationshipLevel: 4.6
   }
 ];
 
@@ -161,16 +165,6 @@ const EnhancedIndex = () => {
   }, [toast]);
 
   // Render different views
-  if (currentView === 'profile') {
-    return (
-      <UserProfile 
-        onBack={handleBackToHome}
-        userPreferences={userPreferences}
-        onUpdatePreferences={handleUpdatePreferences}
-      />
-    );
-  }
-
   if (currentView === 'call' && selectedCharacter) {
     return (
       <VoiceCallInterface 
@@ -356,217 +350,445 @@ const EnhancedIndex = () => {
         <div className="absolute bottom-40 left-1/4 w-20 h-20 bg-gradient-to-br from-violet-200 to-pink-200 rounded-full blur-xl opacity-25 animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Enhanced Hero Section */}
-      <div 
-        className="relative min-h-[45vh] bg-cover bg-center animate-fade-in"
-        style={{ 
-          backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.4), rgba(0,0,0,0.2)), url(${heroBg})` 
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-        
-        <div className="relative p-6 pt-16 text-white">
-          <div className="flex justify-between items-start mb-8">
-            <div className="flex-1">
-              <h1 className="font-display text-4xl font-bold mb-3 animate-fade-up">
-                Welcome back! ✨
-              </h1>
-              <p className="text-white/90 text-xl mb-6 animate-fade-up" style={{ animationDelay: '0.2s' }}>
-                Ready for some quality time together?
-              </p>
-              
-              {/* Daily streak and status indicators */}
-              <div className="flex items-center gap-3 mb-6 animate-fade-up" style={{ animationDelay: '0.4s' }}>
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-sm font-medium">Online Now</span>
-                </div>
-                <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
-                  <Heart className="w-3 h-3 mr-1" />
-                  AI Powered
-                </Badge>
-              </div>
+      {/* Profile View */}
+      {currentView === 'profile' && (
+        <div className="relative z-10 p-6 pt-16 pb-24">
+          <div className="max-w-md mx-auto">
+            <h1 className="text-2xl font-bold mb-6 text-white">Your Profile</h1>
+            
+            <div className="space-y-4">
+              {/* User Card */}
+              <Card className="bg-white/90 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Avatar className="w-16 h-16">
+                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white text-xl">
+                        {user?.email?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h2 className="text-xl font-bold">{userName}</h2>
+                      <p className="text-muted-foreground text-sm">{user?.email}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="preferred-name" className="text-sm font-medium">
+                        Preferred Name
+                      </Label>
+                      <Input 
+                        id="preferred-name"
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        placeholder="How would you like to be addressed?"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <Button 
+                      onClick={() => {
+                        handleUpdatePreferences({ preferredName: userName });
+                      }}
+                      className="w-full"
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Stats Card */}
+              <Card className="bg-white/90 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-4">Your Activity</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-600">3</p>
+                      <p className="text-xs text-muted-foreground">Companions</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-pink-600">{favorites.length}</p>
+                      <p className="text-xs text-muted-foreground">Favorites</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sign Out */}
+              <Card className="bg-white/90 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <Button 
+                    variant="outline" 
+                    className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => {
+                      // Add sign out logic here if needed
+                      toast({
+                        title: "Sign out",
+                        description: "You have been signed out successfully.",
+                      });
+                    }}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Interactive User Greeting Card */}
-          {user && (
-            <Card className="bg-white/15 backdrop-blur-xl border-white/30 shadow-2xl animate-slide-in-left hover:bg-white/20 transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold mb-1 text-white">Hey {userName}!</h2>
-                    <p className="text-white/90 text-sm">Your companions are online and ready to chat</p>
+      {/* Home View Content */}
+      {currentView === 'home' && (
+        <>
+          {/* Enhanced Hero Section */}
+          <div 
+            className="relative min-h-[45vh] bg-cover bg-center animate-fade-in"
+            style={{ 
+              backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.4), rgba(0,0,0,0.2)), url(${heroBg})` 
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+            
+            <div className="relative p-6 pt-16 text-white">
+              <div className="flex justify-between items-start mb-8">
+                <div className="flex-1">
+                  <h1 className="font-display text-4xl font-bold mb-3 animate-fade-up">
+                    Welcome back! ✨
+                  </h1>
+                  <p className="text-white/90 text-xl mb-6 animate-fade-up" style={{ animationDelay: '0.2s' }}>
+                    Ready for some quality time together?
+                  </p>
+                  
+                  {/* Daily streak and status indicators */}
+                  <div className="flex items-center gap-3 mb-6 animate-fade-up" style={{ animationDelay: '0.4s' }}>
+                    <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                      <span className="text-sm font-medium">Online Now</span>
+                    </div>
                   </div>
                 </div>
                 
-                {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/20">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-white">3</p>
-                    <p className="text-xs text-white/80">Available</p>
+                <Button 
+                  onClick={handleCreateNew}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 animate-fade-up"
+                  style={{ animationDelay: '0.6s' }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New
+                </Button>
+              </div>
+
+              {/* Enhanced User Greeting Card */}
+              <Card className="bg-white/15 backdrop-blur-xl border-white/20 shadow-2xl animate-slide-in-left" style={{ animationDelay: '0.8s' }}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-white text-xl font-semibold">
+                        Hey {userName}! 👋
+                      </h2>
+                      <p className="text-white/90 text-sm">
+                        Your companions missed you
+                      </p>
+                    </div>
+                    <Avatar className="w-12 h-12 border-2 border-white/30">
+                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white">
+                        {user?.email?.charAt(0).toUpperCase() || userName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-white">{favorites.length}</p>
-                    <p className="text-xs text-white/80">Favorites</p>
+                  
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <p className="text-white text-2xl font-bold">3</p>
+                      <p className="text-white/80 text-xs">Available</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-white text-2xl font-bold">{favorites.length}</p>
+                      <p className="text-white/80 text-xs">Favorites</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-white text-2xl font-bold">2</p>
+                      <p className="text-white/80 text-xs">Online</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-white">24/7</p>
-                    <p className="text-xs text-white/80">Online</p>
-                  </div>
-                </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Character Grid */}
+          <div className="relative p-6 space-y-6 pb-24">
+            <div className="flex items-center justify-between animate-fade-up">
+              <h2 className="text-2xl font-bold">Your Companions</h2>
+            </div>
+
+            <div className="space-y-6">
+              {CHARACTERS.map((character, index) => (
+                <Card 
+                  key={character.id} 
+                  className="group overflow-hidden bg-gradient-to-br from-background to-background/50 backdrop-blur-xl border-border/50 hover:border-primary/50 transition-all duration-500 cursor-pointer shadow-lg hover:shadow-2xl animate-fade-up"
+                  style={{ animationDelay: `${0.1 * (index + 1)}s` }}
+                  onClick={() => handleCharacterSelect(character)}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      {/* Enhanced Avatar */}
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full blur-sm group-hover:blur-md transition-all duration-300" />
+                        <Avatar className="relative w-16 h-16 border-2 border-primary/30 group-hover:scale-105 transition-transform duration-300">
+                          <AvatarImage src={character.avatar} alt={character.name} className="object-cover" />
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-semibold">
+                            {character.name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        {/* Online Status */}
+                        {character.isOnline && (
+                          <div className="absolute -top-1 -right-1">
+                            <Badge className="bg-green-500 text-white text-xs px-2 py-1 animate-pulse">
+                              Online
+                            </Badge>
+                          </div>
+                        )}
+                        
+                        {/* Unread Count */}
+                        {character.unreadCount && character.unreadCount > 0 && (
+                          <Badge className="absolute -bottom-2 -right-2 bg-gradient-to-r from-pink-500 to-red-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center animate-bounce">
+                            {character.unreadCount}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Character Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-bold text-lg group-hover:text-primary transition-colors duration-300">
+                            {character.name}
+                          </h3>
+                          {character.relationshipLevel && character.relationshipLevel > 4 && (
+                            <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs">
+                              Close Bond
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Personality Tags */}
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {character.personality.slice(0, 2).map((trait) => (
+                            <Badge 
+                              key={trait} 
+                              variant="secondary" 
+                              className="text-xs bg-gradient-to-r from-primary/10 to-accent/10 hover:from-primary/20 hover:to-accent/20 transition-all duration-300"
+                            >
+                              {trait}
+                            </Badge>
+                          ))}
+                        </div>
+                        
+                        {/* Last Message Preview */}
+                        {character.lastMessage && (
+                          <div className="bg-muted/30 rounded-lg p-3 mt-3 border-l-4 border-primary/50">
+                            <p className="text-sm text-muted-foreground italic line-clamp-2">
+                              "{character.lastMessage}"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartCall(character);
+                          }}
+                        >
+                          <Phone className="w-4 h-4 mr-1" />
+                          Call
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:bg-primary/10 transition-all duration-300"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFavorite(character.id);
+                          }}
+                        >
+                          <Heart className={`w-4 h-4 ${favorites.includes(character.id) ? 'fill-primary text-primary' : ''}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Call to Action Card */}
+            <Card className="mt-8 bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5 border-primary/20 animate-fade-up" style={{ animationDelay: '0.6s' }}>
+              <CardContent className="p-6 text-center">
+                <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
+                <h3 className="text-xl font-bold mb-2">Create Your Perfect Companion</h3>
+                <p className="text-muted-foreground mb-4">
+                  Design a unique AI companion tailored to your preferences
+                </p>
+                <Button 
+                  onClick={handleCreateNew}
+                  className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Get Started
+                </Button>
               </CardContent>
             </Card>
-          )}
-        </div>
-      </div>
-
-      {/* Enhanced Character Grid */}
-      <div className="px-4 mt-8 mb-24 relative z-10">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Your AI Companions
-            </h2>
-            <p className="text-muted-foreground text-sm mt-1">Choose someone special to connect with</p>
           </div>
-          <Button variant="outline" size="sm" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600" onClick={handleCreateNew}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create New
-          </Button>
-        </div>
+        </>
+      )}
 
-        <div className="space-y-6">
-          {CHARACTERS.map((character, index) => (
-            <Card 
-              key={character.id}
-              className="group overflow-hidden bg-gradient-to-br from-background to-background/50 backdrop-blur-xl border-border/50 hover:border-primary/50 transition-all duration-500 cursor-pointer shadow-lg hover:shadow-2xl animate-fade-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
-              onClick={() => handleCharacterSelect(character)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center gap-6">
-                  {/* Enhanced Avatar */}
+      {/* Chats View */}
+      {currentView === 'chats' && (
+        <div className="relative z-10 p-6 pt-16 pb-24">
+          <h1 className="text-2xl font-bold mb-6 text-white">All Chats</h1>
+          <div className="space-y-4">
+            {CHARACTERS.map((character) => (
+              <Card 
+                key={character.id} 
+                className="p-4 hover:bg-muted/50 transition-colors cursor-pointer bg-white/90 backdrop-blur-sm"
+                onClick={() => handleCharacterSelect(character)}
+              >
+                <div className="flex items-center gap-4">
                   <div className="relative">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400 p-1 group-hover:scale-105 transition-transform duration-300">
-                      <Avatar className="w-full h-full">
-                        <AvatarImage src={character.avatar} alt={character.name} className="object-cover" />
-                        <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white font-bold text-xl">
-                          {character.name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                    
-                    {/* Online Status */}
-                    {character.isOnline && (
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-400 rounded-full border-3 border-background flex items-center justify-center animate-pulse">
-                        <div className="w-2 h-2 bg-white rounded-full" />
-                      </div>
-                    )}
-                    
-                    {/* Unread Count */}
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={character.avatar} alt={character.name} />
+                      <AvatarFallback>{character.name[0]}</AvatarFallback>
+                    </Avatar>
                     {character.unreadCount && character.unreadCount > 0 && (
-                      <Badge className="absolute -top-2 -left-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center animate-bounce border-2 border-background">
+                      <Badge className="absolute -top-2 -right-2 bg-primary text-white text-xs w-6 h-6 rounded-full flex items-center justify-center">
                         {character.unreadCount}
                       </Badge>
                     )}
                   </div>
                   
-                  {/* Character Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-bold text-xl text-foreground group-hover:text-primary transition-colors">
-                        {character.name}
-                      </h3>
-                      {favorites.includes(character.id) && (
-                        <Heart className="w-5 h-5 text-red-400 fill-current animate-pulse" />
-                      )}
-                      {character.relationshipLevel && character.relationshipLevel > 3.5 && (
-                        <Badge className="bg-gradient-to-r from-pink-500 to-red-500 text-white text-xs">
-                          Close Bond
-                        </Badge>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold">{character.name}</h3>
+                      {character.isOnline && (
+                        <div className="w-2 h-2 bg-green-400 rounded-full" />
                       )}
                     </div>
-                    
-                    <p className="text-muted-foreground mb-3 leading-relaxed">
-                      {character.bio}
+                    <p className="text-sm text-muted-foreground truncate">
+                      {character.lastMessage || 'No messages yet'}
                     </p>
-                    
-                    {/* Personality Tags */}
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {character.personality.map((trait, i) => (
-                        <Badge 
-                          key={trait} 
-                          variant="secondary" 
-                          className="text-xs bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-0 group-hover:from-purple-200 group-hover:to-pink-200 transition-all duration-300"
-                          style={{ animationDelay: `${i * 0.1}s` }}
-                        >
-                          {trait}
-                        </Badge>
-                      ))}
-                    </div>
-                    
-                    {/* Last Message Preview */}
-                    {character.lastMessage && (
-                      <div className="bg-muted/30 rounded-lg p-3 mt-3 border-l-4 border-primary/50">
-                        <p className="text-sm text-muted-foreground italic">
-                          💬 "{character.lastMessage}"
-                        </p>
-                      </div>
-                    )}
                   </div>
                   
-                  {/* Action Buttons */}
-                  <div className="flex flex-col gap-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStartCall(character);
-                      }}
-                      className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 hover:from-green-600 hover:to-emerald-600 shadow-lg group-hover:scale-105 transition-all duration-300"
-                    >
-                      <Phone className="w-4 h-4 mr-2" />
-                      Call
-                    </Button>
-                    
+                  <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleFavorite(character);
+                        handleStartCall(character);
                       }}
-                      className="hover:bg-red-50 hover:text-red-600 group-hover:scale-105 transition-all duration-300"
                     >
-                      <Heart className={`w-4 h-4 ${favorites.includes(character.id) ? 'text-red-500 fill-current' : ''}`} />
+                      <Phone className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFavorite(character.id);
+                      }}
+                    >
+                      <Heart className={`w-4 h-4 ${favorites.includes(character.id) ? 'fill-primary text-primary' : ''}`} />
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
         </div>
+      )}
 
-        {/* Call to Action Card */}
-        <Card className="mt-8 bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 animate-fade-up" style={{ animationDelay: '0.6s' }}>
-          <CardContent className="p-6 text-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Plus className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-bold mb-2 text-purple-800">Create New Companion</h3>
-            <p className="text-purple-600 mb-4">Design someone with the personality and interests you want to talk to</p>
-            <Button className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg" onClick={handleCreateNew}>
-              <Plus className="w-4 h-4 mr-2" />
-              Get Started
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Favorites View */}
+      {currentView === 'favorites' && (
+        <div className="relative z-10 p-6 pt-16 pb-24">
+          <h1 className="text-2xl font-bold mb-6 text-white">Favorites</h1>
+          <div className="space-y-4">
+            {favorites.length === 0 ? (
+              <Card className="p-8 text-center bg-white/90 backdrop-blur-sm">
+                <Heart className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No favorites yet</h3>
+                <p className="text-muted-foreground">
+                  Add companions to your favorites by tapping the heart icon
+                </p>
+              </Card>
+            ) : (
+              CHARACTERS.filter(character => favorites.includes(character.id)).map((character) => (
+                <Card 
+                  key={character.id} 
+                  className="p-4 hover:bg-muted/50 transition-colors cursor-pointer bg-white/90 backdrop-blur-sm"
+                  onClick={() => handleCharacterSelect(character)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={character.avatar} alt={character.name} />
+                        <AvatarFallback>{character.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -top-1 -right-1">
+                        <Heart className="w-4 h-4 fill-primary text-primary" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold">{character.name}</h3>
+                        {character.isOnline && (
+                          <div className="w-2 h-2 bg-green-400 rounded-full" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {character.lastMessage || 'No messages yet'}
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartCall(character);
+                        }}
+                      >
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFavorite(character.id);
+                        }}
+                      >
+                        <Heart className="w-4 h-4 fill-primary text-primary" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Enhanced Mobile Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/50 shadow-2xl">
