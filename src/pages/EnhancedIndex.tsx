@@ -93,6 +93,34 @@ const CHARACTERS: Character[] = [
     unreadCount: 0,
     relationshipLevel: 4.6,
     voiceId: 'EXAVITQu4vr4xnSDxMaL' // Sarah: soft, empathetic, soothing
+  },
+  {
+    id: '4',
+    name: 'Mina',
+    avatar: ariaAvatar,
+    bio: 'Software engineer with dry humor and sharp curiosity; prefers concise chats and practical advice.',
+    personality: ['Intellectual', 'Direct', 'Witty', 'Independent'],
+    voice: { voice_id: 'default_cool_clear', name: 'Cool & Clear' },
+    isOnline: true,
+    mood: 'analytical',
+    lastMessage: "Ship day. Coffee is my personality right now.",
+    unreadCount: 0,
+    relationshipLevel: 3.2,
+    voiceId: 'TxGEqnHWrfWFTfGW9XjX' // Emily: sweet, bright, intelligent
+  },
+  {
+    id: '5',
+    name: 'Noa',
+    avatar: sophieAvatar,
+    bio: 'Shy illustrator who opens up slowly; soft-spoken, observant, and surprisingly funny when comfortable.',
+    personality: ['Gentle', 'Caring', 'Curious', 'Romantic'],
+    voice: { voice_id: 'default_soft_breath', name: 'Soft & Breathier' },
+    isOnline: false,
+    mood: 'reflective',
+    lastMessage: "I drew something for you... can I show you later?",
+    unreadCount: 0,
+    relationshipLevel: 2.7,
+    voiceId: 'ErXwobaYiN019PkySvjV' // Elli: expressive and modern
   }
 ];
 
