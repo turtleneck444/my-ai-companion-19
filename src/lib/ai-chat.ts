@@ -16,8 +16,11 @@ export interface Character {
   avatar: string;
   bio: string;
   personality: string[];
-  voice: string;
-  isOnline: boolean;
+  voice?: {
+    voice_id: string;
+    name: string;
+  };
+  isOnline?: boolean;
   mood?: string;
   relationshipLevel?: number;
 }

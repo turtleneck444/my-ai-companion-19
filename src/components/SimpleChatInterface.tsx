@@ -3,17 +3,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Send, 
   Phone, 
   ArrowLeft, 
   Mic, 
   MicOff,
-  Heart
+  Heart,
+  Smile,
+  Plus,
+  Image,
+  Camera,
+  Gift,
+  Gamepad2,
+  Sparkles,
+  Reply,
+  MoreHorizontal
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { personalityAI, type ChatMessage, type ChatContext } from "@/lib/ai-chat";
 import { voiceCallManager } from "@/lib/voice-call";
+import { EmojiPicker } from "@/components/EmojiPicker";
+import { InteractiveGames } from "@/components/InteractiveGames";
 
 // Using ChatMessage from ai-chat.ts instead of local Message interface
 
@@ -23,21 +36,40 @@ interface Character {
   avatar: string;
   bio: string;
   personality: string[];
-  voice: string;
-  isOnline: boolean;
+  voice?: {
+    voice_id: string;
+    name: string;
+  };
+}
+
+interface UserPreferences {
+  preferredName: string;
+  treatmentStyle: string;
+  age: string;
+  contentFilter: boolean;
 }
 
 interface SimpleChatInterfaceProps {
   character: Character;
-  onBack: () => void;
+  onBack?: () => void;
   onStartCall?: () => void;
-  userPreferences?: {
-    preferredName: string;
-    treatmentStyle: string;
-    age: string;
-    contentFilter: boolean;
-  };
+  userPreferences?: UserPreferences;
 }
+
+// Quick reply suggestions based on personality
+const getQuickReplies = (personality: string[]) => {
+  const baseReplies = ["Hey! 💕", "How are you?", "Tell me more ✨", "That's sweet 😊"];
+  
+  if (personality.includes('Playful')) {
+    return ["Let's play! 🎮", "You're so funny! 😄", "What's up, cutie? 😘", "Surprise me! ✨"];
+  } else if (personality.includes('Romantic')) {
+    return ["I love you 💕", "You're amazing 😍", "Kiss me 💋", "Missing you ❤️"];
+  } else if (personality.includes('Caring')) {
+    return ["How was your day?", "I'm here for you 🤗", "You okay? 💕", "Tell me everything"];
+  }
+  
+  return baseReplies;
+};
 
 export const SimpleChatInterface = ({ 
   character, 
@@ -73,13 +105,25 @@ export const SimpleChatInterface = ({
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
-      content: `Hey ${userPreferences.preferredName}! I'm ${character.name}. ${character.bio} 💕`,
+      content: getInitialMessage(),
       sender: 'ai',
       timestamp: new Date()
     }
   ]);
   
-  // Debug: Check if we're likely missing OpenAI API key
+  const [inputValue, setInputValue] = useState("");
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(true);
+  const [relationshipLevel, setRelationshipLevel] = useState(25);
+  const [showGames, setShowGames] = useState(false);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  // Environment check for debugging
   useEffect(() => {
     console.log('🔧 SimpleChatInterface Environment Check:');
     console.log('- Development mode:', import.meta.env.DEV);
@@ -92,13 +136,6 @@ export const SimpleChatInterface = ({
     }
   }, []);
 
-  const [inputValue, setInputValue] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isAiTyping, setIsAiTyping] = useState(false);
-  const [relationshipLevel, setRelationshipLevel] = useState(25);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -107,46 +144,33 @@ export const SimpleChatInterface = ({
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!inputValue.trim()) return;
+  const sendMessage = async (messageContent?: string) => {
+    const currentInput = messageContent || inputValue.trim();
+    if (!currentInput || isAiTyping) return;
 
+    // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      content: inputValue,
+      content: currentInput,
       sender: 'user',
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = inputValue;
-    setInputValue('');
+    setInputValue("");
     setIsAiTyping(true);
+    setShowQuickReplies(false);
 
-    console.log('💬 Sending message:', currentInput);
-    console.log('🎭 Character:', character.name);
-    console.log('👤 User:', userPreferences.preferredName);
+    // Build chat context for AI
+    const chatContext: ChatContext = {
+      character,
+      userPreferences,
+      conversationHistory: [...messages, userMessage],
+      relationshipLevel,
+      timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'
+    };
 
     try {
-      // Get current time of day
-      const hour = new Date().getHours();
-      const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-
-      // Build chat context for AI
-      const chatContext: ChatContext = {
-        character,
-        userPreferences,
-        conversationHistory: messages,
-        relationshipLevel,
-        timeOfDay
-      };
-
-      console.log('🧠 Chat context built:', {
-        characterName: character.name,
-        relationshipLevel,
-        timeOfDay,
-        historyLength: messages.length
-      });
-
       // Add realistic "thinking" delay
       const thinkingTime = Math.max(2000, Math.min(8000, currentInput.length * 100 + Math.random() * 3000));
       await new Promise(resolve => setTimeout(resolve, thinkingTime));
@@ -199,151 +223,319 @@ export const SimpleChatInterface = ({
 
   const toggleRecording = () => {
     setIsRecording(!isRecording);
-    toast({
-      title: isRecording ? "Recording stopped" : "Recording started",
-      description: "Voice features coming soon!",
-    });
+    if (!isRecording) {
+      toast({ title: "🎤 Voice Recording", description: "Voice messages coming soon!" });
+    }
   };
 
   const handleCall = async () => {
     try {
-      toast({
-        title: "Starting call...",
-        description: `Connecting with ${character.name}`,
-      });
-
+      toast({ title: "Starting call...", description: `Connecting with ${character.name}` });
       const sessionId = await voiceCallManager.startVoiceCall(character, userPreferences);
-      
-      toast({
-        title: "Call connected! 🎉",
-        description: `You're now talking with ${character.name}`,
-      });
-
+      toast({ title: "Call connected! 🎉", description: `You're now talking with ${character.name}` });
       onStartCall?.();
     } catch (error) {
       console.error('Failed to start call:', error);
-      toast({
-        title: "Call failed",
-        description: "Could not connect. Please try again.",
-        variant: "destructive"
-      });
+      toast({ title: "Call failed", description: "Could not connect. Please try again.", variant: "destructive" });
     }
   };
 
-  return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10 max-w-full overflow-hidden">
-      {/* Header */}
-      <Card className="flex items-center justify-between p-4 rounded-none border-0 border-b bg-card/90 backdrop-blur-sm shadow-sm">
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onBack}
-            className="p-2"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <Avatar className="w-10 h-10">
-            <AvatarImage src={character.avatar} alt={character.name} />
-            <AvatarFallback>{character.name[0]}</AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-semibold text-sm">{character.name}</h3>
-            <p className="text-xs text-muted-foreground">
-              {character.isOnline ? 'Online now' : 'Last seen recently'}
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={handleCall}
-            className="p-2 hover:bg-primary/10"
-          >
-            <Phone className="w-5 h-5 text-primary" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="p-2"
-          >
-            <Heart className="w-5 h-5" />
-          </Button>
-        </div>
-      </Card>
+  const handleEmojiSelect = (emoji: string) => {
+    setInputValue(prev => prev + emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[85%] sm:max-w-[80%] p-2 sm:p-3 rounded-2xl text-sm sm:text-base ${
-                message.sender === 'user'
-                  ? 'bg-primary text-primary-foreground ml-auto'
-                  : 'bg-card border shadow-sm'
-              }`}
+  const handleQuickReply = (reply: string) => {
+    sendMessage(reply);
+  };
+
+  const startGame = () => {
+    setShowGames(true);
+  };
+
+  const handleGameMessage = (message: string) => {
+    sendMessage(message);
+  };
+
+  const quickReplies = getQuickReplies(character.personality);
+
+  // If showing games, render the games interface
+  if (showGames) {
+    return (
+      <InteractiveGames 
+        characterName={character.name}
+        onBack={() => setShowGames(false)}
+        onSendMessage={handleGameMessage}
+      />
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10">
+      {/* Enhanced Header */}
+      <div className="flex items-center justify-between p-4 bg-background/95 backdrop-blur-xl border-b shadow-sm">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onBack}
+              className="hover:bg-primary/10 transition-colors"
             >
-              <p className="text-sm">{message.content}</p>
-              <p className={`text-xs mt-1 ${
-                message.sender === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-              }`}>
-                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+          
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Avatar className="h-10 w-10 border-2 border-primary/20">
+                <AvatarImage src={character.avatar} alt={character.name} />
+                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                  {character.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-background rounded-full animate-pulse" />
             </div>
-          </div>
-        ))}
-        
-        {isAiTyping && (
-          <div className="flex justify-start">
-            <div className="bg-card border shadow-sm p-3 rounded-2xl">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-foreground truncate">{character.name}</h3>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                  Online
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Level {Math.floor(relationshipLevel / 10)} Connection
+                </span>
               </div>
             </div>
           </div>
-        )}
-        
-        <div ref={messagesEndRef} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={startGame}
+                className="hover:bg-purple-500/10 text-purple-600 hover:text-purple-700 transition-colors"
+              >
+                <Gamepad2 className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Start a game together</TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleCall}
+                className="hover:bg-green-500/10 text-green-600 hover:text-green-700 transition-colors"
+              >
+                <Phone className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Start voice call</TooltipContent>
+          </Tooltip>
+          
+          <Button variant="ghost" size="sm" className="hover:bg-primary/10">
+            <MoreHorizontal className="w-5 h-5" />
+          </Button>
+        </div>
       </div>
 
-      {/* Input */}
-      <Card className="p-3 sm:p-4 rounded-none border-0 border-t bg-card/90 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
+      {/* Messages Area */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto p-4 space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
+            >
+              {message.sender === 'ai' && (
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarImage src={character.avatar} alt={character.name} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                    {character.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              
+              <div className={`group relative max-w-[80%] ${message.sender === 'user' ? 'order-first' : ''}`}>
+                <div
+                  className={`px-4 py-3 rounded-2xl transition-all duration-200 ${
+                    message.sender === 'user'
+                      ? 'bg-primary text-primary-foreground ml-auto shadow-lg'
+                      : 'bg-background border border-border/50 shadow-sm hover:shadow-md'
+                  }`}
+                >
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                </div>
+                
+                <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-xs text-muted-foreground">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {message.sender === 'ai' && (
+                    <div className="flex gap-1 ml-2">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-red-500/10">
+                        <Heart className="w-3 h-3 text-red-500" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10">
+                        <Reply className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {isAiTyping && (
+            <div className="flex gap-3 justify-start animate-in slide-in-from-bottom-2 duration-300">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={character.avatar} alt={character.name} />
+                <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                  {character.name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="bg-background border border-border/50 px-4 py-3 rounded-2xl shadow-sm">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Quick Replies */}
+      {showQuickReplies && !isAiTyping && (
+        <div className="px-4 py-2">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {quickReplies.map((reply, index) => (
+              <Button
+                key={index}
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickReply(reply)}
+                className="flex-shrink-0 text-xs bg-background/50 hover:bg-primary/10 transition-all duration-200 hover:scale-105"
+              >
+                {reply}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Input Area */}
+      <div className="p-4 bg-background/95 backdrop-blur-xl border-t">
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div className="mb-4">
+            <EmojiPicker 
+              onEmojiSelect={handleEmojiSelect}
+              onClose={() => setShowEmojiPicker(false)}
+            />
+          </div>
+        )}
+        
+        <div className="flex items-end gap-2">
+          {/* Action Buttons */}
+          <div className="flex gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-10 w-10 p-0 hover:bg-blue-500/10 text-blue-600"
+                >
+                  <Camera className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Take photo</TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-10 w-10 p-0 hover:bg-green-500/10 text-green-600"
+                >
+                  <Image className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Send image</TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-10 w-10 p-0 hover:bg-purple-500/10 text-purple-600"
+                >
+                  <Gift className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Send gift</TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Input Field */}
+          <div className="flex-1 relative">
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={`Message ${character.name}...`}
+              className="pr-20 h-10 bg-background/50 border-border/50 focus:border-primary/50 transition-all rounded-full"
+            />
+            
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className={`h-6 w-6 p-0 transition-all duration-200 ${
+                  showEmojiPicker ? 'bg-primary/10 text-primary' : 'hover:bg-primary/10'
+                }`}
+              >
+                <Smile className="w-4 h-4" />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleRecording}
+                className={`h-6 w-6 p-0 transition-all duration-200 ${
+                  isRecording ? 'bg-red-500/10 text-red-500 animate-pulse' : 'hover:bg-primary/10'
+                }`}
+              >
+                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
+
+          {/* Send Button */}
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleRecording}
-            className={`p-2 ${isRecording ? 'text-red-500' : ''}`}
-          >
-            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          </Button>
-          
-          <Input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={`Message ${character.name}...`}
-            className="flex-1"
-            disabled={isAiTyping}
-          />
-          
-          <Button 
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={!inputValue.trim() || isAiTyping}
-            size="sm"
-            className="px-3"
+            className="h-10 w-10 p-0 rounded-full bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all duration-200 hover:scale-105 active:scale-95"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }; 

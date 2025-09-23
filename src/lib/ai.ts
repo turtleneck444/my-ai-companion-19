@@ -3,7 +3,10 @@ export interface SystemPromptContext {
     name: string;
     bio: string;
     personality: string[];
-    voice?: string;
+    voice?: {
+      voice_id: string;
+      name: string;
+    };
   };
   userPreferences: {
     preferredName: string;
