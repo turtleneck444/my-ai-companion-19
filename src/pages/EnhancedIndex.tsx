@@ -94,14 +94,14 @@ interface UserActivity {
   streakDays: number;
 }
 
-type View = 'chats' | 'calls' | 'favorites' | 'profile' | 'chat' | 'call';
+type View = 'home' | 'chats' | 'calls' | 'favorites' | 'profile' | 'chat' | 'call' | 'discover' | 'stats';
 
 const EnhancedIndex = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [currentView, setCurrentView] = useState<View>('chats');
+  const [currentView, setCurrentView] = useState<View>('home');
   const { stats, updateStats } = useUserStats();
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [showBackendNotification, setShowBackendNotification] = useState(true);
