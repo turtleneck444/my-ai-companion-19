@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +87,7 @@ const CHARACTERS: Character[] = [
 const EnhancedIndex = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   // Core state - minimal and stable
   const [currentView, setCurrentView] = useState<View>('home');
@@ -134,6 +136,11 @@ const EnhancedIndex = () => {
         : [...prev, character.id]
     );
   }, []);
+
+  // Navigation handler for creating new companions
+  const handleCreateNew = useCallback(() => {
+    navigate('/create');
+  }, [navigate]);
 
   // Stable user preferences
   const userPreferences = useMemo(() => ({
@@ -426,7 +433,7 @@ const EnhancedIndex = () => {
             </h2>
             <p className="text-muted-foreground text-sm mt-1">Choose someone special to connect with</p>
           </div>
-          <Button variant="outline" size="sm" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600">
+          <Button variant="outline" size="sm" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600" onClick={handleCreateNew}>
             <Plus className="w-4 h-4 mr-2" />
             Create New
           </Button>
@@ -553,7 +560,7 @@ const EnhancedIndex = () => {
             </div>
             <h3 className="text-xl font-bold mb-2 text-purple-800">Create New Companion</h3>
             <p className="text-purple-600 mb-4">Design someone with the personality and interests you want to talk to</p>
-            <Button className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg">
+            <Button className="bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg" onClick={handleCreateNew}>
               <Plus className="w-4 h-4 mr-2" />
               Get Started
             </Button>
