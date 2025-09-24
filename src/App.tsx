@@ -34,6 +34,8 @@ const App = () => (
               <Route path="/" element={<LandingPage />} />
               <Route path="/home" element={<LandingPage />} />
               <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/auth" element={<AuthPage />} />
               
               {/* Protected app routes */}
@@ -78,3 +80,5 @@ const App = () => (
 
 
 export default App;
+import { TermsOfService } from './pages/TermsOfService';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';

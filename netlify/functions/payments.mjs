@@ -1,258 +1,366 @@
-// Netlify function for payment processing with Square integration
-import { Client, Environment } from 'square';
-import crypto from 'crypto';
+// Netlify function for payment processing with Stripe
+import Stripe from 'stripe';
 
-export const handler = async (event, context) => {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Subscription plans configuration
+const SUBSCRIPTION_PLANS = {
+  premium: {
+    priceId: process.env.STRIPE_PREMIUM_PRICE_ID || 'price_premium_monthly',
+    amount: 1900, // $19.00 in cents
+    currency: 'usd',
+    interval: 'month'
+  },
+  pro: {
+    priceId: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_monthly', 
+    amount: 4900, // $49.00 in cents
+    currency: 'usd',
+    interval: 'month'
+  }
+};
+
+export async function handler(event) {
+  // Set CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-square-hmacsha256-signature',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   };
 
+  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
   try {
-    const { path, body } = event;
+    const { httpMethod, path, body } = event;
     const data = body ? JSON.parse(body) : {};
 
+    // Route handling
     if (path.endsWith('/create-intent')) {
-      return await createPaymentIntent(data, headers);
+      return await handleCreateIntent(data, headers);
     } else if (path.endsWith('/confirm')) {
-      return await confirmPayment(data, headers);
+      return await handleConfirmPayment(data, headers);
     } else if (path.endsWith('/create-subscription')) {
-      return await createSubscription(data, headers);
+      return await handleCreateSubscription(data, headers);
     } else if (path.endsWith('/cancel-subscription')) {
-      return await cancelSubscription(data, headers);
+      return await handleCancelSubscription(data, headers);
     } else if (path.endsWith('/webhook')) {
       return await handleWebhook(event, headers);
-    } else {
-      return { statusCode: 404, headers, body: JSON.stringify({ error: 'Endpoint not found' }) };
+    } else if (path.includes('/subscription/')) {
+      return await handleGetSubscription(path, headers);
+    } else if (path.includes('/customer/') && path.includes('/subscriptions')) {
+      return await handleGetCustomerSubscriptions(path, headers);
     }
-  } catch (error) {
-    console.error('Payment processing error:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) };
-  }
-};
 
-function getSquareClient() {
-  const environment = process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox;
-  return new Client({ accessToken: process.env.SQUARE_ACCESS_TOKEN, environment });
-}
-
-async function createPaymentIntent(data, headers) {
-  try {
-    const { amount, currency = 'USD' } = data;
-    if (!amount || amount <= 0) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid amount' }) };
-
-    const paymentIntent = {
-      id: `sq_intent_${Date.now()}`,
-      amount: amount * 100,
-      currency: currency.toUpperCase(),
-      status: 'requires_payment_method',
-      applicationId: process.env.SQUARE_APPLICATION_ID
+    return {
+      statusCode: 404,
+      headers,
+      body: JSON.stringify({ error: 'Endpoint not found' })
     };
 
-    return { statusCode: 200, headers, body: JSON.stringify(paymentIntent) };
   } catch (error) {
-    console.error('Payment intent creation failed:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create payment intent' }) };
+    console.error('Payment function error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error', details: error.message })
+    };
   }
 }
 
-async function confirmPayment(data, headers) {
+async function handleCreateIntent(data, headers) {
+  const { planId, userId, amount, currency = 'usd' } = data;
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Stripe not configured' })
+    };
+  }
+
   try {
-    const { paymentIntentId, sourceId, amount, currency } = data;
-    if (!paymentIntentId || !sourceId || !amount) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing payment details' }) };
-
-    const client = getSquareClient();
-    const paymentsApi = client.paymentsApi;
-
-    const requestBody = {
-      sourceId,
-      amountMoney: {
-        amount: BigInt(Math.round(amount * 100)),
-        currency: (currency || 'USD').toUpperCase()
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100, // Convert to cents
+      currency: currency.toLowerCase(),
+      metadata: {
+        planId,
+        userId: userId || 'anonymous'
       },
-      idempotencyKey: `confirm_${paymentIntentId}_${Date.now()}`,
-      locationId: process.env.SQUARE_LOCATION_ID
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        id: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret,
+        status: paymentIntent.status
+      })
     };
-
-    const response = await paymentsApi.createPayment(requestBody);
-    const payment = response.result.payment;
-
-    return { statusCode: 200, headers, body: JSON.stringify({ id: payment.id, status: payment.status, receiptUrl: payment.receiptUrl }) };
   } catch (error) {
-    console.error('Square payment error:', error);
-    const message = error?.message || 'Payment error';
-    return { statusCode: 500, headers, body: JSON.stringify({ error: message }) };
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to create payment intent', details: error.message })
+    };
   }
 }
 
-// Helpers for subscriptions
-function resolvePlanVariationId(planId) {
-  const map = {
-    premium: process.env.SQUARE_PLAN_PREMIUM_ID,
-    pro: process.env.SQUARE_PLAN_PRO_ID,
-  };
-  return map[planId];
+async function handleConfirmPayment(data, headers) {
+  const { paymentIntentId } = data;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency
+      })
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to confirm payment', details: error.message })
+    };
+  }
 }
 
-async function getOrCreateCustomer(client, { email, givenName, referenceId }) {
-  const customers = client.customersApi;
-  if (!email) throw new Error('Email required for subscription');
+async function handleCreateSubscription(data, headers) {
+  const { planId, userId, paymentMethodId, customerId } = data;
+
+  const plan = SUBSCRIPTION_PLANS[planId];
+  if (!plan) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Invalid plan ID' })
+    };
+  }
+
   try {
-    const search = await customers.searchCustomers({
-      query: { filter: { emailAddress: { exact: email } } }
-    });
-    const found = search?.result?.customers?.[0];
-    if (found) {
-      // Ensure referenceId is set for webhook mapping
-      if (!found.referenceId && referenceId) {
-        try { await customers.updateCustomer(found.id, { referenceId }); } catch {}
-      }
-      return found;
+    let customer;
+    
+    // Create or retrieve customer
+    if (customerId) {
+      customer = await stripe.customers.retrieve(customerId);
+    } else {
+      customer = await stripe.customers.create({
+        metadata: {
+          userId: userId || 'anonymous'
+        }
+      });
     }
-  } catch (e) {
-    // continue to create
-  }
-  const resp = await customers.createCustomer({
-    idempotencyKey: `cust_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    emailAddress: email,
-    givenName: givenName || 'Customer',
-    referenceId
-  });
-  return resp.result.customer;
-}
 
-async function createCardOnFile(client, { customerId, sourceId }) {
-  const cards = client.cardsApi;
-  const resp = await cards.createCard({
-    idempotencyKey: `card_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    sourceId,
-    card: { customerId }
-  });
-  return resp.result.card;
-}
-
-async function createSubscription(data, headers) {
-  try {
-    const { planId, email, name, paymentMethodId, userId } = data; // paymentMethodId is sourceId from SDK
-    if (!planId || !paymentMethodId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing plan or payment source' }) };
-
-    const planVariationId = resolvePlanVariationId(planId);
-    if (!planVariationId) return { statusCode: 400, headers, body: JSON.stringify({ error: `Missing Square plan mapping for ${planId}` }) };
-
-    const client = getSquareClient();
-
-    // 1) Ensure customer; store app userId in referenceId for webhooks
-    const customer = await getOrCreateCustomer(client, { email, givenName: name, referenceId: userId });
-
-    // 2) Create card on file from sourceId
-    const card = await createCardOnFile(client, { customerId: customer.id, sourceId: paymentMethodId });
-
-    // 3) Create subscription
-    const subs = client.subscriptionsApi;
-    const resp = await subs.createSubscription({
-      idempotencyKey: `sub_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      locationId: process.env.SQUARE_LOCATION_ID,
-      planVariationId: planVariationId,
-      customerId: customer.id,
-      cardId: card.id,
+    // Attach payment method to customer
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customer.id,
     });
-    const subscription = resp.result.subscription;
 
-    return { statusCode: 200, headers, body: JSON.stringify({ id: subscription.id, status: subscription.status, customerId: customer.id }) };
-  } catch (error) {
-    console.error('Subscription creation failed:', error);
-    const message = error?.message || 'Failed to create subscription';
-    return { statusCode: 500, headers, body: JSON.stringify({ error: message }) };
-  }
-}
-
-async function cancelSubscription(data, headers) {
-  try {
-    const { subscriptionId } = data;
-    const client = getSquareClient();
-    const resp = await client.subscriptionsApi.cancelSubscription(subscriptionId);
-    return { statusCode: 200, headers, body: JSON.stringify({ id: subscriptionId, status: resp.result.subscription?.status || 'CANCELED' }) };
-  } catch (error) {
-    console.error('Subscription cancellation failed:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to cancel subscription' }) };
-  }
-}
-
-function verifySquareSignature(event) {
-  try {
-    const signatureKeyBase64 = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
-    const notificationUrl = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL; // must exactly match Square config
-    if (!signatureKeyBase64 || !notificationUrl) return true; // skip if not configured
-    const signatureHeader = event.headers['x-square-hmacsha256-signature'];
-    if (!signatureHeader) return false;
-    const hmacKey = Buffer.from(signatureKeyBase64, 'base64');
-    const message = notificationUrl + (event.body || '');
-    const digest = crypto.createHmac('sha256', hmacKey).update(message).digest('base64');
-    return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signatureHeader));
-  } catch (e) {
-    console.warn('Webhook signature verify failed:', e);
-    return false;
-  }
-}
-
-async function updateSupabaseUserPlanByUserId(userId, plan) {
-  try {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE;
-    if (!url || !key || !userId) return;
-    await fetch(`${url}/auth/v1/admin/users/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ user_metadata: { plan } })
+    // Set as default payment method
+    await stripe.customers.update(customer.id, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
     });
-  } catch (e) {
-    console.warn('Supabase plan update failed:', e);
+
+    // Create subscription
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [
+        {
+          price: plan.priceId,
+        },
+      ],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        planId,
+        userId: userId || 'anonymous'
+      }
+    });
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        id: subscription.id,
+        status: subscription.status,
+        customerId: customer.id,
+        clientSecret: subscription.latest_invoice.payment_intent.client_secret,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
+      })
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to create subscription', details: error.message })
+    };
+  }
+}
+
+async function handleCancelSubscription(data, headers) {
+  const { subscriptionId } = data;
+
+  try {
+    const subscription = await stripe.subscriptions.cancel(subscriptionId);
+    
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        id: subscription.id,
+        status: subscription.status,
+        canceledAt: new Date(subscription.canceled_at * 1000).toISOString()
+      })
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to cancel subscription', details: error.message })
+    };
+  }
+}
+
+async function handleGetSubscription(path, headers) {
+  const subscriptionId = path.split('/').pop();
+
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        id: subscription.id,
+        status: subscription.status,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        planId: subscription.metadata.planId
+      })
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to retrieve subscription', details: error.message })
+    };
+  }
+}
+
+async function handleGetCustomerSubscriptions(path, headers) {
+  const customerId = path.split('/')[2];
+
+  try {
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'all'
+    });
+    
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(subscriptions.data.map(sub => ({
+        id: sub.id,
+        status: sub.status,
+        currentPeriodStart: new Date(sub.current_period_start * 1000).toISOString(),
+        currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+        planId: sub.metadata.planId
+      })))
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to retrieve subscriptions', details: error.message })
+    };
   }
 }
 
 async function handleWebhook(event, headers) {
+  const sig = event.headers['stripe-signature'];
+  let stripeEvent;
+
   try {
-    if (!verifySquareSignature(event)) {
-      return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid signature' }) };
+    stripeEvent = stripe.webhooks.constructEvent(event.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: `Webhook Error: ${err.message}` })
+    };
+  }
+
+  try {
+    // Handle the event
+    switch (stripeEvent.type) {
+      case 'payment_intent.succeeded':
+        const paymentIntent = stripeEvent.data.object;
+        console.log('Payment succeeded:', paymentIntent.id);
+        // Update user's plan in your database here
+        break;
+        
+      case 'customer.subscription.created':
+        const subscriptionCreated = stripeEvent.data.object;
+        console.log('Subscription created:', subscriptionCreated.id);
+        // Update user's subscription status in your database here
+        break;
+        
+      case 'customer.subscription.updated':
+        const subscriptionUpdated = stripeEvent.data.object;
+        console.log('Subscription updated:', subscriptionUpdated.id);
+        // Update user's subscription status in your database here
+        break;
+        
+      case 'customer.subscription.deleted':
+        const subscriptionDeleted = stripeEvent.data.object;
+        console.log('Subscription canceled:', subscriptionDeleted.id);
+        // Update user's subscription status in your database here
+        break;
+        
+      case 'invoice.payment_succeeded':
+        const invoice = stripeEvent.data.object;
+        console.log('Invoice payment succeeded:', invoice.id);
+        // Handle successful recurring payment
+        break;
+        
+      case 'invoice.payment_failed':
+        const failedInvoice = stripeEvent.data.object;
+        console.log('Invoice payment failed:', failedInvoice.id);
+        // Handle failed payment - maybe send email notification
+        break;
+        
+      default:
+        console.log(`Unhandled event type ${stripeEvent.type}`);
     }
 
-    const body = event.body || '';
-    const data = JSON.parse(body || '{}');
-    const type = data?.type || data?.event_type || 'unknown';
-
-    const client = getSquareClient();
-    let customerId = data?.data?.object?.subscription?.customer_id || data?.data?.object?.payment?.customer_id;
-    let userId = null;
-
-    if (customerId) {
-      try {
-        const resp = await client.customersApi.retrieveCustomer(customerId);
-        userId = resp?.result?.customer?.referenceId || null;
-      } catch (e) {
-        console.warn('Could not retrieve customer for webhook mapping', e);
-      }
-    }
-
-    let newPlan = null;
-    if (type.includes('subscription.created') || type.includes('subscription.activated') || type.includes('invoice.paid')) {
-      newPlan = 'premium';
-    }
-    if (type.includes('subscription.canceled') || type.includes('invoice.payment_failed')) {
-      newPlan = 'free';
-    }
-
-    if (newPlan && userId) {
-      await updateSupabaseUserPlanByUserId(userId, newPlan);
-    }
-
-    return { statusCode: 200, headers, body: JSON.stringify({ received: true }) };
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ received: true })
+    };
   } catch (error) {
-    console.error('Webhook handling failed:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Webhook processing failed' }) };
+    console.error('Webhook processing failed:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Webhook processing failed' })
+    };
   }
 }

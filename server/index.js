@@ -1,12 +1,38 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
+
+// Rate limiting configuration
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
+
+// More strict rate limiting for AI endpoints
+const aiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 AI requests per minute
+  message: {
+    error: 'Too many AI requests, please slow down.',
+  },
+});
+
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-app.post('/api/openai-chat', async (req, res) => {
+// OpenAI Chat endpoint with rate limiting
+app.post('/api/openai-chat', aiLimiter, async (req, res) => {
   try {
     const { messages, model, temperature, max_tokens } = req.body || {};
     const resolvedModel = model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -49,7 +75,8 @@ app.post('/api/openai-chat', async (req, res) => {
   }
 });
 
-app.post('/api/elevenlabs-tts', async (req, res) => {
+// ElevenLabs TTS endpoint with rate limiting
+app.post('/api/elevenlabs-tts', aiLimiter, async (req, res) => {
   try {
     const { text, voiceId } = req.body || {};
     const finalVoiceId = voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID || process.env.VITE_ELEVENLABS_VOICE_ID;
@@ -93,7 +120,41 @@ app.post('/api/elevenlabs-tts', async (req, res) => {
   }
 });
 
+// Email subscription endpoint
+app.post('/api/email/subscribe', async (req, res) => {
+  try {
+    const { email, source, timestamp, userAgent, referrer } = req.body;
+    
+    if (!email || !email.includes('@')) {
+      res.status(400).json({ error: 'Valid email required' });
+      return;
+    }
+
+    // In a real implementation, you would save this to a database
+    // For now, we'll just log it and return success
+    console.log('Email subscription:', { email, source, timestamp, userAgent, referrer });
+    
+    res.status(200).json({ 
+      success: true, 
+      message: 'Email subscribed successfully' 
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Email subscription failed', details: String(err) });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`API server listening on http://localhost:${port}`);
-}); 
+  console.log('Rate limiting enabled: 100 requests per 15 minutes');
+  console.log('AI endpoints limited to 10 requests per minute');
+});

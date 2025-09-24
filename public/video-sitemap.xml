@@ -2,55 +2,36 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
 
-  <!-- Demo Video -->
+  <!-- Demo Videos -->
   <url>
-    <loc>https://www.loveaicompanion.com/</loc>
+    <loc>https://www.loveaicompanion.com/demo</loc>
     <video:video>
       <video:thumbnail_loc>https://www.loveaicompanion.com/video-thumbnail.jpg</video:thumbnail_loc>
-      <video:title>LoveAI - Meet Your Perfect AI Companion</video:title>
-      <video:description>Experience the future of AI companionship with LoveAI. See how our emotional AI technology creates meaningful connections through realistic conversations, voice calls, and personalized interactions.</video:description>
-      <video:content_loc>https://www.loveaicompanion.com/demo-video.mp4</video:content_loc>
-      <video:duration>150</video:duration>
+      <video:title>LoveAI Demo - AI Companion Experience</video:title>
+      <video:description>Watch how LoveAI creates meaningful connections with advanced emotional AI technology</video:description>
+      <video:content_loc>https://www.loveaicompanion.com/videos/demo.mp4</video:content_loc>
+      <video:player_loc allow_embed="yes">https://www.loveaicompanion.com/player</video:player_loc>
+      <video:duration>120</video:duration>
       <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
       <video:family_friendly>yes</video:family_friendly>
-      <video:tag>AI companion</video:tag>
-      <video:tag>virtual relationship</video:tag>
-      <video:tag>emotional AI</video:tag>
-      <video:tag>artificial intelligence</video:tag>
-      <video:category>Technology</video:category>
+      <video:restriction relationship="allow">US CA GB AU</video:restriction>
+      <video:gallery_loc title="LoveAI Gallery">https://www.loveaicompanion.com/gallery</video:gallery_loc>
     </video:video>
   </url>
 
-  <!-- Character Introduction Videos -->
+  <!-- Tutorial Videos -->
   <url>
-    <loc>https://www.loveaicompanion.com/characters/luna</loc>
+    <loc>https://www.loveaicompanion.com/tutorials</loc>
     <video:video>
-      <video:thumbnail_loc>https://www.loveaicompanion.com/avatar-luna.jpg</video:thumbnail_loc>
-      <video:title>Meet Luna - Your Warm and Caring AI Companion</video:title>
-      <video:description>Get to know Luna, an AI companion with a warm personality who loves deep conversations and emotional connections.</video:description>
-      <video:duration>60</video:duration>
+      <video:thumbnail_loc>https://www.loveaicompanion.com/tutorial-thumbnail.jpg</video:thumbnail_loc>
+      <video:title>How to Create Your AI Companion - Tutorial</video:title>
+      <video:description>Step-by-step guide to creating your perfect AI companion with LoveAI</video:description>
+      <video:content_loc>https://www.loveaicompanion.com/videos/tutorial.mp4</video:content_loc>
+      <video:player_loc allow_embed="yes">https://www.loveaicompanion.com/player</video:player_loc>
+      <video:duration>300</video:duration>
       <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
       <video:family_friendly>yes</video:family_friendly>
-      <video:tag>Luna</video:tag>
-      <video:tag>AI character</video:tag>
-      <video:tag>virtual companion</video:tag>
     </video:video>
   </url>
 
-  <!-- Feature Demo Videos -->
-  <url>
-    <loc>https://www.loveaicompanion.com/features/voice-calls</loc>
-    <video:video>
-      <video:thumbnail_loc>https://www.loveaicompanion.com/natalie.png</video:thumbnail_loc>
-      <video:title>LoveAI Voice Calls - Natural AI Conversations</video:title>
-      <video:description>Experience natural voice conversations with your AI companion using advanced speech synthesis and real-time processing.</video:description>
-      <video:duration>90</video:duration>
-      <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
-      <video:family_friendly>yes</video:family_friendly>
-      <video:tag>voice calls</video:tag>
-      <video:tag>AI speech</video:tag>
-      <video:tag>natural conversation</video:tag>
-    </video:video>
-  </url>
-
-</urlset> 
+</urlset>

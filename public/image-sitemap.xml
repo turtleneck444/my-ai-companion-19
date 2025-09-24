@@ -2,91 +2,61 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 
-  <!-- Homepage Images -->
+  <!-- Main Images -->
   <url>
     <loc>https://www.loveaicompanion.com/</loc>
     <image:image>
       <image:loc>https://www.loveaicompanion.com/thumbnail.png</image:loc>
       <image:caption>LoveAI - Your Perfect AI Companion Platform</image:caption>
-      <image:title>LoveAI Homepage - AI Companion Platform</image:title>
+      <image:title>LoveAI Platform Homepage</image:title>
+      <image:license>https://www.loveaicompanion.com/license</image:license>
     </image:image>
     <image:image>
       <image:loc>https://www.loveaicompanion.com/chat.png</image:loc>
-      <image:caption>Real AI Chat Interface Screenshot</image:caption>
-      <image:title>LoveAI Chat Experience with Luna</image:title>
+      <image:caption>Real AI Chat Interface - LoveAI</image:caption>
+      <image:title>LoveAI Chat Experience</image:title>
+      <image:license>https://www.loveaicompanion.com/license</image:license>
     </image:image>
     <image:image>
       <image:loc>https://www.loveaicompanion.com/home.png</image:loc>
-      <image:caption>LoveAI Mobile App Interface</image:caption>
-      <image:title>LoveAI Mobile App Experience</image:title>
+      <image:caption>LoveAI Homepage Interface</image:caption>
+      <image:title>LoveAI Home Experience</image:title>
+      <image:license>https://www.loveaicompanion.com/license</image:license>
     </image:image>
   </url>
 
   <!-- Character Images -->
   <url>
-    <loc>https://www.loveaicompanion.com/characters/luna</loc>
+    <loc>https://www.loveaicompanion.com/characters</loc>
     <image:image>
-      <image:loc>https://www.loveaicompanion.com/avatar-luna.jpg</image:loc>
-      <image:caption>Luna - AI Companion with Warm Personality</image:caption>
-      <image:title>Meet Luna, Your AI Companion</image:title>
+      <image:loc>https://www.loveaicompanion.com/assets/avatar-luna.jpg</image:loc>
+      <image:caption>Luna - AI Companion Character</image:caption>
+      <image:title>Meet Luna, your AI companion</image:title>
+      <image:license>https://www.loveaicompanion.com/license</image:license>
     </image:image>
-  </url>
-
-  <url>
-    <loc>https://www.loveaicompanion.com/characters/aria</loc>
     <image:image>
       <image:loc>https://www.loveaicompanion.com/assets/avatar-aria.jpg</image:loc>
-      <image:caption>Aria - Mysterious AI Companion</image:caption>
-      <image:title>Meet Aria, Your AI Companion</image:title>
+      <image:caption>Aria - AI Companion Character</image:caption>
+      <image:title>Meet Aria, your AI companion</image:title>
+      <image:license>https://www.loveaicompanion.com/license</image:license>
     </image:image>
-  </url>
-
-  <url>
-    <loc>https://www.loveaicompanion.com/characters/sophie</loc>
     <image:image>
       <image:loc>https://www.loveaicompanion.com/assets/avatar-sophie.jpg</image:loc>
-      <image:caption>Sophie - Intelligent AI Companion</image:caption>
-      <image:title>Meet Sophie, Your AI Companion</image:title>
+      <image:caption>Sophie - AI Companion Character</image:caption>
+      <image:title>Meet Sophie, your AI companion</image:title>
+      <image:license>https://www.loveaicompanion.com/license</image:license>
     </image:image>
   </url>
 
   <!-- Feature Images -->
   <url>
-    <loc>https://www.loveaicompanion.com/features/voice-calls</loc>
+    <loc>https://www.loveaicompanion.com/features</loc>
     <image:image>
-      <image:loc>https://www.loveaicompanion.com/natalie.png</image:loc>
-      <image:caption>AI Voice Call Feature Demo</image:caption>
-      <image:title>LoveAI Voice Call Interface</image:title>
+      <image:loc>https://www.loveaicompanion.com/hero-bg.jpg</image:loc>
+      <image:caption>LoveAI Hero Background - AI Technology</image:caption>
+      <image:title>LoveAI Technology Background</image:title>
+      <image:license>https://www.loveaicompanion.com/license</image:license>
     </image:image>
   </url>
 
-  <url>
-    <loc>https://www.loveaicompanion.com/features/personality-customization</loc>
-    <image:image>
-      <image:loc>https://www.loveaicompanion.com/heather.png</image:loc>
-      <image:caption>AI Personality Customization Interface</image:caption>
-      <image:title>LoveAI Personality Creation</image:title>
-    </image:image>
-  </url>
-
-  <!-- App Preview Images -->
-  <url>
-    <loc>https://www.loveaicompanion.com/ai-companion</loc>
-    <image:image>
-      <image:loc>https://www.loveaicompanion.com/assets/hero-bg.jpg</image:loc>
-      <image:caption>AI Companion Platform Hero Background</image:caption>
-      <image:title>LoveAI Platform Background</image:title>
-    </image:image>
-  </url>
-
-  <!-- Favicon and Icons -->
-  <url>
-    <loc>https://www.loveaicompanion.com/</loc>
-    <image:image>
-      <image:loc>https://www.loveaicompanion.com/favicon.ico</image:loc>
-      <image:caption>LoveAI App Icon</image:caption>
-      <image:title>LoveAI Favicon</image:title>
-    </image:image>
-  </url>
-
-</urlset> 
+</urlset>

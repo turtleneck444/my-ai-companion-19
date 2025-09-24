@@ -1,11 +1,9 @@
-// Payment processing configuration and utilities
-// Configure your payment provider by setting the appropriate environment variables
+// Enhanced payment processing with real Stripe integration
+import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 
 export interface PaymentConfig {
   provider: 'stripe' | 'square' | 'paypal' | 'razorpay';
   publishableKey: string;
-  // Secrets must NEVER be bundled client-side
-  // They are intentionally omitted from the client configuration
   environment: 'test' | 'live';
 }
 
@@ -28,24 +26,28 @@ export interface SubscriptionPlan {
 
 export interface PaymentIntent {
   id: string;
-  amount: number;
-  currency: string;
-  status: 'pending' | 'succeeded' | 'failed' | 'canceled' | 'requires_payment_method' | 'COMPLETED';
-  clientSecret?: string;
-  applicationId?: string;
-  receiptUrl?: string;
+  clientSecret: string;
+  status: string;
 }
 
-// Payment provider configurations (client-safe only)
+export interface Subscription {
+  id: string;
+  status: string;
+  customerId: string;
+  clientSecret?: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  planId: string;
+}
+
+// Payment configuration
 export const PAYMENT_CONFIG: PaymentConfig = {
   provider: (import.meta.env.VITE_PAYMENT_PROVIDER as any) || 'stripe',
   publishableKey: import.meta.env.VITE_PAYMENT_PUBLISHABLE_KEY || '',
   environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test'
 };
 
-const API_BASE = import.meta.env.DEV ? '/api/payments' : '/.netlify/functions/payments';
-
-// Updated subscription plans with consumer-focused Pro tier
+// Updated subscription plans with Stripe price IDs
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'free',
@@ -124,92 +126,110 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   }
 ];
 
-// Payment processing functions
+const API_BASE = import.meta.env.DEV ? '/api/payments' : '/.netlify/functions/payments';
+
+// Enhanced payment processing with real Stripe integration
 export class PaymentProcessor {
   private config: PaymentConfig;
+  private stripe: Stripe | null = null;
+  private elements: StripeElements | null = null;
 
-  constructor(config: PaymentConfig) {
-    this.config = config;
+  constructor() {
+    this.config = PAYMENT_CONFIG;
+    this.initializeStripe();
   }
 
-  async createPaymentIntent(planId: string, userId: string): Promise<PaymentIntent> {
+  private async initializeStripe() {
+    if (this.config.provider === 'stripe' && this.config.publishableKey) {
+      this.stripe = await loadStripe(this.config.publishableKey);
+    }
+  }
+
+  // Create payment intent for one-time payments
+  async createPaymentIntent(planId: string, userId?: string): Promise<PaymentIntent> {
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
     if (!plan) {
-      throw new Error('Plan not found');
+      throw new Error('Invalid plan ID');
     }
 
     const response = await fetch(`${API_BASE}/create-intent`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         planId,
         userId,
         amount: plan.price,
-        currency: plan.currency,
+        currency: plan.currency.toLowerCase(),
         provider: this.config.provider
       })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to create payment intent');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create payment intent');
     }
 
-    return await response.json();
+    return response.json();
   }
 
-  async confirmPayment(params: { paymentIntentId: string; sourceId: string; amount: number; currency: string; }): Promise<PaymentIntent> {
+  // Confirm payment
+  async confirmPayment(paymentIntentId: string): Promise<PaymentIntent> {
     const response = await fetch(`${API_BASE}/confirm`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        paymentIntentId: params.paymentIntentId,
-        sourceId: params.sourceId,
-        amount: params.amount,
-        currency: params.currency,
+        paymentIntentId,
         provider: this.config.provider
       })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to confirm payment');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to confirm payment');
     }
 
-    return await response.json();
+    return response.json();
   }
 
-  async createSubscription(planId: string, userId: string, paymentMethodId: string, customer?: { email?: string; name?: string; }): Promise<any> {
+  // Create subscription
+  async createSubscription(
+    planId: string, 
+    paymentMethodId: string, 
+    userId?: string,
+    customerId?: string
+  ): Promise<Subscription> {
     const response = await fetch(`${API_BASE}/create-subscription`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         planId,
-        // userId kept for backward compatibility but not required for Square
         userId,
         paymentMethodId,
-        email: customer?.email,
-        name: customer?.name,
+        customerId,
         provider: this.config.provider
       })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to create subscription');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create subscription');
     }
 
-    return await response.json();
+    return response.json();
   }
 
-  async cancelSubscription(subscriptionId: string): Promise<any> {
+  // Cancel subscription
+  async cancelSubscription(subscriptionId: string): Promise<Subscription> {
     const response = await fetch(`${API_BASE}/cancel-subscription`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         subscriptionId,
@@ -218,62 +238,133 @@ export class PaymentProcessor {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to cancel subscription');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to cancel subscription');
     }
 
-    return await response.json();
+    return response.json();
+  }
+
+  // Get subscription details
+  async getSubscription(subscriptionId: string): Promise<Subscription> {
+    const response = await fetch(`${API_BASE}/subscription/${subscriptionId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get subscription');
+    }
+
+    return response.json();
+  }
+
+  // Get customer subscriptions
+  async getCustomerSubscriptions(customerId: string): Promise<Subscription[]> {
+    const response = await fetch(`${API_BASE}/customer/${customerId}/subscriptions`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get customer subscriptions');
+    }
+
+    return response.json();
+  }
+
+  // Get Stripe instance for frontend integration
+  getStripe(): Stripe | null {
+    return this.stripe;
+  }
+
+  // Check if payment provider is configured
+  isConfigured(): boolean {
+    return this.config.provider === 'stripe' && !!this.config.publishableKey;
+  }
+
+  // Get available payment methods
+  getPaymentMethods(): string[] {
+    switch (this.config.provider) {
+      case 'stripe':
+        return ['card', 'apple_pay', 'google_pay'];
+      case 'square':
+        return ['card', 'apple_pay', 'google_pay'];
+      case 'paypal':
+        return ['paypal'];
+      case 'razorpay':
+        return ['card', 'netbanking', 'upi', 'wallet'];
+      default:
+        return ['card'];
+    }
   }
 }
 
-// Initialize payment processor
-export const paymentProcessor = new PaymentProcessor(PAYMENT_CONFIG);
+// Export singleton instance
+export const paymentProcessor = new PaymentProcessor();
 
-// Utility functions
-export const formatPrice = (amount: number, currency: string = 'USD'): string => {
+// Helper function to format price
+export function formatPrice(price: number, currency: string = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency
-  }).format(amount);
-};
+    currency: currency.toUpperCase(),
+  }).format(price);
+}
 
-export const getPlanById = (planId: string): SubscriptionPlan | undefined => {
+// Helper function to get plan by ID
+export function getPlanById(planId: string): SubscriptionPlan | undefined {
   return SUBSCRIPTION_PLANS.find(plan => plan.id === planId);
-};
+}
 
-export const isPaymentConfigured = (): boolean => {
-  // Only publishable key is needed on the client
-  return !!(PAYMENT_CONFIG.publishableKey);
-};
-
-// Usage tracking utilities
-export const checkMessageLimit = (currentPlan: string, messagesUsed: number): boolean => {
-  const plan = getPlanById(currentPlan);
+// Helper function to check if user can access feature
+export function canAccessFeature(
+  userPlan: string, 
+  feature: keyof SubscriptionPlan['limits']
+): boolean {
+  const plan = getPlanById(userPlan);
   if (!plan) return false;
   
-  if (plan.limits.messagesPerDay === -1) return true; // Unlimited
-  return messagesUsed < plan.limits.messagesPerDay;
-};
+  const limit = plan.limits[feature];
+  return limit === true || limit === -1 || limit > 0;
+}
 
-export const checkVoiceCallLimit = (currentPlan: string, callsUsed: number): boolean => {
-  const plan = getPlanById(currentPlan);
+// Usage tracking helper functions
+export function checkMessageLimit(userPlan: string, messagesUsed: number): boolean {
+  const plan = getPlanById(userPlan);
   if (!plan) return false;
   
-  if (plan.limits.voiceCallsPerDay === -1) return true; // Unlimited
-  return callsUsed < plan.limits.voiceCallsPerDay;
-};
+  const limit = plan.limits.messagesPerDay;
+  return limit === -1 || messagesUsed < limit; // -1 means unlimited
+}
 
-export const getRemainingMessages = (currentPlan: string, messagesUsed: number): number => {
-  const plan = getPlanById(currentPlan);
+export function checkVoiceCallLimit(userPlan: string, voiceCallsUsed: number): boolean {
+  const plan = getPlanById(userPlan);
+  if (!plan) return false;
+  
+  const limit = plan.limits.voiceCallsPerDay;
+  return limit === -1 || voiceCallsUsed < limit; // -1 means unlimited
+}
+
+export function getRemainingMessages(userPlan: string, messagesUsed: number): number {
+  const plan = getPlanById(userPlan);
   if (!plan) return 0;
   
-  if (plan.limits.messagesPerDay === -1) return -1; // Unlimited
-  return Math.max(0, plan.limits.messagesPerDay - messagesUsed);
-};
+  const limit = plan.limits.messagesPerDay;
+  if (limit === -1) return -1; // unlimited
+  return Math.max(0, limit - messagesUsed);
+}
 
-export const getRemainingVoiceCalls = (currentPlan: string, callsUsed: number): number => {
-  const plan = getPlanById(currentPlan);
+export function getRemainingVoiceCalls(userPlan: string, voiceCallsUsed: number): number {
+  const plan = getPlanById(userPlan);
   if (!plan) return 0;
   
-  if (plan.limits.voiceCallsPerDay === -1) return true as any; // keep type compat
-  return Math.max(0, plan.limits.voiceCallsPerDay - callsUsed);
-};
+  const limit = plan.limits.voiceCallsPerDay;
+  if (limit === -1) return -1; // unlimited
+  return Math.max(0, limit - voiceCallsUsed);
+}

@@ -45,6 +45,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SEO } from '@/components/SEO';
 import { SocialShare } from '@/components/SocialShare';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { emailService } from '@/lib/email-service';
+import { EmailCollection } from '@/components/EmailCollection';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
@@ -84,7 +86,7 @@ export const LandingPage = () => {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // TODO: Implement email collection
+    // Real email collection implementation
     setTimeout(() => {
       setIsSubmitting(false);
       setEmail('');

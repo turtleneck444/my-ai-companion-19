@@ -1,7 +1,6 @@
-// Payment processing API endpoints
-// Configure your payment provider by setting environment variables
-
+// Real Payment processing API endpoints with Stripe integration
 const express = require('express');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const router = express.Router();
 
 // Payment provider configurations
@@ -15,123 +14,280 @@ const PAYMENT_CONFIG = {
     applicationId: process.env.SQUARE_APPLICATION_ID,
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
     environment: process.env.SQUARE_ENVIRONMENT || 'sandbox'
-  },
-  paypal: {
-    clientId: process.env.PAYPAL_CLIENT_ID,
-    clientSecret: process.env.PAYPAL_CLIENT_SECRET,
-    environment: process.env.PAYPAL_ENVIRONMENT || 'sandbox'
-  },
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    keySecret: process.env.RAZORPAY_KEY_SECRET
   }
 };
 
-// Create payment intent
+// Subscription plans configuration
+const SUBSCRIPTION_PLANS = {
+  premium: {
+    priceId: process.env.STRIPE_PREMIUM_PRICE_ID || 'price_premium_monthly',
+    amount: 1900, // $19.00 in cents
+    currency: 'usd',
+    interval: 'month'
+  },
+  pro: {
+    priceId: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_monthly', 
+    amount: 4900, // $49.00 in cents
+    currency: 'usd',
+    interval: 'month'
+  }
+};
+
+// Create payment intent for one-time payments
 router.post('/create-intent', async (req, res) => {
   try {
-    const { planId, userId, amount, currency, provider } = req.body;
+    const { planId, userId, amount, currency = 'usd', provider = 'stripe' } = req.body;
     
-    // TODO: Implement actual payment processing based on provider
-    // This is a placeholder implementation
-    
-    const paymentIntent = {
-      id: `pi_${Date.now()}`,
+    if (provider !== 'stripe') {
+      return res.status(400).json({ error: 'Only Stripe is currently supported' });
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
       amount: amount * 100, // Convert to cents
       currency: currency.toLowerCase(),
-      status: 'requires_payment_method',
-      clientSecret: `pi_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`
-    };
+      metadata: {
+        planId,
+        userId: userId || 'anonymous'
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
 
-    res.json(paymentIntent);
+    res.json({
+      id: paymentIntent.id,
+      clientSecret: paymentIntent.client_secret,
+      status: paymentIntent.status
+    });
   } catch (error) {
     console.error('Payment intent creation failed:', error);
-    res.status(500).json({ error: 'Failed to create payment intent' });
+    res.status(500).json({ error: 'Failed to create payment intent', details: error.message });
   }
 });
 
 // Confirm payment
 router.post('/confirm', async (req, res) => {
   try {
-    const { paymentIntentId, paymentMethodId, provider } = req.body;
+    const { paymentIntentId, provider = 'stripe' } = req.body;
     
-    // TODO: Implement payment confirmation based on provider
-    // This is a placeholder implementation
-    
-    const paymentIntent = {
-      id: paymentIntentId,
-      status: 'succeeded',
-      paymentMethod: paymentMethodId
-    };
+    if (provider !== 'stripe') {
+      return res.status(400).json({ error: 'Only Stripe is currently supported' });
+    }
 
-    res.json(paymentIntent);
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    res.json({
+      id: paymentIntent.id,
+      status: paymentIntent.status,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency
+    });
   } catch (error) {
     console.error('Payment confirmation failed:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    res.status(500).json({ error: 'Failed to confirm payment', details: error.message });
   }
 });
 
 // Create subscription
 router.post('/create-subscription', async (req, res) => {
   try {
-    const { planId, userId, paymentMethodId, provider } = req.body;
+    const { planId, userId, paymentMethodId, customerId, provider = 'stripe' } = req.body;
     
-    // TODO: Implement subscription creation based on provider
-    // This is a placeholder implementation
-    
-    const subscription = {
-      id: `sub_${Date.now()}`,
-      planId,
-      userId,
-      status: 'active',
-      currentPeriodStart: new Date().toISOString(),
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-      paymentMethod: paymentMethodId
-    };
+    if (provider !== 'stripe') {
+      return res.status(400).json({ error: 'Only Stripe is currently supported' });
+    }
 
-    res.json(subscription);
+    const plan = SUBSCRIPTION_PLANS[planId];
+    if (!plan) {
+      return res.status(400).json({ error: 'Invalid plan ID' });
+    }
+
+    let customer;
+    
+    // Create or retrieve customer
+    if (customerId) {
+      customer = await stripe.customers.retrieve(customerId);
+    } else {
+      customer = await stripe.customers.create({
+        metadata: {
+          userId: userId || 'anonymous'
+        }
+      });
+    }
+
+    // Attach payment method to customer
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customer.id,
+    });
+
+    // Set as default payment method
+    await stripe.customers.update(customer.id, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    // Create subscription
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [
+        {
+          price: plan.priceId,
+        },
+      ],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        planId,
+        userId: userId || 'anonymous'
+      }
+    });
+
+    res.json({
+      id: subscription.id,
+      status: subscription.status,
+      customerId: customer.id,
+      clientSecret: subscription.latest_invoice.payment_intent.client_secret,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
+    });
   } catch (error) {
     console.error('Subscription creation failed:', error);
-    res.status(500).json({ error: 'Failed to create subscription' });
+    res.status(500).json({ error: 'Failed to create subscription', details: error.message });
   }
 });
 
 // Cancel subscription
 router.post('/cancel-subscription', async (req, res) => {
   try {
-    const { subscriptionId, provider } = req.body;
+    const { subscriptionId, provider = 'stripe' } = req.body;
     
-    // TODO: Implement subscription cancellation based on provider
-    // This is a placeholder implementation
-    
-    const subscription = {
-      id: subscriptionId,
-      status: 'canceled',
-      canceledAt: new Date().toISOString()
-    };
+    if (provider !== 'stripe') {
+      return res.status(400).json({ error: 'Only Stripe is currently supported' });
+    }
 
-    res.json(subscription);
+    const subscription = await stripe.subscriptions.cancel(subscriptionId);
+    
+    res.json({
+      id: subscription.id,
+      status: subscription.status,
+      canceledAt: new Date(subscription.canceled_at * 1000).toISOString()
+    });
   } catch (error) {
     console.error('Subscription cancellation failed:', error);
-    res.status(500).json({ error: 'Failed to cancel subscription' });
+    res.status(500).json({ error: 'Failed to cancel subscription', details: error.message });
   }
 });
 
-// Webhook handler for payment events
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+// Get subscription details
+router.get('/subscription/:subscriptionId', async (req, res) => {
   try {
-    const sig = req.headers['stripe-signature'] || req.headers['square-signature'];
-    const payload = req.body;
+    const { subscriptionId } = req.params;
     
-    // TODO: Implement webhook verification and processing based on provider
-    // This is a placeholder implementation
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     
-    console.log('Webhook received:', { sig, payload });
+    res.json({
+      id: subscription.id,
+      status: subscription.status,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      planId: subscription.metadata.planId
+    });
+  } catch (error) {
+    console.error('Failed to retrieve subscription:', error);
+    res.status(500).json({ error: 'Failed to retrieve subscription', details: error.message });
+  }
+});
+
+// Get customer subscriptions
+router.get('/customer/:customerId/subscriptions', async (req, res) => {
+  try {
+    const { customerId } = req.params;
     
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'all'
+    });
+    
+    res.json(subscriptions.data.map(sub => ({
+      id: sub.id,
+      status: sub.status,
+      currentPeriodStart: new Date(sub.current_period_start * 1000).toISOString(),
+      currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+      planId: sub.metadata.planId
+    })));
+  } catch (error) {
+    console.error('Failed to retrieve customer subscriptions:', error);
+    res.status(500).json({ error: 'Failed to retrieve subscriptions', details: error.message });
+  }
+});
+
+// Webhook handler for Stripe events
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    // Handle the event
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+        const paymentIntent = event.data.object;
+        console.log('Payment succeeded:', paymentIntent.id);
+        // Update user's plan in your database here
+        break;
+        
+      case 'customer.subscription.created':
+        const subscriptionCreated = event.data.object;
+        console.log('Subscription created:', subscriptionCreated.id);
+        // Update user's subscription status in your database here
+        break;
+        
+      case 'customer.subscription.updated':
+        const subscriptionUpdated = event.data.object;
+        console.log('Subscription updated:', subscriptionUpdated.id);
+        // Update user's subscription status in your database here
+        break;
+        
+      case 'customer.subscription.deleted':
+        const subscriptionDeleted = event.data.object;
+        console.log('Subscription canceled:', subscriptionDeleted.id);
+        // Update user's subscription status in your database here
+        break;
+        
+      case 'invoice.payment_succeeded':
+        const invoice = event.data.object;
+        console.log('Invoice payment succeeded:', invoice.id);
+        // Handle successful recurring payment
+        break;
+        
+      case 'invoice.payment_failed':
+        const failedInvoice = event.data.object;
+        console.log('Invoice payment failed:', failedInvoice.id);
+        // Handle failed payment - maybe send email notification
+        break;
+        
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
     res.json({ received: true });
   } catch (error) {
     console.error('Webhook processing failed:', error);
-    res.status(400).json({ error: 'Webhook processing failed' });
+    res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
 
