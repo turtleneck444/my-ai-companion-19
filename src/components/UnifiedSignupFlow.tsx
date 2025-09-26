@@ -74,13 +74,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-    }
-    
-    // Require password for account creation
-    if (!formData.password || formData.password.length < 6) {
-      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
-      return;
-    }      toast({
+      toast({
         title: "Invalid Email",
         description: "Please enter a valid email address.",
         variant: "destructive"
@@ -116,7 +110,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       setStep('payment');
     }
   };
-
   const createAccount = async (planOverride?: string) => {
     setIsLoading(true);
     try {
@@ -138,18 +131,9 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       );
 
       if (error) {
-        toast({
-          title: "Signup Failed",
-          description: error.message,
-          variant: "destructive"
-        });
         return;
       }
 
-      toast({
-        title: "Account Created! 🎉",
-        description: `Welcome to LoveAI! Check your email to verify your account.`,
-      });
 
       // Navigate based on plan
       if (finalPlan === 'free') {
@@ -161,11 +145,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       
       onClose?.();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
     } finally {
       setIsLoading(false);
     }
@@ -176,42 +155,8 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     
     // Require email to proceed (used for receipts/customer association)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-    }
     
     // Require password for account creation
-    if (!formData.password || formData.password.length < 6) {
-      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
-      return;
-    }      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
-      return;
-    }
-    
-    setStep('processing');
-    setIsLoading(true);
-
-    try {
-      let sourceId: string | undefined;
-      if (selectedPlan !== 'free') {
-        // Tokenize Square card
-        if (!squareCard) {
-          await mountSquareCard();
-        }
-        const result = await squareCard.tokenize();
-        if (result.status !== 'OK') {
-          throw new Error(result.errors?.[0]?.message || 'Card tokenization failed');
-        }
-        sourceId = result.token;
-      }
-
-      // Process payment with backend
-      const paymentResult = await paymentProcessor.processPayment({
-        amount: selectedPlanDetails.price,
-        currency: selectedPlanDetails.currency,
-        planId: selectedPlan,
-        customerEmail: formData.email,
-        sourceId
-      });
 
       if (paymentResult.success) {
         console.log('🔍 Payment result details:', paymentResult);        // Payment successful - create account with paid plan
@@ -219,31 +164,15 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
         
         const isDevelopment = paymentResult.paymentIntentId?.startsWith('dev_pi_');
         
-        toast({
-          title: "Payment Successful! 🎉",
-          description: isDevelopment 
-            ? `Development mode: Account created with ${selectedPlanDetails.name} plan!`
-            : `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
-        });
 
         navigate('/app', { replace: true, state: { startChatDefault: true } });
         return;
       } else {
         console.error('Payment failed:', paymentResult.error);
-        toast({
-          title: "Payment Failed",
-          description: paymentResult.error || "Payment could not be processed. Please try again.",
-          variant: "destructive"
-        });
         setStep('payment');
       }
     } catch (error: any) {
       console.error('Payment error:', error);
-      toast({
-        title: "Payment Error",
-        description: error.message || "An unexpected error occurred. Please try again.",
-        variant: "destructive"
-      });
       setStep('payment');
     } finally {
       setIsLoading(false);
@@ -469,11 +398,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       setSquareReady(true);
     } catch (e) {
       console.error("Square init error", e);
-      toast({ 
-        title: "Payment Error", 
-        description: e.message || "Failed to load payment form. Please check your Square configuration.", 
-        variant: "destructive" 
-      });
     }
   };
   // Auto-mount card when we enter the payment step
