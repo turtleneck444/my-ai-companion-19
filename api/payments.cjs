@@ -14,10 +14,39 @@ function requireSquareEnv(res) {
   return true;
 }
 
+async function activateSupabaseUser(userId, planId) {
+  try {
+    if (!userId) return;
+    const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+    const body = {
+      subscription_status: planId === 'free' ? 'free' : 'active',
+      plan: planId,
+      subscription_plan_id: planId,
+      updated_at: new Date().toISOString()
+    };
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      console.warn('Supabase profile activation failed:', t);
+    }
+  } catch (e) {
+    console.warn('activateSupabaseUser error:', e);
+  }
+}
+
 router.post('/create-intent', async (req, res) => {
   try {
     const { planId, userId, amount, currency = 'usd', sourceId } = req.body;
-    console.log('💳 Payment request:', { planId, amount, currency, hasSourceId: !!sourceId });
+    console.log('💳 Payment request:', { planId, amount, currency, hasSourceId: !!sourceId, userId });
 
     if (!requireSquareEnv(res)) return;
     if (!sourceId || typeof sourceId !== 'string') {
@@ -59,6 +88,11 @@ router.post('/create-intent', async (req, res) => {
 
     const pay = result.payment;
     if (!pay) return res.status(500).json({ error: 'No payment returned' });
+
+    // On success, activate Supabase user with the selected plan
+    if (['COMPLETED', 'APPROVED'].includes(String(pay.status || '').toUpperCase())) {
+      await activateSupabaseUser(userId, planId);
+    }
 
     return res.json({ id: pay.id, status: pay.status, referenceId: pay.reference_id, amount: pay.amount_money?.amount, currency: pay.amount_money?.currency });
   } catch (error) {
