@@ -3,6 +3,12 @@
   publish = "dist"
   functions = "netlify/functions"
 
+# Ensure .well-known static files are served as-is before SPA catch-all
+[[redirects]]
+  from = "/.well-known/*"
+  to = "/.well-known/:splat"
+  status = 200
+
 # Single Page App routing
 [[redirects]]
   from = "/api/*"
@@ -13,6 +19,22 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Force correct headers for all .well-known files
+[[headers]]
+  for = "/.well-known/*"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"
+    Cache-Control = "public, max-age=300, must-revalidate, no-transform"
+    X-Content-Type-Options = "nosniff"
+
+# Extra strict headers for the Apple Pay association file
+[[headers]]
+  for = "/.well-known/apple-developer-merchantid-domain-association"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"
+    Cache-Control = "public, max-age=300, must-revalidate, no-transform"
+    X-Content-Type-Options = "nosniff"
 
 [build.environment]
   # Use an LTS Node to avoid toolchain mismatches
