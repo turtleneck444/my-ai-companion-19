@@ -1,0 +1,45 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Ensure .well-known static files are served as-is before SPA catch-all
+[[redirects]]
+  from = "/.well-known/*"
+  to = "/.well-known/:splat"
+  status = 200
+
+# Single Page App routing
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Force correct headers for all .well-known files
+[[headers]]
+  for = "/.well-known/*"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"
+    Cache-Control = "public, max-age=300, must-revalidate, no-transform"
+    X-Content-Type-Options = "nosniff"
+
+# Extra strict headers for the Apple Pay association file
+[[headers]]
+  for = "/.well-known/apple-developer-merchantid-domain-association"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"
+    Cache-Control = "public, max-age=300, must-revalidate, no-transform"
+    X-Content-Type-Options = "nosniff"
+
+[build.environment]
+  # Use an LTS Node to avoid toolchain mismatches
+  NODE_VERSION = "20"
+  # Secrets scanner: omit non-sensitive, expected client-side keys
+  SECRETS_SCAN_OMIT_KEYS = "VITE_PAYMENT_PROVIDER,VITE_PAYMENT_ENVIRONMENT,SQUARE_ENVIRONMENT,VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_PAYMENT_PUBLISHABLE_KEY,SQUARE_APPLICATION_ID,VITE_SQUARE_LOCATION_ID,SQUARE_LOCATION_ID"
+  # Uncomment to fully disable secrets scanning if your org policy allows it
+  # SECRETS_SCAN_ENABLED = "false"
