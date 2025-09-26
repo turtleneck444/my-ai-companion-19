@@ -74,7 +74,13 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      toast({
+    }
+    
+    // Require password for account creation
+    if (!formData.password || formData.password.length < 6) {
+      toast({ title: x27Password requiredx27, description: x27Enter a password (min 6 characters) to create your accountx27, variant: x27destructivex27 });
+      return;
+    }      toast({
         title: "Invalid Email",
         description: "Please enter a valid email address.",
         variant: "destructive"
@@ -117,7 +123,12 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       const finalPlan = planOverride || selectedPlan;
       
       const { error } = await signUp(
-        formData.email,
+        console.log(x27🔍 Signup attempt with:x27, {
+          email: formData.email,
+          hasPassword: !!formData.password,
+          passwordLength: formData.password.length,
+          plan: finalPlan
+        });        formData.email,
         formData.password,
         {
           preferred_name: formData.preferredName,
@@ -166,7 +177,13 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     // Require email to proceed (used for receipts/customer association)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
+    }
+    
+    // Require password for account creation
+    if (!formData.password || formData.password.length < 6) {
+      toast({ title: x27Password requiredx27, description: x27Enter a password (min 6 characters) to create your accountx27, variant: x27destructivex27 });
+      return;
+    }      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
       return;
     }
     
@@ -197,7 +214,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       });
 
       if (paymentResult.success) {
-        // Payment successful - create account with paid plan
+        console.log(x27🔍 Payment result details:x27, paymentResult);        // Payment successful - create account with paid plan
         await createAccount(selectedPlan);
         
         const isDevelopment = paymentResult.paymentIntentId?.startsWith('dev_pi_');
@@ -333,7 +350,35 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
 
         <div className="space-y-2">
           <Label htmlFor="email">Email Address *</Label>
+      </div>
+
+      {/* Password field for account creation */}
+      <div className="space-y-2">
+        <Label htmlFor="passwordForPayment">Password *</Label>
+        <div className="relative">
           <Input
+            id="passwordForPayment"
+            type={showPassword ? "text" : "password"}
+            value={formData.password}
+            onChange={(e) => handleInputChange("password", e.target.value)}
+            placeholder="Create a secure password"
+            minLength={6}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Minimum 6 characters</p>          <Input
             id="email"
             type="email"
             value={formData.email}
@@ -451,7 +496,35 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       {/* Ensure we have an email for receipts/customer mapping */}
       <div className="space-y-2">
         <Label htmlFor="emailForPayment">Email Address *</Label>
-        <Input
+      </div>
+
+      {/* Password field for account creation */}
+      <div className="space-y-2">
+        <Label htmlFor="passwordForPayment">Password *</Label>
+        <div className="relative">
+          <Input
+            id="passwordForPayment"
+            type={showPassword ? "text" : "password"}
+            value={formData.password}
+            onChange={(e) => handleInputChange("password", e.target.value)}
+            placeholder="Create a secure password"
+            minLength={6}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Minimum 6 characters</p>        <Input
           id="emailForPayment"
           type="email"
           value={formData.email}
