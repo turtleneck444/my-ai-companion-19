@@ -153,14 +153,13 @@ async function handleCreateIntent(data, headers, square) {
       }
       const idempotencyKey = `${userId || 'anonymous'}-${planId}-${Date.now()}`;
       const { paymentsApi } = square;
-      const payment = await paymentsApi.createPayment({
-      console.log(x27💳 Creating Square payment with:x27, {
-        sourceId: sourceId.substring(0, 10) + x27...x27,
+      console.log('💳 Creating Square payment with:', {
+        sourceId: sourceId.substring(0, 10) + '...',
         amount: Math.round(amount * 100),
         currency: currency.toUpperCase(),
         locationId: process.env.SQUARE_LOCATION_ID
-      });        sourceId,
-        idempotencyKey,
+      });      const payment = await paymentsApi.createPayment({
+        sourceId,        idempotencyKey,
         amountMoney: { amount: Math.round(amount * 100), currency: currency.toUpperCase() },
         locationId: process.env.SQUARE_LOCATION_ID,
         note: `LoveAI ${planId} plan`,
@@ -168,7 +167,7 @@ async function handleCreateIntent(data, headers, square) {
       });
 
       const sq = payment?.result?.payment;
-      console.log(x27💳 Square payment result:x27, {
+      console.log('💳 Square payment result:', {
         id: sq?.id,
         status: sq?.status,
         amount: sq?.amountMoney?.amount,
@@ -181,7 +180,7 @@ async function handleCreateIntent(data, headers, square) {
       }
 
       // Only return success for approved/completed payments
-      if ([x27COMPLETEDx27, x27APPROVEDx27].includes((sq.status || x27x27).toUpperCase())) {
+      if (['COMPLETED', 'APPROVED'].includes((sq.status || '').toUpperCase())) {
         return { statusCode: 200, headers, body: JSON.stringify({ id: sq.id, status: sq.status, success: true }) };
       } else {
         return { statusCode: 400, headers, body: JSON.stringify({ error: `Payment failed with status: ${sq.status}`, status: sq.status }) };
