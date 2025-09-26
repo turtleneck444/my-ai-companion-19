@@ -471,7 +471,7 @@ export class PaymentProcessor {
         }
         const json = await response.json();
         // Check if Square payment was actually successful
-        if (json.status && ![x27COMPLETEDx27, x27APPROVEDx27].includes(json.status.toUpperCase())) {
+        if (json.status && !['COMPLETED', 'APPROVED'].includes(json.status.toUpperCase())) {
           return { success: false, error: `Payment failed: ${json.status}` };
         }        return { success: true, paymentIntentId: json.id || ('square-' + Date.now()) };
       }
