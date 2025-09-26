@@ -1,5 +1,6 @@
 // Netlify function for payment processing with multiple providers
 import Stripe from 'stripe';
+import { Client as SquareClient, Environment as SquareEnv } from 'square';
 
 // Check if payments are enabled
 const PAYMENT_PROVIDER = process.env.VITE_PAYMENT_PROVIDER || 'none';
@@ -9,6 +10,18 @@ const PAYMENTS_ENABLED = PAYMENT_PROVIDER !== 'none' && PAYMENT_PROVIDER !== 'di
 let stripe = null;
 if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'stripe' && process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+}
+
+// Initialize Square client if enabled
+let square = null;
+if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'square' && process.env.SQUARE_ACCESS_TOKEN) {
+  const env = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
+    ? SquareEnv.Production
+    : SquareEnv.Sandbox;
+  square = new SquareClient({
+    accessToken: process.env.SQUARE_ACCESS_TOKEN,
+    environment: env,
+  });
 }
 
 // Subscription plans configuration
@@ -91,44 +104,54 @@ export async function handler(event) {
 }
 
 async function handleCreateIntent(data, headers) {
-  const { planId, userId, amount, currency = 'usd' } = data;
-
-  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Payment processor not configured' })
-    };
-  }
+  const { planId, userId, amount, currency = 'usd', provider = PAYMENT_PROVIDER, sourceId } = data;
 
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100, // Convert to cents
-      currency: currency.toLowerCase(),
-      metadata: {
-        planId,
-        userId: userId || 'anonymous'
-      },
-      automatic_payment_methods: {
-        enabled: true,
-      },
-    });
+    if (provider === 'stripe') {
+      if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Stripe not configured' }) };
+      }
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100),
+        currency: currency.toLowerCase(),
+        metadata: { planId, userId: userId || 'anonymous' },
+        automatic_payment_methods: { enabled: true },
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ id: paymentIntent.id, clientSecret: paymentIntent.client_secret, status: paymentIntent.status }) };
+    }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        id: paymentIntent.id,
-        clientSecret: paymentIntent.client_secret,
-        status: paymentIntent.status
-      })
-    };
+    if (provider === 'square') {
+      if (!square || !process.env.SQUARE_LOCATION_ID) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Square not configured' }) };
+      }
+      if (!sourceId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing sourceId (card token)' }) };
+      }
+      const idempotencyKey = `${userId || 'anonymous'}-${planId}-${Date.now()}`;
+      const { paymentsApi } = square;
+      const payment = await paymentsApi.createPayment({
+        sourceId,
+        idempotencyKey,
+        amountMoney: { amount: Math.round(amount * 100), currency: currency.toUpperCase() },
+        locationId: process.env.SQUARE_LOCATION_ID,
+        note: `LoveAI ${planId} plan`,
+        referenceId: `${planId}-${userId || 'anonymous'}`,
+      });
+
+      const sq = payment?.result?.payment;
+      if (!sq) throw new Error('Square payment failed');
+
+      // Mark user active in Supabase on success
+      if (['COMPLETED', 'APPROVED'].includes((sq.status || '').toUpperCase())) {
+        await activateSupabaseUser(userId, planId);
+      }
+
+      return { statusCode: 200, headers, body: JSON.stringify({ id: sq.id, status: sq.status }) };
+    }
+
+    return { statusCode: 400, headers, body: JSON.stringify({ error: `Unsupported provider: ${provider}` }) };
   } catch (error) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Failed to create payment intent', details: error.message })
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create payment', details: String(error?.message || error) }) };
   }
 }
 
@@ -462,5 +485,33 @@ async function handleStripeWebhookEvents(stripeEvent, headers) {
       headers,
       body: JSON.stringify({ error: 'Webhook processing failed' })
     };
+  }
+}
+
+async function activateSupabaseUser(userId, planId) {
+  try {
+    if (!userId) return;
+    const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        subscription_status: 'active',
+        plan: planId,
+        subscription_plan_id: planId,
+        updated_at: new Date().toISOString()
+      })
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      console.warn('Supabase profile activation failed:', t);
+    }
+  } catch (e) {
+    console.warn('activateSupabaseUser error:', e);
   }
 }
