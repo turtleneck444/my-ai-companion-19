@@ -11,24 +11,6 @@ if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'stripe' && process.env.STRIPE_SECR
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 }
 
-// Initialize Square client if enabled
-let square = null;
-if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'square' && process.env.SQUARE_ACCESS_TOKEN) {
-  try {
-    const { Client: SquareClient, Environment: SquareEnv } = await import('square');
-    const env = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
-      ? SquareEnv.Production
-      : SquareEnv.Sandbox;
-    square = new SquareClient({
-      accessToken: process.env.SQUARE_ACCESS_TOKEN,
-      environment: env,
-    });
-    console.log('✅ Square client initialized successfully');
-  } catch (error) {
-    console.error('Square SDK load failed, continuing without Square:', error.message);
-  }
-}
-
 // Subscription plans configuration
 const SUBSCRIPTION_PLANS = {
   premium: {
@@ -71,13 +53,31 @@ export async function handler(event) {
     };
   }
 
+  // Initialize Square client if needed
+  let square = null;
+  if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'square' && process.env.SQUARE_ACCESS_TOKEN) {
+    try {
+      const { Client: SquareClient, Environment: SquareEnv } = await import('square');
+      const env = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
+        ? SquareEnv.Production
+        : SquareEnv.Sandbox;
+      square = new SquareClient({
+        accessToken: process.env.SQUARE_ACCESS_TOKEN,
+        environment: env,
+      });
+      console.log('✅ Square client initialized successfully');
+    } catch (error) {
+      console.error('Square SDK load failed, continuing without Square:', error.message);
+    }
+  }
+
   try {
     const { httpMethod, path, body } = event;
     const data = body ? JSON.parse(body) : {};
 
     // Route handling
     if (path.endsWith('/create-intent')) {
-      return await handleCreateIntent(data, headers);
+      return await handleCreateIntent(data, headers, square);
     } else if (path.endsWith('/confirm')) {
       return await handleConfirmPayment(data, headers);
     } else if (path.endsWith('/create-subscription')) {
@@ -108,7 +108,7 @@ export async function handler(event) {
   }
 }
 
-async function handleCreateIntent(data, headers) {
+async function handleCreateIntent(data, headers, square) {
   const { planId, userId, amount, currency = 'usd', provider = PAYMENT_PROVIDER, sourceId } = data;
 
   console.log('💳 Payment request:', {
