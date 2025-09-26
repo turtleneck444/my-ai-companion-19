@@ -74,12 +74,17 @@ router.post('/create-intent', async (req, res) => {
         return res.status(500).json({ error: 'Square not configured' });
       }
 
+      const { sourceId } = req.body || {};
+      if (!sourceId || typeof sourceId !== 'string') {
+        return res.status(400).json({ error: 'Missing sourceId from Square card tokenization' });
+      }
+
       // Create Square payment
       const { paymentsApi } = squareClient;
       const payment = await paymentsApi.createPayment({
-        sourceId: 'EXTERNAL', // Will be replaced by frontend token
+        sourceId,
         amountMoney: {
-          amount: amount * 100, // Convert to cents
+          amount: Math.round(amount * 100), // cents
           currency: currency.toUpperCase()
         },
         locationId: process.env.SQUARE_LOCATION_ID,
@@ -327,3 +332,5 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 });
 
 module.exports = router;
+// ESM interop for server/index.js default import
+exports.default = router;

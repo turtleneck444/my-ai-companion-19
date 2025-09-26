@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
 import rateLimit from 'express-rate-limit';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const paymentsRouter = require('../api/payments.cjs');
 
 const app = express();
 
@@ -30,6 +33,9 @@ const aiLimiter = rateLimit({
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
+
+// Mount real payments API (Stripe/Square)
+app.use('/api/payments', paymentsRouter);
 
 // OpenAI Chat endpoint with rate limiting
 app.post('/api/openai-chat', aiLimiter, async (req, res) => {

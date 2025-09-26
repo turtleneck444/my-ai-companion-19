@@ -10,7 +10,7 @@ import { UserProfile } from "@/components/UserProfile";
 import { AgeGate } from "@/components/AgeGate";
 import { LandingPage } from "@/pages/LandingPage";
 import { PricingPage } from "@/pages/PricingPage";
-import { AuthPage } from "@/pages/Auth";
+import Auth from "@/pages/Auth";
 import Index from "./pages/EnhancedIndex";
 import NotFound from "./pages/NotFound";
 import Create from "./pages/Create";
@@ -37,7 +37,7 @@ const App = () => (
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
-              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/auth" element={<Auth />} />
               
               {/* Protected app routes */}
               <Route path="/app" element={
