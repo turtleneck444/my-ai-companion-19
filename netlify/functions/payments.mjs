@@ -66,7 +66,13 @@ export async function handler(event) {
         environment: env,
       });
       console.log('✅ Square client initialized successfully');
-    } catch (error) {
+  console.log("🔧 Square environment check:", {
+    PAYMENT_PROVIDER,
+    SQUARE_ACCESS_TOKEN: process.env.SQUARE_ACCESS_TOKEN ? "SET" : "MISSING",
+    SQUARE_ENVIRONMENT: process.env.SQUARE_ENVIRONMENT,
+    SQUARE_LOCATION_ID: process.env.SQUARE_LOCATION_ID ? "SET" : "MISSING",
+    PAYMENTS_ENABLED
+  });    } catch (error) {
       console.error('Square SDK load failed, continuing without Square:', error.message);
     }
   }
@@ -136,7 +142,11 @@ async function handleCreateIntent(data, headers, square) {
     if (provider === 'square') {
       if (!square || !process.env.SQUARE_LOCATION_ID) {
         console.log('❌ Square not properly configured');
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Square not configured' }) };
+  console.log("🔧 Square configuration check:", {
+    hasSquare: !!square,
+    SQUARE_LOCATION_ID: process.env.SQUARE_LOCATION_ID ? "SET" : "MISSING",
+    SQUARE_ACCESS_TOKEN: process.env.SQUARE_ACCESS_TOKEN ? "SET" : "MISSING"
+  });        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Square not configured' }) };
       }
       if (!sourceId) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing sourceId (card token)' }) };
