@@ -110,17 +110,11 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       setStep('payment');
     }
   };
+
   const createAccount = async (planOverride?: string) => {
     setIsLoading(true);
     try {
       const finalPlan = planOverride || selectedPlan;
-      
-      console.log('🔍 Signup attempt with:', {
-        email: formData.email,
-        hasPassword: !!formData.password,
-        passwordLength: formData.password.length,
-        plan: finalPlan
-      });
       
       const { error } = await signUp(
         formData.email,
@@ -130,13 +124,109 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
           plan: finalPlan,
           age: formData.age
         }
+      );
+
+      if (error) {
+        toast({
+          title: "Signup Failed",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Account Created! 🎉",
+        description: `Welcome to LoveAI! Check your email to verify your account.`,
+      });
+
+      // Navigate based on plan
+      if (finalPlan === 'free') {
+        navigate('/app');
+      } else {
+        // For paid plans, the payment was already processed
+        navigate('/app');
+      }
+      
+      onClose?.();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!selectedPlanDetails) return;
+    
+    // Require email to proceed (used for receipts/customer association)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
+      return;
+    }
+    
+    setStep('processing');
+    setIsLoading(true);
+
+    try {
+      let sourceId: string | undefined;
+      if (selectedPlan !== 'free') {
+        // Tokenize Square card
+        if (!squareCard) {
+          await mountSquareCard();
+        }
+        const result = await squareCard.tokenize();
+        if (result.status !== 'OK') {
+          throw new Error(result.errors?.[0]?.message || 'Card tokenization failed');
+        }
+        sourceId = result.token;
+      }
+
+      // Process payment with backend
+      const paymentResult = await paymentProcessor.processPayment({
+        amount: selectedPlanDetails.price,
+        currency: selectedPlanDetails.currency,
+        planId: selectedPlan,
+        customerEmail: formData.email,
+        sourceId
+      });
+
+      if (paymentResult.success) {
+        // Payment successful - create account with paid plan
+        await createAccount(selectedPlan);
+        
+        const isDevelopment = paymentResult.paymentIntentId?.startsWith('dev_pi_');
+        
+        toast({
+          title: "Payment Successful! 🎉",
+          description: isDevelopment 
+            ? `Development mode: Account created with ${selectedPlanDetails.name} plan!`
+            : `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
+        });
+
+        navigate('/app', { replace: true, state: { startChatDefault: true } });
         return;
       } else {
         console.error('Payment failed:', paymentResult.error);
+        toast({
+          title: "Payment Failed",
+          description: paymentResult.error || "Payment could not be processed. Please try again.",
+          variant: "destructive"
+        });
         setStep('payment');
       }
     } catch (error: any) {
       console.error('Payment error:', error);
+      toast({
+        title: "Payment Error",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
       setStep('payment');
     } finally {
       setIsLoading(false);
@@ -243,35 +333,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
 
         <div className="space-y-2">
           <Label htmlFor="email">Email Address *</Label>
-      </div>
-
-      {/* Password field for account creation */}
-      <div className="space-y-2">
-        <Label htmlFor="passwordForPayment">Password *</Label>
-        <div className="relative">
           <Input
-            id="passwordForPayment"
-            type={showPassword ? "text" : "password"}
-            value={formData.password}
-            onChange={(e) => handleInputChange("password", e.target.value)}
-            placeholder="Create a secure password"
-            minLength={6}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword(!showPassword)}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">Minimum 6 characters</p>          <Input
             id="email"
             type="email"
             value={formData.email}
@@ -362,6 +424,11 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       setSquareReady(true);
     } catch (e) {
       console.error("Square init error", e);
+      toast({ 
+        title: "Payment Error", 
+        description: e.message || "Failed to load payment form. Please check your Square configuration.", 
+        variant: "destructive" 
+      });
     }
   };
   // Auto-mount card when we enter the payment step
@@ -384,35 +451,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       {/* Ensure we have an email for receipts/customer mapping */}
       <div className="space-y-2">
         <Label htmlFor="emailForPayment">Email Address *</Label>
-      </div>
-
-      {/* Password field for account creation */}
-      <div className="space-y-2">
-        <Label htmlFor="passwordForPayment">Password *</Label>
-        <div className="relative">
-          <Input
-            id="passwordForPayment"
-            type={showPassword ? "text" : "password"}
-            value={formData.password}
-            onChange={(e) => handleInputChange("password", e.target.value)}
-            placeholder="Create a secure password"
-            minLength={6}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword(!showPassword)}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">Minimum 6 characters</p>        <Input
+        <Input
           id="emailForPayment"
           type="email"
           value={formData.email}
