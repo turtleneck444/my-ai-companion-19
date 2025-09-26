@@ -973,55 +973,6 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-background border-t py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-glow rounded-full flex items-center justify-center">
-                  <Heart className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold font-display">LoveAI</span>
-              </div>
-              <p className="text-muted-foreground mb-4">
-                The future of AI relationships. Experience meaningful connections with AI companions that understand and grow with you.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
-                <li><a href="#preview" className="hover:text-foreground transition-colors">Preview</a></li>
-                <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">API</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Integrations</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Support</h3>
-              <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#faq" className="hover:text-foreground transition-colors">FAQ</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Terms of Service</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
-                          <p>&copy; 2024 LoveAI. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
     </div>
     </>
   );
