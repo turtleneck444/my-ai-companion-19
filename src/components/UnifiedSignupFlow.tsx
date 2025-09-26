@@ -277,7 +277,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
                 }}
               >
                 {plan.id === 'free' ? 'Get Started Free' : 
-                 plan.id === 'premium' ? 'Start Premium Trial' : 'Go Pro'}
+                 plan.id === 'premium' ? 'Start Premium Plan' : 'Go Pro'}
               </Button>
             </CardContent>
           </Card>

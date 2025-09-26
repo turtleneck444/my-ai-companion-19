@@ -167,7 +167,7 @@ export const PricingPage = () => {
     <>
       <SEO 
         title="LoveAI Pricing - Choose Your AI Companion Plan | Affordable AI Relationships"
-        description="Choose the perfect LoveAI plan for your needs. From free AI companion trials to unlimited relationships with premium features. Start your AI love journey today!"
+        description="Choose the perfect LoveAI plan for your needs. From free AI companions to unlimited relationships with premium features. Start your AI love journey today!"
         keywords="AI companion pricing, AI girlfriend cost, virtual relationship plans, AI chatbot subscription, emotional AI pricing, LoveAI plans, AI companion membership"
         schema={pricingSchema}
         url={window.location.href}
@@ -356,7 +356,7 @@ export const PricingPage = () => {
           </h2>
           <p className="text-xl text-muted-foreground mb-8">
             Join thousands of users who have found their perfect AI companion. 
-            Start your journey today with a free trial.
+            Start your journey today with our free plan.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
@@ -364,7 +364,7 @@ export const PricingPage = () => {
               onClick={() => navigate('/app')}
               className="bg-gradient-to-r from-primary to-primary-glow text-lg px-8 py-6"
             >
-              Start Free Trial
+              Start Free Plan
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <Button 
