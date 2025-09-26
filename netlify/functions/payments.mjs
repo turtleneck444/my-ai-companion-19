@@ -315,7 +315,7 @@ async function handleGetCustomerSubscriptions(path, headers) {
 
 async function handleWebhook(event, headers) {
   // Check if payment processor is available
-  if (!stripe || !PAYMENTS_ENABLED) {
+  if (!PAYMENTS_ENABLED) {
     return {
       statusCode: 200,
       headers,
@@ -327,20 +327,86 @@ async function handleWebhook(event, headers) {
     };
   }
 
-  const sig = event.headers['stripe-signature'];
-  let stripeEvent;
-
-  try {
-    stripeEvent = stripe.webhooks.constructEvent(event.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: `Webhook Error: ${err.message}` })
-    };
+  // Handle Square webhooks
+  if (PAYMENT_PROVIDER === 'square') {
+    return await handleSquareWebhook(event, headers);
   }
 
+  // Handle Stripe webhooks
+  if (PAYMENT_PROVIDER === 'stripe') {
+    const sig = event.headers['stripe-signature'];
+    let stripeEvent;
+
+    try {
+      stripeEvent = stripe.webhooks.constructEvent(event.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: `Webhook Error: ${err.message}` })
+      };
+    }
+
+    return await handleStripeWebhookEvents(stripeEvent, headers);
+  }
+
+  return {
+    statusCode: 400,
+    headers,
+    body: JSON.stringify({ error: `Unsupported payment provider: ${PAYMENT_PROVIDER}` })
+  };
+}
+
+// Handle Square webhook events
+async function handleSquareWebhook(event, headers) {
+  try {
+    const webhookBody = event.body;
+    const webhookSignature = event.headers['x-square-signature'];
+    
+    // For now, just log the webhook and return success
+    // TODO: Add Square webhook signature verification when Square credentials are configured
+    console.log('Square webhook received:', {
+      signature: webhookSignature ? 'present' : 'missing',
+      bodyLength: webhookBody ? webhookBody.length : 0
+    });
+
+    const data = webhookBody ? JSON.parse(webhookBody) : {};
+    console.log('Square webhook event type:', data.type);
+
+    // Handle different Square webhook events
+    switch (data.type) {
+      case 'payment.created':
+        console.log('Square payment created:', data.data?.object?.id);
+        // Update user's plan in your database here
+        break;
+        
+      case 'payment.updated':
+        console.log('Square payment updated:', data.data?.object?.id);
+        // Update payment status in your database here
+        break;
+        
+      default:
+        console.log(`Unhandled Square event type: ${data.type}`);
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ received: true })
+    };
+  } catch (error) {
+    console.error('Square webhook processing failed:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Square webhook processing failed' })
+    };
+  }
+}
+
+// Handle Stripe webhook events
+async function handleStripeWebhookEvents(stripeEvent, headers) {
   try {
     // Handle the event
     switch (stripeEvent.type) {
