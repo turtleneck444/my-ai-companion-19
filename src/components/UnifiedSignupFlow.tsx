@@ -130,50 +130,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
           plan: finalPlan,
           age: formData.age
         }
-      );        formData.password,
-        {
-          preferred_name: formData.preferredName,
-          plan: finalPlan,
-          age: formData.age
-        }
-      );
-
-      if (error) {
-        return;
-      }
-
-
-      // Navigate based on plan
-      if (finalPlan === 'free') {
-        navigate('/app');
-      } else {
-        // For paid plans, the payment was already processed
-        navigate('/app');
-      }
-      
-      onClose?.();
-    } catch (error: any) {
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePayment = async () => {
-    if (!selectedPlanDetails) return;
-    
-    // Require email to proceed (used for receipts/customer association)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
-    // Require password for account creation
-
-      if (paymentResult.success) {
-        console.log('🔍 Payment result details:', paymentResult);        // Payment successful - create account with paid plan
-        await createAccount(selectedPlan);
-        
-        const isDevelopment = paymentResult.paymentIntentId?.startsWith('dev_pi_');
-        
-
-        navigate('/app', { replace: true, state: { startChatDefault: true } });
         return;
       } else {
         console.error('Payment failed:', paymentResult.error);
