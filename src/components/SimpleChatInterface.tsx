@@ -23,7 +23,7 @@ import {
   MoreHorizontal
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
 import { personalityAI, type ChatMessage, type ChatContext } from "@/lib/ai-chat";
 import { voiceCallManager } from "@/lib/voice-call";
 import { EmojiPicker } from "@/components/EmojiPicker";
@@ -88,11 +88,11 @@ export const SimpleChatInterface = ({
   const { user } = useAuth();
   const {
     currentPlan,
-    setCurrentPlan,
     incrementMessages,
     canSendMessage,
-    remainingMessages
-  } = useUsageTracking();
+    remainingMessages,
+    isLoading: usageLoading
+  } = useSupabaseUsageTracking();
   // Generate initial message based on character personality
   const getInitialMessage = () => {
     const name = userPreferences.preferredName;
@@ -138,11 +138,7 @@ export const SimpleChatInterface = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Initialize plan from user metadata
-  useEffect(() => {
-    const plan = (user as any)?.user_metadata?.plan || 'free';
-    setCurrentPlan(plan);
-  }, [user, setCurrentPlan]);
+  // Plan is now loaded automatically from Supabase by useSupabaseUsageTracking
 
   // Environment check for debugging
   useEffect(() => {
@@ -237,7 +233,13 @@ export const SimpleChatInterface = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
-    incrementMessages();
+    
+    // Track usage in database
+    const usageTracked = await incrementMessages();
+    if (!usageTracked) {
+      console.warn('Failed to track message usage in database');
+    }
+    
     // Persist user message
     persistMessage(userMessage);
     setInputValue("");

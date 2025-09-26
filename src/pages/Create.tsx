@@ -15,7 +15,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { speakText } from "@/lib/voice";
 import { generateAvatarImage, validateImagePrompt, examplePrompts } from "@/lib/image-generation";
 import { useNavigate } from "react-router-dom";
-import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
 import { PaymentModal } from "@/components/PaymentModal";
 import { 
@@ -83,7 +83,7 @@ const Create = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { currentPlan, setCurrentPlan } = useUsageTracking();
+  const { currentPlan } = useSupabaseUsageTracking();
   const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);

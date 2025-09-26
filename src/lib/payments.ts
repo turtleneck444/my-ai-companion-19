@@ -27,7 +27,7 @@ export interface SubscriptionPlan {
   name: string;
   price: number;
   currency: string;
-  interval: 'month' | 'year';
+  interval: 'month' | 'year' | 'forever';
   features: string[];
   limits: {
     messagesPerDay: number;
@@ -69,18 +69,18 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Free',
     price: 0,
     currency: 'USD',
-    interval: 'month',
+    interval: 'forever',
     features: [
-      '15 messages per day',
-      '3 voice calls per day',
+      '5 messages per day',
       '1 AI Companion',
       'Basic personalities only',
-      'Text chat & voice',
-      'Community support'
+      'Text chat only',
+      'Community support',
+      'Limited customization'
     ],
     limits: {
-      messagesPerDay: 15,
-      voiceCallsPerDay: 3,
+      messagesPerDay: 5,
+      voiceCallsPerDay: 0,
       companions: 1,
       customPersonalities: false,
       advancedFeatures: false
@@ -89,22 +89,22 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'premium',
     name: 'Premium',
-    price: 19.99,
+    price: 19.00,
     currency: 'USD',
     interval: 'month',
     features: [
-      '200 messages per day',
-      '10 voice calls per day',
-      'Up to 5 AI Companions',
+      '50 messages per day',
+      '5 voice calls per day',
+      'Up to 3 AI Companions',
       'Custom personality creation',
       'Advanced voice features',
       'Priority support',
-      'Enhanced customization options'
+      'Early access to new features'
     ],
     limits: {
-      messagesPerDay: 200,
-      voiceCallsPerDay: 10,
-      companions: 5,
+      messagesPerDay: 50,
+      voiceCallsPerDay: 5,
+      companions: 3,
       customPersonalities: true,
       advancedFeatures: true
     },
@@ -113,19 +113,18 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 99,
+    price: 49.00,
     currency: 'USD',
     interval: 'month',
     features: [
-      'Unlimited messages per day',
-      'Unlimited voice calls per day',
+      'Unlimited messages',
+      'Unlimited voice calls',
       'Unlimited AI Companions',
-      'Advanced personality customization',
-      'Premium voice options',
+      'Advanced AI training',
       'Custom voice creation',
-      'Priority support',
-      'Early access to all features',
-      'Advanced analytics & insights',
+      'Advanced analytics API access insights',
+      'Exclusive companion themes',
+      'Dedicated support',
       'Premium customer support'
     ],
     limits: {

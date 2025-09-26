@@ -17,7 +17,7 @@ import {
 import { speakText, stopAllTTS } from "@/lib/voice";
 import { personalityAI, type ChatContext, type ChatMessage } from "@/lib/ai-chat";
 import { useToast } from "@/hooks/use-toast";
-import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Character {
@@ -50,7 +50,7 @@ export const VoiceCallInterface = ({
   userPreferences 
 }: VoiceCallInterfaceProps) => {
   const { user } = useAuth();
-  const { canMakeVoiceCall, incrementVoiceCalls, currentPlan, setCurrentPlan } = useUsageTracking();
+  const { canMakeVoiceCall, incrementVoiceCalls, currentPlan } = useSupabaseUsageTracking();
   // Helper: resolve selected ElevenLabs voice id
   const getVoiceId = () => character.voiceId || character.voice?.voice_id || '21m00Tcm4TlvDq8ikWAM'; // Rachel fallback (female)
   // Call state
@@ -289,15 +289,13 @@ export const VoiceCallInterface = ({
 
   // Block call if plan disallows
   useEffect(() => {
-    const plan = (user as any)?.user_metadata?.plan || 'free';
-    setCurrentPlan(plan);
     if (!canMakeVoiceCall) {
       toast({ title: 'Upgrade required', description: `Your plan (${currentPlan}) has reached voice call limits.`, variant: 'destructive' });
       // End quickly if not allowed
       try { recognitionRef.current?.stop(); } catch {}
       try { stopAllTTS(); } catch {}
     }
-  }, [user, canMakeVoiceCall, currentPlan, setCurrentPlan, toast]);
+  }, [canMakeVoiceCall, currentPlan, toast]);
 
   // Voice activity detection
   const monitorVoiceLevel = () => {

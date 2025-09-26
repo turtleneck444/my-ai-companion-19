@@ -22,7 +22,7 @@ import {
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "react-router-dom";
@@ -162,7 +162,7 @@ const EnhancedIndex = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation() as any;
-  const { currentPlan, setCurrentPlan, remainingMessages, remainingVoiceCalls } = useUsageTracking();
+  const { currentPlan, remainingMessages, remainingVoiceCalls } = useSupabaseUsageTracking();
   
   // Core state - minimal and stable
   const [currentView, setCurrentView] = useState<View>('home');
@@ -243,11 +243,7 @@ const EnhancedIndex = () => {
     return () => clearInterval(id);
   }, []);
 
-  // Initialize current plan for meters
-  useEffect(() => {
-    const plan = (user as any)?.user_metadata?.plan || 'free';
-    setCurrentPlan(plan);
-  }, [user, setCurrentPlan]);
+  // Plan is now loaded automatically from Supabase by useSupabaseUsageTracking
 
   // If navigated with a character to start chat with, open chat
   useEffect(() => {

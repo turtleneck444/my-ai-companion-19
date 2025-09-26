@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import Create from "./pages/Create";
 import CreationSuccess from "./pages/CreationSuccess";
 import CompanionLibrary from "./pages/CompanionLibrary";
+import { AdminDashboard } from "./pages/AdminDashboard";
 import { FooterNotice } from "@/components/FooterNotice";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,13 @@ const App = () => (
               <Route path="/profile" element={
                 <ProtectedRoute>
                   <UserProfile />
+                </ProtectedRoute>
+              } />
+              
+              {/* Admin routes */}
+              <Route path="/admin" element={
+                <ProtectedRoute>
+                  <AdminDashboard />
                 </ProtectedRoute>
               } />
               
