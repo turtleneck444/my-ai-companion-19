@@ -172,8 +172,8 @@ export class PaymentProcessor {
       document.head.appendChild(script);
       
       await new Promise((resolve, reject) => {
-        script.onload = resolve;
-        script.onerror = reject;
+        script.onload = resolve as any;
+        script.onerror = reject as any;
       });
     }
 
@@ -185,7 +185,7 @@ export class PaymentProcessor {
     );
   }
 
-  // Create payment intent for one-time payments
+  // Create payment intent for one-time payments (Stripe or server preflight). For Square, we don't require this in prod.
   async createPaymentIntent(planId: string, userId?: string): Promise<PaymentIntent> {
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
     if (!plan) {
@@ -208,29 +208,31 @@ export class PaymentProcessor {
       });
 
       if (!response.ok) {
-        // If backend is not available, simulate payment intent for development
-        if (response.status >= 500 || !response.headers.get('content-type')?.includes('application/json')) {
-          console.warn('Backend not available, simulating payment intent');
+        // Only simulate in development; in production surface the error
+        if (import.meta.env.DEV && (response.status >= 500 || !response.headers.get('content-type')?.includes('application/json'))) {
+          console.warn('Backend not available, simulating payment intent (DEV only)');
           return {
             id: `dev_pi_${Date.now()}`,
             clientSecret: `dev_pi_${Date.now()}_secret`,
             status: 'requires_payment_method'
           };
         }
-        
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ error: 'Failed to create payment intent' }));
         throw new Error(error.error || 'Failed to create payment intent');
       }
 
       return response.json();
     } catch (networkError) {
-      // Handle network errors (backend not running)
-      console.warn('Backend not available, simulating payment intent for development');
-      return {
-        id: `dev_pi_${Date.now()}`,
-        clientSecret: `dev_pi_${Date.now()}_secret`,
-        status: 'requires_payment_method'
-      };
+      // Only simulate in development
+      if (import.meta.env.DEV) {
+        console.warn('Backend not available, simulating payment intent (DEV only)');
+        return {
+          id: `dev_pi_${Date.now()}`,
+          clientSecret: `dev_pi_${Date.now()}_secret`,
+          status: 'requires_payment_method'
+        };
+      }
+      throw networkError;
     }
   }
 
@@ -423,34 +425,9 @@ export class PaymentProcessor {
         return { success: true, paymentIntentId: 'free-plan' };
       }
 
-      // Create payment intent (Stripe) or prepare Square payload
-      const paymentIntent = await this.createPaymentIntent(options.planId);
-      
-      // Check if this is a development/simulated payment intent
-      if (paymentIntent.id.startsWith('dev_pi_')) {
-        console.log('🧪 Development mode: simulating successful payment');
-        return { 
-          success: true, 
-          paymentIntentId: paymentIntent.id
-        };
-      }
-      
-      if (this.config.provider === 'stripe' && this.stripe) {
-        // For production: implement actual Stripe payment confirmation
-        // For now: simulate successful payment if keys are configured
-        if (this.config.publishableKey && this.config.publishableKey !== 'your_stripe_publishable_key') {
-          return { 
-            success: true, 
-            paymentIntentId: paymentIntent.id || 'stripe-' + Date.now()
-          };
-        } else {
-          return { success: false, error: 'Stripe not properly configured' };
-        }
-      } else if (this.config.provider === 'square') {
-        if (!options.sourceId) {
-          return { success: false, error: 'Missing card token (sourceId)' };
-        }
-        // Call backend to create the Square payment using tokenized sourceId
+      // Handle Square directly (no preflight intent) to avoid dev simulation in prod
+      if (this.config.provider === 'square') {
+        if (!options.sourceId) return { success: false, error: 'Missing card token (sourceId)' };
         const response = await fetch(`${API_BASE}/create-intent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -470,7 +447,24 @@ export class PaymentProcessor {
         const json = await response.json();
         return { success: true, paymentIntentId: json.id || ('square-' + Date.now()) };
       }
-      
+
+      // For Stripe: Create and then confirm intent
+      const paymentIntent = await this.createPaymentIntent(options.planId);
+
+      // Only simulate success on dev
+      if (import.meta.env.DEV && paymentIntent.id.startsWith('dev_pi_')) {
+        console.log('🧪 Development mode: simulating successful payment');
+        return { success: true, paymentIntentId: paymentIntent.id };
+      }
+
+      if (this.config.provider === 'stripe' && this.stripe) {
+        if (this.config.publishableKey && this.config.publishableKey !== 'your_stripe_publishable_key') {
+          return { success: true, paymentIntentId: paymentIntent.id || 'stripe-' + Date.now() };
+        } else {
+          return { success: false, error: 'Stripe not properly configured' };
+        }
+      }
+
       return { success: false, error: 'Payment provider not available' };
     } catch (error: any) {
       console.error('Payment processing error:', error);
@@ -504,9 +498,7 @@ export function canAccessFeature(
   if (!plan) return false;
   
   const limit = plan.limits[feature];
-  // Handle boolean features
   if (typeof limit === 'boolean') return limit;
-  // Handle numeric features
   if (typeof limit === 'number') return limit === -1 || limit > 0;
   return false;
 }
@@ -515,33 +507,29 @@ export function canAccessFeature(
 export function checkMessageLimit(userPlan: string, messagesUsed: number): boolean {
   const plan = getPlanById(userPlan);
   if (!plan) return false;
-  
   const limit = plan.limits.messagesPerDay;
-  return limit === -1 || messagesUsed < limit; // -1 means unlimited
+  return limit === -1 || messagesUsed < limit;
 }
 
 export function checkVoiceCallLimit(userPlan: string, voiceCallsUsed: number): boolean {
   const plan = getPlanById(userPlan);
   if (!plan) return false;
-  
   const limit = plan.limits.voiceCallsPerDay;
-  return limit === -1 || voiceCallsUsed < limit; // -1 means unlimited
+  return limit === -1 || voiceCallsUsed < limit;
 }
 
 export function getRemainingMessages(userPlan: string, messagesUsed: number): number {
   const plan = getPlanById(userPlan);
   if (!plan) return 0;
-  
   const limit = plan.limits.messagesPerDay;
-  if (limit === -1) return -1; // unlimited
+  if (limit === -1) return -1;
   return Math.max(0, limit - messagesUsed);
 }
 
 export function getRemainingVoiceCalls(userPlan: string, voiceCallsUsed: number): number {
   const plan = getPlanById(userPlan);
   if (!plan) return 0;
-  
   const limit = plan.limits.voiceCallsPerDay;
-  if (limit === -1) return -1; // unlimited
+  if (limit === -1) return -1;
   return Math.max(0, limit - voiceCallsUsed);
 }
