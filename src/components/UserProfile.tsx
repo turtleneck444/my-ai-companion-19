@@ -1101,7 +1101,43 @@ export const UserProfile = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="w-5 h-5" />
-                Account Management
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                Support & Help
+              </CardTitle>
+              <CardDescription>Get help and contact our support team</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="p-4 rounded-lg border border-blue-200 bg-blue-50">
+                  <h4 className="font-medium mb-2 text-blue-900">Need Help?</h4>
+                  <p className="text-sm text-blue-700 mb-3">
+                    Our support team is here to help you with any questions or issues.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <Button asChild className="w-full">
+                      <a href="mailto:support@loveaicompanion.com" className="flex items-center gap-2">
+                        <Mail className="w-4 h-4" />
+                        Email Support
+                      </a>
+                    </Button>
+                    <Button variant="outline" asChild className="w-full">
+                      <a href="/support" className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4" />
+                        Support Center
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600">
+                  <p><strong>Response Time:</strong> 24-48 hours</p>
+                  <p><strong>Hours:</strong> Monday - Friday, 9 AM - 6 PM EST</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>                Account Management
               </CardTitle>
               <CardDescription>Manage your account settings and preferences</CardDescription>
             </CardHeader>

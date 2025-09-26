@@ -18,6 +18,9 @@ import CreationSuccess from "./pages/CreationSuccess";
 import CompanionLibrary from "./pages/CompanionLibrary";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { FooterNotice } from "@/components/FooterNotice";
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Support from './pages/Support';
 
 const queryClient = new QueryClient();
 
@@ -28,15 +31,16 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-                  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AgeGate />
-          <Routes>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <AgeGate />
+            <Routes>
               {/* Public routes */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/home" element={<LandingPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/auth" element={<Auth />} />
               
               {/* Protected app routes */}
@@ -86,7 +90,4 @@ const App = () => (
   </QueryClientProvider>
 );
 
-
 export default App;
-import TermsOfService from './pages/TermsOfService';
-import PrivacyPolicy from './pages/PrivacyPolicy';
