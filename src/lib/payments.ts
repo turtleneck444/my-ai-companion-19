@@ -59,7 +59,8 @@ export interface Subscription {
 export const PAYMENT_CONFIG: PaymentConfig = {
   provider: (import.meta.env.VITE_PAYMENT_PROVIDER as any) || 'stripe',
   publishableKey: import.meta.env.VITE_PAYMENT_PUBLISHABLE_KEY || '',
-  environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test'
+  environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test',
+  locationId: (import.meta.env.VITE_SQUARE_LOCATION_ID || import.meta.env.VITE_PAYMENT_LOCATION_ID || '') as string
 };
 
 // Updated subscription plans with detailed features matching the reference guide
@@ -458,7 +459,8 @@ export class PaymentProcessor {
             amount: options.amount,
             currency: options.currency.toLowerCase(),
             provider: 'square',
-            sourceId: options.sourceId
+            sourceId: options.sourceId,
+            email: options.customerEmail
           })
         });
         if (!response.ok) {

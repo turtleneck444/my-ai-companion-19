@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +34,8 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     agreeTerms: false
   });
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
   const selectedPlanDetails = SUBSCRIPTION_PLANS.find(plan => plan.id === selectedPlan);
   const paymentProcessor = new PaymentProcessor();
 
@@ -43,7 +45,19 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
 
   const handlePlanSelection = (planId: string) => {
     setSelectedPlan(planId);
-    setStep('details');
+    if (planId === 'free') {
+      setStep('details');
+    } else {
+      setStep('payment');
+      // Keep focus centered on the signup flow to avoid footer distractions
+      setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, left: 0 });
+        }
+      }, 0);
+    }
   };
 
   const handleAccountCreation = async () => {
@@ -149,6 +163,13 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
   const handlePayment = async () => {
     if (!selectedPlanDetails) return;
     
+    // Require email to proceed (used for receipts/customer association)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
+      return;
+    }
+    
     setStep('processing');
     setIsLoading(true);
 
@@ -179,7 +200,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
         // Payment successful - create account with paid plan
         await createAccount(selectedPlan);
         
-        // Check if this was a development simulation
         const isDevelopment = paymentResult.paymentIntentId?.startsWith('dev_pi_');
         
         toast({
@@ -189,7 +209,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
             : `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
         });
 
-        // Immediately take user into their first chat to avoid dead-ends
         navigate('/app', { replace: true, state: { startChatDefault: true } });
         return;
       } else {
@@ -265,6 +284,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
               </ul>
               
               <Button 
+                type="button"
                 className={`w-full py-3 text-base font-semibold ${
                   plan.id === 'free' ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' :
                   plan.id === 'premium' ? 'bg-purple-500 hover:bg-purple-600 text-white' :
@@ -273,6 +293,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
                 variant={plan.id === 'free' ? 'outline' : 'default'}
                 onClick={(e) => {
                   e.stopPropagation();
+                  e.preventDefault();
                   handlePlanSelection(plan.id);
                 }}
               >
@@ -422,6 +443,18 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
         </p>
       </div>
 
+      {/* Ensure we have an email for receipts/customer mapping */}
+      <div className="space-y-2">
+        <Label htmlFor="emailForPayment">Email Address *</Label>
+        <Input
+          id="emailForPayment"
+          type="email"
+          value={formData.email}
+          onChange={(e) => handleInputChange('email', e.target.value)}
+          placeholder="your@email.com"
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Payment Summary</CardTitle>
@@ -481,7 +514,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
   );
 
   return (
-    <div className="w-full">
+    <div className="w-full" ref={containerRef}>
       {step === 'plan' ? (
         <div className="w-full">
           {renderPlanSelection()}

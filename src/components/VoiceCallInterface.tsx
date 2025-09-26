@@ -19,6 +19,7 @@ import { personalityAI, type ChatContext, type ChatMessage } from "@/lib/ai-chat
 import { useToast } from "@/hooks/use-toast";
 import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
+import { PaymentModal } from "@/components/PaymentModal";
 
 interface Character {
   id: string;
@@ -50,7 +51,7 @@ export const VoiceCallInterface = ({
   userPreferences 
 }: VoiceCallInterfaceProps) => {
   const { user } = useAuth();
-  const { canMakeVoiceCall, incrementVoiceCalls, currentPlan } = useSupabaseUsageTracking();
+  const { canMakeVoiceCall, incrementVoiceCalls, currentPlan, refreshLimits } = useSupabaseUsageTracking();
   // Helper: resolve selected ElevenLabs voice id
   const getVoiceId = () => character.voiceId || character.voice?.voice_id || '21m00Tcm4TlvDq8ikWAM'; // Rachel fallback (female)
   // Call state
@@ -63,6 +64,8 @@ export const VoiceCallInterface = ({
   const [callConnected, setCallConnected] = useState(false);
   const [pushToTalk, setPushToTalk] = useState(false);
   const [isPTTHeld, setIsPTTHeld] = useState(false);
+  const [showUpgradePayment, setShowUpgradePayment] = useState(false);
+  const [upgradePlan, setUpgradePlan] = useState<'premium' | 'pro'>('premium');
   
   // Conversation state
   const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
@@ -92,6 +95,17 @@ export const VoiceCallInterface = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   
   const { toast } = useToast();
+
+  // If plan cannot make voice calls, prompt upgrade and block call UI noise
+  useEffect(() => {
+    if (!canMakeVoiceCall) {
+      setShowUpgradePayment(true);
+      setUpgradePlan('premium');
+      toast({ title: 'Upgrade required', description: `Your plan (${currentPlan}) doesn't allow more voice calls. Upgrade to continue instantly.`, variant: 'destructive' });
+      try { recognitionRef.current?.stop(); } catch {}
+      try { stopAllTTS(); } catch {}
+    }
+  }, [canMakeVoiceCall, currentPlan, toast]);
 
   // Utility: unlock/resume audio on first user gesture (required by mobile browsers)
   const unlockAudio = async () => {
@@ -812,6 +826,15 @@ export const VoiceCallInterface = ({
           </Button>
         </div>
       </div>
+
+      {showUpgradePayment && (
+        <PaymentModal
+          isOpen={showUpgradePayment}
+          onClose={() => setShowUpgradePayment(false)}
+          selectedPlan={upgradePlan}
+          onSuccess={() => { setShowUpgradePayment(false); refreshLimits?.(); toast({ title: 'Upgraded!', description: 'Voice calling unlocked. Try again now.' }); }}
+        />
+      )}
     </div>
   );
 };

@@ -21,15 +21,32 @@ import { FooterNotice } from "@/components/FooterNotice";
 import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Support from './pages/Support';
+import React, { useEffect } from 'react';
 
 const queryClient = new QueryClient();
 
+function ScrollToTop() {
+  const location = useLocation();
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      // Fallback for browsers not supporting the above
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }, [location.pathname]);
+  return null;
+}
+
+// New AppShell component to handle conditional rendering of FooterNotice
 function AppShell() {
   const location = useLocation();
-  const showFooter = !location.pathname.startsWith('/app');
+  // Hide footer if path starts with /app (e.g., /app, /app/chat, etc.)
+  const showFooter = !location.pathname.startsWith('/app'); 
 
   return (
     <>
+      <ScrollToTop />
       <AgeGate />
       <Routes>
         {/* Public routes */}
@@ -78,7 +95,7 @@ function AppShell() {
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-      {showFooter && <FooterNotice />}
+      {showFooter && <FooterNotice />} {/* Conditionally render FooterNotice */}
     </>
   );
 }
@@ -91,7 +108,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <AppShell />
+            <AppShell /> {/* Render AppShell */}
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
