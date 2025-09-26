@@ -2,7 +2,7 @@
 import Stripe from 'stripe';
 
 // Check if payments are enabled
-const PAYMENT_PROVIDER = process.env.VITE_PAYMENT_PROVIDER || 'none';
+const PAYMENT_PROVIDER = process.env.PAYMENT_PROVIDER || 'none';
 const PAYMENTS_ENABLED = PAYMENT_PROVIDER !== 'none' && PAYMENT_PROVIDER !== 'disabled';
 
 // Initialize payment processor only if enabled
