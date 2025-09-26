@@ -115,14 +115,22 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     try {
       const finalPlan = planOverride || selectedPlan;
       
+      console.log('🔍 Signup attempt with:', {
+        email: formData.email,
+        hasPassword: !!formData.password,
+        passwordLength: formData.password.length,
+        plan: finalPlan
+      });
+      
       const { error } = await signUp(
-        console.log('🔍 Signup attempt with:', {
-          email: formData.email,
-          hasPassword: !!formData.password,
-          passwordLength: formData.password.length,
-          plan: finalPlan
-        });        formData.email,
+        formData.email,
         formData.password,
+        {
+          preferred_name: formData.preferredName,
+          plan: finalPlan,
+          age: formData.age
+        }
+      );        formData.password,
         {
           preferred_name: formData.preferredName,
           plan: finalPlan,
