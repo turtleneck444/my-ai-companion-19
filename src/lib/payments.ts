@@ -470,7 +470,10 @@ export class PaymentProcessor {
           return { success: false, error: err.error || 'Square payment failed' };
         }
         const json = await response.json();
-        return { success: true, paymentIntentId: json.id || ('square-' + Date.now()) };
+        // Check if Square payment was actually successful
+        if (json.status && ![x27COMPLETEDx27, x27APPROVEDx27].includes(json.status.toUpperCase())) {
+          return { success: false, error: `Payment failed: ${json.status}` };
+        }        return { success: true, paymentIntentId: json.id || ('square-' + Date.now()) };
       }
 
       // For Stripe: Create and then confirm intent

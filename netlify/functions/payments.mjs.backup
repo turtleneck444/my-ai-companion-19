@@ -1,6 +1,5 @@
 // Netlify function for payment processing with multiple providers
 import Stripe from 'stripe';
-import { Client as SquareClient, Environment as SquareEnv } from 'square';
 
 // Check if payments are enabled
 const PAYMENT_PROVIDER = process.env.VITE_PAYMENT_PROVIDER || 'none';
@@ -10,18 +9,6 @@ const PAYMENTS_ENABLED = PAYMENT_PROVIDER !== 'none' && PAYMENT_PROVIDER !== 'di
 let stripe = null;
 if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'stripe' && process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-}
-
-// Initialize Square client if enabled
-let square = null;
-if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'square' && process.env.SQUARE_ACCESS_TOKEN) {
-  const env = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
-    ? SquareEnv.Production
-    : SquareEnv.Sandbox;
-  square = new SquareClient({
-    accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    environment: env,
-  });
 }
 
 // Subscription plans configuration
@@ -66,13 +53,31 @@ export async function handler(event) {
     };
   }
 
+  // Initialize Square client if needed
+  let square = null;
+  if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'square' && process.env.SQUARE_ACCESS_TOKEN) {
+    try {
+      const { Client: SquareClient, Environment: SquareEnv } = await import('square');
+      const env = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
+        ? SquareEnv.Production
+        : SquareEnv.Sandbox;
+      square = new SquareClient({
+        accessToken: process.env.SQUARE_ACCESS_TOKEN,
+        environment: env,
+      });
+      console.log('✅ Square client initialized successfully');
+    } catch (error) {
+      console.error('Square SDK load failed, continuing without Square:', error.message);
+    }
+  }
+
   try {
     const { httpMethod, path, body } = event;
     const data = body ? JSON.parse(body) : {};
 
     // Route handling
     if (path.endsWith('/create-intent')) {
-      return await handleCreateIntent(data, headers);
+      return await handleCreateIntent(data, headers, square);
     } else if (path.endsWith('/confirm')) {
       return await handleConfirmPayment(data, headers);
     } else if (path.endsWith('/create-subscription')) {
@@ -103,8 +108,16 @@ export async function handler(event) {
   }
 }
 
-async function handleCreateIntent(data, headers) {
+async function handleCreateIntent(data, headers, square) {
   const { planId, userId, amount, currency = 'usd', provider = PAYMENT_PROVIDER, sourceId } = data;
+
+  console.log('💳 Payment request:', {
+    planId,
+    amount,
+    currency,
+    provider,
+    hasSourceId: !!sourceId
+  });
 
   try {
     if (provider === 'stripe') {
@@ -122,6 +135,7 @@ async function handleCreateIntent(data, headers) {
 
     if (provider === 'square') {
       if (!square || !process.env.SQUARE_LOCATION_ID) {
+        console.log('❌ Square not properly configured');
         return { statusCode: 500, headers, body: JSON.stringify({ error: 'Square not configured' }) };
       }
       if (!sourceId) {
@@ -151,6 +165,7 @@ async function handleCreateIntent(data, headers) {
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unsupported provider: ${provider}` }) };
   } catch (error) {
+    console.error('Payment processing error:', error);
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create payment', details: String(error?.message || error) }) };
   }
 }
@@ -400,30 +415,31 @@ async function handleSquareWebhook(event, headers) {
     // Handle different Square webhook events
     switch (data.type) {
       case 'payment.created':
-        console.log('Square payment created:', data.data?.object?.id);
-        // Update user's plan in your database here
-        break;
-        
       case 'payment.updated':
-        console.log('Square payment updated:', data.data?.object?.id);
-        // Update payment status in your database here
+        console.log('Payment event received:', data.data?.id);
         break;
-        
+      case 'invoice.payment_made':
+        console.log('Invoice payment made:', data.data?.id);
+        break;
       default:
-        console.log(`Unhandled Square event type: ${data.type}`);
+        console.log('Unhandled webhook event type:', data.type);
     }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ received: true })
+      body: JSON.stringify({ 
+        message: 'Square webhook processed successfully',
+        eventType: data.type,
+        received: true 
+      })
     };
   } catch (error) {
-    console.error('Square webhook processing failed:', error);
+    console.error('Square webhook error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Square webhook processing failed' })
+      body: JSON.stringify({ error: 'Webhook processing failed', details: error.message })
     };
   }
 }
@@ -431,63 +447,44 @@ async function handleSquareWebhook(event, headers) {
 // Handle Stripe webhook events
 async function handleStripeWebhookEvents(stripeEvent, headers) {
   try {
-    // Handle the event
+    console.log('Stripe webhook received:', stripeEvent.type);
+
     switch (stripeEvent.type) {
       case 'payment_intent.succeeded':
         const paymentIntent = stripeEvent.data.object;
         console.log('Payment succeeded:', paymentIntent.id);
-        // Update user's plan in your database here
+        // Handle successful payment
         break;
-        
       case 'customer.subscription.created':
-        const subscriptionCreated = stripeEvent.data.object;
-        console.log('Subscription created:', subscriptionCreated.id);
-        // Update user's subscription status in your database here
-        break;
-        
       case 'customer.subscription.updated':
-        const subscriptionUpdated = stripeEvent.data.object;
-        console.log('Subscription updated:', subscriptionUpdated.id);
-        // Update user's subscription status in your database here
+        const subscription = stripeEvent.data.object;
+        console.log('Subscription event:', subscription.id);
+        // Handle subscription events
         break;
-        
-      case 'customer.subscription.deleted':
-        const subscriptionDeleted = stripeEvent.data.object;
-        console.log('Subscription canceled:', subscriptionDeleted.id);
-        // Update user's subscription status in your database here
-        break;
-        
-      case 'invoice.payment_succeeded':
-        const invoice = stripeEvent.data.object;
-        console.log('Invoice payment succeeded:', invoice.id);
-        // Handle successful recurring payment
-        break;
-        
-      case 'invoice.payment_failed':
-        const failedInvoice = stripeEvent.data.object;
-        console.log('Invoice payment failed:', failedInvoice.id);
-        // Handle failed payment - maybe send email notification
-        break;
-        
       default:
-        console.log(`Unhandled event type ${stripeEvent.type}`);
+        console.log('Unhandled Stripe event type:', stripeEvent.type);
     }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ received: true })
+      body: JSON.stringify({ 
+        message: 'Stripe webhook processed successfully',
+        eventType: stripeEvent.type,
+        received: true 
+      })
     };
   } catch (error) {
-    console.error('Webhook processing failed:', error);
+    console.error('Stripe webhook error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Webhook processing failed' })
+      body: JSON.stringify({ error: 'Webhook processing failed', details: error.message })
     };
   }
 }
 
+// Activate Supabase user after successful payment
 async function activateSupabaseUser(userId, planId) {
   try {
     if (!userId) return;

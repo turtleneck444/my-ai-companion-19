@@ -154,7 +154,12 @@ async function handleCreateIntent(data, headers, square) {
       const idempotencyKey = `${userId || 'anonymous'}-${planId}-${Date.now()}`;
       const { paymentsApi } = square;
       const payment = await paymentsApi.createPayment({
-        sourceId,
+      console.log(x27💳 Creating Square payment with:x27, {
+        sourceId: sourceId.substring(0, 10) + x27...x27,
+        amount: Math.round(amount * 100),
+        currency: currency.toUpperCase(),
+        locationId: process.env.SQUARE_LOCATION_ID
+      });        sourceId,
         idempotencyKey,
         amountMoney: { amount: Math.round(amount * 100), currency: currency.toUpperCase() },
         locationId: process.env.SQUARE_LOCATION_ID,
@@ -163,15 +168,24 @@ async function handleCreateIntent(data, headers, square) {
       });
 
       const sq = payment?.result?.payment;
-      if (!sq) throw new Error('Square payment failed');
+      console.log(x27💳 Square payment result:x27, {
+        id: sq?.id,
+        status: sq?.status,
+        amount: sq?.amountMoney?.amount,
+        currency: sq?.amountMoney?.currency
+      });      if (!sq) throw new Error('Square payment failed');
 
       // Mark user active in Supabase on success
       if (['COMPLETED', 'APPROVED'].includes((sq.status || '').toUpperCase())) {
         await activateSupabaseUser(userId, planId);
       }
 
-      return { statusCode: 200, headers, body: JSON.stringify({ id: sq.id, status: sq.status }) };
-    }
+      // Only return success for approved/completed payments
+      if ([x27COMPLETEDx27, x27APPROVEDx27].includes((sq.status || x27x27).toUpperCase())) {
+        return { statusCode: 200, headers, body: JSON.stringify({ id: sq.id, status: sq.status, success: true }) };
+      } else {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: `Payment failed with status: ${sq.status}`, status: sq.status }) };
+      }    }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: `Unsupported provider: ${provider}` }) };
   } catch (error) {
