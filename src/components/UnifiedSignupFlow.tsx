@@ -78,7 +78,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     
     // Require password for account creation
     if (!formData.password || formData.password.length < 6) {
-      toast({ title: x27Password requiredx27, description: x27Enter a password (min 6 characters) to create your accountx27, variant: x27destructivex27 });
+      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
       return;
     }      toast({
         title: "Invalid Email",
@@ -123,7 +123,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       const finalPlan = planOverride || selectedPlan;
       
       const { error } = await signUp(
-        console.log(x27🔍 Signup attempt with:x27, {
+        console.log('🔍 Signup attempt with:', {
           email: formData.email,
           hasPassword: !!formData.password,
           passwordLength: formData.password.length,
@@ -181,7 +181,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     
     // Require password for account creation
     if (!formData.password || formData.password.length < 6) {
-      toast({ title: x27Password requiredx27, description: x27Enter a password (min 6 characters) to create your accountx27, variant: x27destructivex27 });
+      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
       return;
     }      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
       return;
@@ -214,7 +214,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       });
 
       if (paymentResult.success) {
-        console.log(x27🔍 Payment result details:x27, paymentResult);        // Payment successful - create account with paid plan
+        console.log('🔍 Payment result details:', paymentResult);        // Payment successful - create account with paid plan
         await createAccount(selectedPlan);
         
         const isDevelopment = paymentResult.paymentIntentId?.startsWith('dev_pi_');
