@@ -314,6 +314,19 @@ async function handleGetCustomerSubscriptions(path, headers) {
 }
 
 async function handleWebhook(event, headers) {
+  // Check if payment processor is available
+  if (!stripe || !PAYMENTS_ENABLED) {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ 
+        message: 'Webhook received but payments are disabled',
+        provider: PAYMENT_PROVIDER,
+        received: true 
+      })
+    };
+  }
+
   const sig = event.headers['stripe-signature'];
   let stripeEvent;
 
