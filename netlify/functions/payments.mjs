@@ -1,7 +1,15 @@
-// Netlify function for payment processing with Stripe
+// Netlify function for payment processing with multiple providers
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Check if payments are enabled
+const PAYMENT_PROVIDER = process.env.VITE_PAYMENT_PROVIDER || 'none';
+const PAYMENTS_ENABLED = PAYMENT_PROVIDER !== 'none' && PAYMENT_PROVIDER !== 'disabled';
+
+// Initialize payment processor only if enabled
+let stripe = null;
+if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'stripe' && process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+}
 
 // Subscription plans configuration
 const SUBSCRIPTION_PLANS = {
@@ -30,6 +38,19 @@ export async function handler(event) {
   // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
+  }
+
+  // Check if payments are disabled
+  if (!PAYMENTS_ENABLED) {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Payments are currently disabled',
+        provider: PAYMENT_PROVIDER,
+        message: 'Payment processing is not configured' 
+      })
+    };
   }
 
   try {
@@ -72,11 +93,11 @@ export async function handler(event) {
 async function handleCreateIntent(data, headers) {
   const { planId, userId, amount, currency = 'usd' } = data;
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Stripe not configured' })
+      body: JSON.stringify({ error: 'Payment processor not configured' })
     };
   }
 

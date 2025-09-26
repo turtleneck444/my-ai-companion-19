@@ -193,10 +193,18 @@ const CheckoutForm = ({ selectedPlan, onSuccess, onClose }: {
 
 export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: PaymentModalProps) => {
   const [stripePromise, setStripePromise] = useState<any>(null);
+  const [paymentProvider, setPaymentProvider] = useState<string>('stripe');
 
   useEffect(() => {
     if (paymentProcessor.isConfigured()) {
-      setStripePromise(loadStripe(paymentProcessor.getStripe()?.publishableKey || ''));
+      const provider = paymentProcessor.getProvider();
+      setPaymentProvider(provider);
+      
+      if (provider === 'stripe') {
+        const config = paymentProcessor.getConfig();
+        setStripePromise(loadStripe(config.publishableKey));
+      }
+      // Square initialization is handled in paymentProcessor.initializeSquare()
     }
   }, []);
 
@@ -219,7 +227,7 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
               onSuccess={onSuccess} 
               onClose={onClose} 
             />
-          ) : stripePromise ? (
+          ) : paymentProvider === 'stripe' && stripePromise ? (
             <Elements stripe={stripePromise}>
               <CheckoutForm 
                 selectedPlan={selectedPlan} 
@@ -227,6 +235,12 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
                 onClose={onClose} 
               />
             </Elements>
+          ) : paymentProvider === 'square' ? (
+            <CheckoutForm 
+              selectedPlan={selectedPlan} 
+              onSuccess={onSuccess} 
+              onClose={onClose} 
+            />
           ) : (
             <div className="text-center py-8">
               <p className="text-muted-foreground">Loading payment form...</p>

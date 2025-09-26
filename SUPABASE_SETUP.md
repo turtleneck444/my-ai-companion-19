@@ -138,3 +138,13 @@ If you need help with Supabase setup:
 - Check the browser console for detailed error messages
 
 Your LoveAI platform will work both with and without Supabase configuration, making it flexible for development and testing! 
+
+## 🎯 **Steps to run this:**
+
+1. **Go to**: https://fpzbbprrwdoidgnfxntz.supabase.co
+2. **Click**: "SQL Editor" in the left sidebar
+3. **Copy**: The entire SQL script above
+4. **Paste**: Into the SQL Editor
+5. **Click**: "Run" (or press Ctrl+Enter)
+
+**After you run this**, let me know and I'll restart your development server to use the new database! 🚀 

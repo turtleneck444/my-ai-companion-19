@@ -35,6 +35,7 @@ import heroBg from "@/assets/hero-bg.jpg";
 import { PaymentModal } from "@/components/PaymentModal";
 import { useSearchParams } from "react-router-dom";
 import { getPlanById } from "@/lib/payments";
+import { supabase } from "@/lib/supabase";
 
 interface Character {
   id: string;
@@ -171,6 +172,57 @@ const EnhancedIndex = () => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const [databaseCharacters, setDatabaseCharacters] = useState<Character[]>([]);
+  const [allCharacters, setAllCharacters] = useState<Character[]>(CHARACTERS);
+
+  // Load characters from Supabase database
+  useEffect(() => {
+    const loadDatabaseCharacters = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: dbCharacters, error } = await supabase
+          .from('characters')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.log('Could not load database characters:', error.message);
+          return;
+        }
+
+        if (dbCharacters && dbCharacters.length > 0) {
+          const formattedCharacters: Character[] = dbCharacters.map(char => ({
+            id: char.id,
+            name: char.name,
+            avatar: char.avatar_url || '/placeholder.svg',
+            bio: char.description || char.bio || 'A unique companion ready to chat!',
+            personality: Array.isArray(char.personality) ? char.personality : 
+                        typeof char.personality === 'string' ? [char.personality] : 
+                        ['Friendly', 'Thoughtful'],
+            voice: { 
+              voice_id: char.voice_id || 'default', 
+              name: char.voice || 'Default Voice' 
+            },
+            isOnline: true,
+            mood: 'friendly',
+            lastMessage: 'Hi there! I\'m ready to chat with you!',
+            unreadCount: 0,
+            relationshipLevel: 1.0,
+            voiceId: char.voice_id || '21m00Tcm4TlvDq8ikWAM'
+          }));
+
+          console.log('Loaded database characters:', formattedCharacters);
+          setDatabaseCharacters(formattedCharacters);
+          setAllCharacters([...formattedCharacters, ...CHARACTERS]);
+        }
+      } catch (error) {
+        console.log('Error loading characters:', error);
+      }
+    };
+
+    loadDatabaseCharacters();
+  }, [user]);
 
   // Update user name only when user data changes
   useEffect(() => {
@@ -253,6 +305,11 @@ const EnhancedIndex = () => {
     setSelectedCharacter(null);
   }, []);
 
+  const handleBackToChats = useCallback(() => {
+    setCurrentView('chats');
+    setSelectedCharacter(null);
+  }, []);
+
   const handleFavorite = useCallback((characterId: string) => {
     setFavorites(prev => 
       prev.includes(characterId) 
@@ -300,7 +357,7 @@ const EnhancedIndex = () => {
     return (
       <SimpleChatInterface 
         character={selectedCharacter}
-        onBack={handleBackToHome}
+        onBack={handleBackToChats}
         onStartCall={() => handleStartCall()}
         userPreferences={userPreferences}
       />
@@ -325,7 +382,7 @@ const EnhancedIndex = () => {
         </div>
 
         <div className="p-4 space-y-4 mb-20">
-          {CHARACTERS.map((character) => (
+          {allCharacters.map((character) => (
             <Card 
               key={character.id} 
               className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
@@ -387,7 +444,7 @@ const EnhancedIndex = () => {
   }
 
   if (currentView === 'favorites') {
-    const favoriteCharacters = CHARACTERS.filter(char => favorites.includes(char.id));
+    const favoriteCharacters = allCharacters.filter(char => favorites.includes(char.id));
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
@@ -588,7 +645,7 @@ const EnhancedIndex = () => {
             </div>
 
             <div className="space-y-6">
-              {CHARACTERS.map((character, index) => (
+              {allCharacters.map((character, index) => (
                 <Card 
                   key={character.id} 
                   className="group overflow-hidden bg-gradient-to-br from-background to-background/50 backdrop-blur-xl border-border/50 hover:border-primary/50 transition-all duration-500 cursor-pointer shadow-lg hover:shadow-2xl animate-fade-up"

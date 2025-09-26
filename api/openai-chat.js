@@ -68,19 +68,32 @@ export default async function handler(req, res) {
       console.log(`🧠 Using session memory with ${session_memory.topics?.length || 0} topics`);
     }
 
+    const apiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      console.error('❌ OpenAI API key not found');
+      res.status(500).json({ error: 'OpenAI API key not configured' });
+      return;
+    }
+
+    console.log('🔑 Using API key:', apiKey.substring(0, 20) + '...');
+    console.log('📤 Request payload:', JSON.stringify(requestPayload, null, 2));
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify(requestPayload),
     });
 
+    console.log('📥 OpenAI Response status:', response.status);
+
     if (!response.ok) {
       const error = await response.text();
-      console.error(`OpenAI API error: ${response.status} - ${error}`);
-      res.status(response.status).send(error);
+      console.error(`❌ OpenAI API error: ${response.status} - ${error}`);
+      res.status(response.status).json({ error: `OpenAI API error: ${response.status}`, details: error });
       return;
     }
 

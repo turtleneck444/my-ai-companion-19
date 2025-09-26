@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-09-26T05:30:55.265Z",
+  "oldDatabase": "https://tletrkawclviclmgatlp.supabase.co",
+  "newDatabase": "https://fpzbbprrwdoidgnfxntz.supabase.co",
+  "results": [
+    {
+      "table": "user_profiles",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.user_profiles' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "profiles",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.profiles' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "companions",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.companions' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "characters",
+      "status": "failed",
+      "error": "Could not find the 'voice' column of 'characters' in the schema cache",
+      "records": 1,
+      "migrated": 0
+    },
+    {
+      "table": "conversations",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.conversations' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "messages",
+      "status": "empty",
+      "error": null,
+      "records": 0
+    },
+    {
+      "table": "subscriptions",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.subscriptions' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "payments",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.payments' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "plans",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.plans' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "usage_tracking",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.usage_tracking' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "usage",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.usage' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "analytics",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.analytics' in the schema cache",
+      "records": 0
+    },
+    {
+      "table": "settings",
+      "status": "fetch_failed",
+      "error": "Could not find the table 'public.settings' in the schema cache",
+      "records": 0
+    }
+  ],
+  "summary": {
+    "tablesProcessed": 13,
+    "successful": 1,
+    "recordsFound": 1,
+    "recordsMigrated": 0
+  }
+}

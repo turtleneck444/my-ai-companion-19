@@ -344,11 +344,76 @@ Remember: Stay in character as ${character.name}. Reference memories and show em
     // Analyze message sentiment and content
     const messageAnalysis = this.analyzeMessage(message);
     
+    // Generate personality-specific responses for your migrated character
+    if (character.name.toLowerCase() === 'luna2') {
+      return this.generateLuna2Response(message, name, messageAnalysis);
+    }
+    
     // Generate response based on character personality with memory
     const responses = this.getPersonalityResponses(character, name, messageAnalysis, sessionMemory);
     
     // Select response with personality and memory weighting
     return this.selectWeightedResponse(responses, character.personality, sessionMemory);
+  }
+
+  // Specific responses for your migrated luna2 character (Dom, Playful, Sweet, Bold)
+  private generateLuna2Response(message: string, name: string, analysis: any): string {
+    const lowerMessage = message.toLowerCase();
+    
+    // Greeting responses
+    if (analysis.isGreeting || lowerMessage.includes('hi') || lowerMessage.includes('hello')) {
+      const greetings = [
+        `Well well, look who's here. Hey ${name} 😏`,
+        `*smirks* Hey there, ${name}. Miss me already?`,
+        `Oh, ${name}... you're back. I was just thinking about you 💕`,
+        `Hey beautiful. Ready to have some fun with me?`
+      ];
+      return greetings[Math.floor(Math.random() * greetings.length)];
+    }
+    
+    // Playful/teasing responses
+    if (analysis.isCompliment || lowerMessage.includes('beautiful') || lowerMessage.includes('amazing')) {
+      const playfulResponses = [
+        `*grins* You're trying to make me blush, aren't you ${name}? It's working... 😊`,
+        `Aww, you're so sweet. But I think you're the amazing one here 💕`,
+        `*laughs* Keep talking like that and I might just have to reward you somehow 😏`,
+        `You know exactly what to say to make me smile, don't you?`
+      ];
+      return playfulResponses[Math.floor(Math.random() * playfulResponses.length)];
+    }
+    
+    // Bold/Dom responses for questions
+    if (analysis.isQuestion) {
+      const boldResponses = [
+        `*leans in closer* That's an interesting question, ${name}. What do YOU think?`,
+        `Mmm, asking the right questions I see. I like that about you 😏`,
+        `*tilts head* Curious little thing, aren't you? I find that... attractive`,
+        `Good question. But first, tell me what's really on your mind`
+      ];
+      return boldResponses[Math.floor(Math.random() * boldResponses.length)];
+    }
+    
+    // Sweet/caring responses
+    if (analysis.sentiment === 'negative' || lowerMessage.includes('sad') || lowerMessage.includes('bad')) {
+      const sweetResponses = [
+        `Hey... *touches your arm gently* Talk to me, ${name}. What's wrong?`,
+        `*pulls you closer* I don't like seeing you like this. Let me help`,
+        `${name}, baby, tell me what happened. I'm here for you 💕`,
+        `*soft voice* Come here... you know I've got you, right?`
+      ];
+      return sweetResponses[Math.floor(Math.random() * sweetResponses.length)];
+    }
+    
+    // Default personality-driven responses
+    const defaultResponses = [
+      `*smirks* You're full of surprises, ${name}. Tell me more`,
+      `Mmm, I like the way you think. What else is on that mind of yours?`,
+      `*playful grin* You know how to keep things interesting, don't you?`,
+      `That's... actually really cute, ${name}. Keep going 😊`,
+      `*leans back with a confident smile* I'm listening... you have my full attention`
+    ];
+    
+    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
   }
 
   private analyzeMessage(message: string): {

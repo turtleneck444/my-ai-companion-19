@@ -1,10 +1,25 @@
-// Enhanced payment processing with real Stripe integration
+// Enhanced payment processing with Square and Stripe support
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
+
+// Square Web Payments SDK types
+declare global {
+  interface Window {
+    Square?: {
+      payments: (appId: string, locationId?: string) => {
+        card: () => Promise<any>;
+        applePay: () => Promise<any>;
+        googlePay: () => Promise<any>;
+        ach: () => Promise<any>;
+      };
+    };
+  }
+}
 
 export interface PaymentConfig {
   provider: 'stripe' | 'square' | 'paypal' | 'razorpay';
   publishableKey: string;
-  environment: 'test' | 'live';
+  environment: 'test' | 'live' | 'sandbox' | 'production';
+  locationId?: string; // Required for Square
 }
 
 export interface SubscriptionPlan {
@@ -47,7 +62,7 @@ export const PAYMENT_CONFIG: PaymentConfig = {
   environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test'
 };
 
-// Updated subscription plans with Stripe price IDs
+// Updated subscription plans with correct pricing and limits
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'free',
@@ -56,16 +71,16 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     currency: 'USD',
     interval: 'month',
     features: [
-      '5 messages per day',
+      '15 messages per day',
+      '3 voice calls per day',
       '1 AI Companion',
       'Basic personalities only',
-      'Text chat only',
-      'Community support',
-      'Limited customization'
+      'Text chat & voice',
+      'Community support'
     ],
     limits: {
-      messagesPerDay: 5,
-      voiceCallsPerDay: 0,
+      messagesPerDay: 15,
+      voiceCallsPerDay: 3,
       companions: 1,
       customPersonalities: false,
       advancedFeatures: false
@@ -74,23 +89,22 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'premium',
     name: 'Premium',
-    price: 19,
+    price: 19.99,
     currency: 'USD',
     interval: 'month',
     features: [
-      '50 messages per day',
-      '5 voice calls per day',
-      'Up to 3 AI Companions',
+      '200 messages per day',
+      '10 voice calls per day',
+      'Up to 5 AI Companions',
       'Custom personality creation',
       'Advanced voice features',
       'Priority support',
-      'Early access to new features',
       'Enhanced customization options'
     ],
     limits: {
-      messagesPerDay: 50,
-      voiceCallsPerDay: 5,
-      companions: 3,
+      messagesPerDay: 200,
+      voiceCallsPerDay: 10,
+      companions: 5,
       customPersonalities: true,
       advancedFeatures: true
     },
@@ -99,7 +113,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 49,
+    price: 99,
     currency: 'USD',
     interval: 'month',
     features: [
@@ -109,11 +123,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Advanced personality customization',
       'Premium voice options',
       'Custom voice creation',
-      'Advanced AI training',
       'Priority support',
       'Early access to all features',
       'Advanced analytics & insights',
-      'Exclusive companion themes',
       'Premium customer support'
     ],
     limits: {
@@ -133,15 +145,39 @@ export class PaymentProcessor {
   private config: PaymentConfig;
   private stripe: Stripe | null = null;
   private elements: StripeElements | null = null;
+  private squarePayments: any = null;
 
   constructor() {
     this.config = PAYMENT_CONFIG;
-    this.initializeStripe();
+    this.initializePaymentProvider();
   }
 
-  private async initializeStripe() {
+  private async initializePaymentProvider() {
     if (this.config.provider === 'stripe' && this.config.publishableKey) {
       this.stripe = await loadStripe(this.config.publishableKey);
+    } else if (this.config.provider === 'square' && this.config.publishableKey) {
+      await this.initializeSquare();
+    }
+  }
+
+  private async initializeSquare() {
+    // Load Square Web Payments SDK
+    if (!window.Square) {
+      const script = document.createElement('script');
+      script.src = 'https://sandbox-web.squarecdn.com/v1/square.js';
+      script.async = true;
+      document.head.appendChild(script);
+      
+      await new Promise((resolve) => {
+        script.onload = resolve;
+      });
+    }
+
+    if (window.Square) {
+      this.squarePayments = window.Square.payments(
+        this.config.publishableKey,
+        this.config.locationId
+      );
     }
   }
 
@@ -284,9 +320,43 @@ export class PaymentProcessor {
     return this.stripe;
   }
 
+  // Get Square payments instance for frontend integration
+  getSquarePayments(): any {
+    return this.squarePayments;
+  }
+
+  // Create Square card payment form
+  async createSquareCard(): Promise<any> {
+    if (!this.squarePayments) {
+      throw new Error('Square payments not initialized');
+    }
+    return await this.squarePayments.card();
+  }
+
+  // Create Square Apple Pay
+  async createSquareApplePay(): Promise<any> {
+    if (!this.squarePayments) {
+      throw new Error('Square payments not initialized');
+    }
+    return await this.squarePayments.applePay();
+  }
+
+  // Create Square Google Pay
+  async createSquareGooglePay(): Promise<any> {
+    if (!this.squarePayments) {
+      throw new Error('Square payments not initialized');
+    }
+    return await this.squarePayments.googlePay();
+  }
+
   // Check if payment provider is configured
   isConfigured(): boolean {
-    return this.config.provider === 'stripe' && !!this.config.publishableKey;
+    if (this.config.provider === 'stripe') {
+      return !!this.config.publishableKey;
+    } else if (this.config.provider === 'square') {
+      return !!this.config.publishableKey && !!this.config.locationId;
+    }
+    return false;
   }
 
   // Get available payment methods
@@ -303,6 +373,16 @@ export class PaymentProcessor {
       default:
         return ['card'];
     }
+  }
+
+  // Get payment provider
+  getProvider(): string {
+    return this.config.provider;
+  }
+
+  // Get configuration
+  getConfig(): PaymentConfig {
+    return { ...this.config };
   }
 }
 
@@ -331,7 +411,11 @@ export function canAccessFeature(
   if (!plan) return false;
   
   const limit = plan.limits[feature];
-  return limit === true || limit === -1 || limit > 0;
+  // Handle boolean features
+  if (typeof limit === 'boolean') return limit;
+  // Handle numeric features
+  if (typeof limit === 'number') return limit === -1 || limit > 0;
+  return false;
 }
 
 // Usage tracking helper functions
