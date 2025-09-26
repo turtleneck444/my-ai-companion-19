@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -401,6 +401,14 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     }
   };
 
+  // Auto-mount card when we enter the payment step
+  useEffect(() => {
+    if (step === 'payment' && !squareReady) {
+      mountSquareCard();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   const renderPayment = () => (
     <div className="space-y-6">
       <div className="text-center">
@@ -431,9 +439,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       <div className="p-4 border rounded-lg">
         <div id="square-card" className="min-h-[56px]"></div>
         {!squareReady && (
-          <Button onClick={mountSquareCard} className="mt-3" variant="outline">
-            Load Secure Card Form
-          </Button>
+          <p className="text-sm text-muted-foreground mt-2">Loading secure card form…</p>
         )}
       </div>
 
@@ -447,7 +453,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
         </Button>
         <Button 
           onClick={handlePayment}
-          disabled={isLoading}
+          disabled={isLoading || !squareReady}
           className="flex-1"
         >
           Complete Purchase

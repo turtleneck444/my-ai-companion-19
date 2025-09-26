@@ -1,122 +1,85 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const TermsOfService = () => {
-  const navigate = useNavigate();
-
+export default function TermsOfService() {
   return (
-    <div className="min-h-screen bg-gradient-soft py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mb-4"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-4xl font-bold text-center mb-2">Terms of Service</h1>
-          <p className="text-center text-muted-foreground">
-            Last updated: {new Date().toLocaleDateString()}
-          </p>
-        </div>
-
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-10 px-4">
+      <div className="max-w-3xl mx-auto">
         <Card>
-          <CardContent className="p-8 space-y-6">
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                By accessing and using LoveAI ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
-              </p>
-            </section>
+          <CardHeader>
+            <CardTitle className="text-3xl">LoveAI Terms of Service</CardTitle>
+          </CardHeader>
+          <CardContent className="prose max-w-none">
+            <p><strong>Effective date:</strong> {new Date().toLocaleDateString()}</p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                LoveAI is an AI companion platform that provides users with personalized AI characters for conversation, entertainment, and emotional support. The service includes text and voice interactions, character customization, and various subscription-based features.
-              </p>
-            </section>
+            <h2>1. Agreement</h2>
+            <p>
+              By using LoveAI you agree to these Terms and our Privacy Policy. If you do not agree, do not use the service.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">3. User Accounts</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                To access certain features of the Service, you must register for an account. You agree to provide accurate, current, and complete information during the registration process and to update such information to keep it accurate, current, and complete.
-              </p>
-            </section>
+            <h2>2. Eligibility</h2>
+            <p>You must be at least 18 (or the age of majority in your jurisdiction) to use LoveAI.</p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">4. Acceptable Use</h2>
-              <p className="text-muted-foreground leading-relaxed mb-4">
-                You agree not to use the Service to:
-              </p>
-              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
-                <li>Violate any applicable laws or regulations</li>
-                <li>Transmit any content that is harmful, threatening, abusive, or harassing</li>
-                <li>Attempt to gain unauthorized access to the Service or related systems</li>
-                <li>Use the Service for any commercial purpose without our express written consent</li>
-                <li>Interfere with or disrupt the Service or servers connected to the Service</li>
-              </ul>
-            </section>
+            <h2>3. Accounts</h2>
+            <ul>
+              <li>Provide accurate information and keep your credentials secure.</li>
+              <li>You are responsible for all activity under your account.</li>
+            </ul>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">5. Subscription and Payment</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Some features of the Service require a paid subscription. By subscribing, you agree to pay all applicable fees and charges. Subscriptions automatically renew unless cancelled before the renewal date. You may cancel your subscription at any time through your account settings.
-              </p>
-            </section>
+            <h2>4. Acceptable Use</h2>
+            <p>You agree not to:</p>
+            <ul>
+              <li>Be hateful, harass, threaten, or otherwise engage in abusive/offensive behavior.</li>
+              <li>Attempt to hack, probe, or disrupt the service (including scraping, rate abuse, or bypassing limits).</li>
+              <li>Upload malware or content that infringes others’ rights or violates law.</li>
+              <li>Misuse AI outputs (e.g., impersonation, deceptive activity, or illegal use).</li>
+            </ul>
+            <p>
+              We may suspend or ban accounts for violations. Repeated or severe violations may result in permanent termination.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">6. Privacy and Data</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the Service, to understand our practices. We collect and process your data in accordance with applicable privacy laws and our Privacy Policy.
-              </p>
-            </section>
+            <h2>5. Content & AI Outputs</h2>
+            <ul>
+              <li>AI outputs may be inaccurate. Do not rely on them for professional advice.</li>
+              <li>You are responsible for how you use outputs. We may filter or block unsafe content.</li>
+            </ul>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">7. Intellectual Property</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                The Service and its original content, features, and functionality are and will remain the exclusive property of LoveAI and its licensors. The Service is protected by copyright, trademark, and other laws.
-              </p>
-            </section>
+            <h2>6. Plans, Billing, and Refunds</h2>
+            <ul>
+              <li>Paid plans grant usage limits/features described in the app. Taxes may be included in price where stated.</li>
+              <li>Charges are processed by our payment processor. By subscribing you authorize recurring charges where applicable.</li>
+              <li>Except where required by law, fees are non‑refundable once delivered.</li>
+            </ul>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">8. Limitation of Liability</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                In no event shall LoveAI, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the Service.
-              </p>
-            </section>
+            <h2>7. Service Changes</h2>
+            <p>
+              We may modify or discontinue features. We will make reasonable efforts to notify you of material changes.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">9. Termination</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                We may terminate or suspend your account and bar access to the Service immediately, without prior notice or liability, under our sole discretion, for any reason whatsoever and without limitation, including but not limited to a breach of the Terms.
-              </p>
-            </section>
+            <h2>8. Disclaimers</h2>
+            <p>
+              Service is provided “as is” without warranties. To the extent permitted by law, we disclaim implied warranties
+              of merchantability, fitness for a particular purpose, and non‑infringement.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">10. Changes to Terms</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material, we will provide at least 30 days notice prior to any new terms taking effect.
-              </p>
-            </section>
+            <h2>9. Limitation of Liability</h2>
+            <p>
+              To the maximum extent permitted by law, LoveAI is not liable for indirect, incidental, special, or consequential damages.
+              Our aggregate liability for claims relating to the service shall not exceed the amount you paid in the 3 months prior to the claim.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">11. Contact Information</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                If you have any questions about these Terms of Service, please contact us at:
-                <br />
-                Email: legal@loveaicompanion.com
-                <br />
-                Address: [Your Business Address]
-              </p>
-            </section>
+            <h2>10. Termination</h2>
+            <p>
+              You may stop using the service at any time. We may suspend or terminate accounts that violate these Terms or present risk.
+            </p>
+
+            <h2>11. Governing Law</h2>
+            <p>These Terms are governed by the laws of the jurisdiction of our principal place of business.</p>
+
+            <h2>12. Contact</h2>
+            <p>Questions? Contact support via the app.</p>
           </CardContent>
         </Card>
       </div>
     </div>
   );
-};
+}

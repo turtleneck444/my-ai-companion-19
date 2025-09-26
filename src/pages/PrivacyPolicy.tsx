@@ -1,163 +1,84 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const PrivacyPolicy = () => {
-  const navigate = useNavigate();
-
+export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-gradient-soft py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mb-4"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-4xl font-bold text-center mb-2">Privacy Policy</h1>
-          <p className="text-center text-muted-foreground">
-            Last updated: {new Date().toLocaleDateString()}
-          </p>
-        </div>
-
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-10 px-4">
+      <div className="max-w-3xl mx-auto">
         <Card>
-          <CardContent className="p-8 space-y-6">
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">1. Information We Collect</h2>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Personal Information</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    We collect information you provide directly to us, such as when you create an account, including your name, email address, and password.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Usage Information</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    We collect information about how you use our Service, including your interactions with AI companions, conversation history, and feature usage.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Device Information</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    We collect information about your device, including IP address, browser type, operating system, and device identifiers.
-                  </p>
-                </div>
-              </div>
-            </section>
+          <CardHeader>
+            <CardTitle className="text-3xl">LoveAI Privacy Policy</CardTitle>
+          </CardHeader>
+          <CardContent className="prose prose-p:leading-relaxed prose-headings:scroll-mt-20 max-w-none">
+            <p><strong>Effective date:</strong> {new Date().toLocaleDateString()}</p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">2. How We Use Your Information</h2>
-              <p className="text-muted-foreground leading-relaxed mb-4">
-                We use the information we collect to:
-              </p>
-              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
-                <li>Provide, maintain, and improve our Service</li>
-                <li>Process transactions and send related information</li>
-                <li>Send technical notices, updates, and support messages</li>
-                <li>Respond to your comments and questions</li>
-                <li>Monitor and analyze trends and usage</li>
-                <li>Personalize your experience with AI companions</li>
-                <li>Detect, investigate, and prevent security incidents</li>
-              </ul>
-            </section>
+            <h2>1. What we do</h2>
+            <p>
+              LoveAI provides AI companion experiences. We care deeply about your privacy. This policy explains
+              what we collect, how we use it, and the strict controls we apply to protect your data.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">3. Information Sharing</h2>
-              <p className="text-muted-foreground leading-relaxed mb-4">
-                We do not sell, trade, or otherwise transfer your personal information to third parties except in the following circumstances:
-              </p>
-              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
-                <li>With your explicit consent</li>
-                <li>To comply with legal obligations</li>
-                <li>To protect our rights and prevent fraud</li>
-                <li>With service providers who assist in operating our Service</li>
-                <li>In connection with a business transfer or acquisition</li>
-              </ul>
-            </section>
+            <h2>2. Your conversations</h2>
+            <ul>
+              <li><strong>No human reads your chats.</strong> We do not view, monitor, or manually review your conversations.</li>
+              <li>Conversations are processed by our AI providers solely to generate responses and to provide essential features like message history.</li>
+              <li>We may store message metadata (timestamps, character, usage counters) to enforce plan limits and improve service reliability.</li>
+            </ul>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">4. Data Security</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet or electronic storage is 100% secure.
-              </p>
-            </section>
+            <h2>3. Data we collect</h2>
+            <ul>
+              <li>Account data: email, preferred name, plan, subscription status.</li>
+              <li>Usage data: message counts, voice-call counts, device/browser info for security and fraud prevention.</li>
+              <li>Payment data: handled by our payment processor (e.g., Square). We do not store full card numbers.</li>
+            </ul>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">5. Data Retention</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                We retain your personal information for as long as necessary to provide our Service and fulfill the purposes outlined in this Privacy Policy, unless a longer retention period is required or permitted by law.
-              </p>
-            </section>
+            <h2>4. How we use data</h2>
+            <ul>
+              <li>To operate LoveAI (authentication, chat generation, plan enforcement).</li>
+              <li>To secure the platform (abuse detection, rate limiting, fraud prevention).</li>
+              <li>To comply with legal obligations (tax, accounting, requests from authorities where required by law).</li>
+            </ul>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">6. Your Rights</h2>
-              <p className="text-muted-foreground leading-relaxed mb-4">
-                Depending on your location, you may have the following rights regarding your personal information:
-              </p>
-              <ul className="list-disc list-inside text-muted-foreground space-y-2 ml-4">
-                <li>Access to your personal information</li>
-                <li>Correction of inaccurate information</li>
-                <li>Deletion of your personal information</li>
-                <li>Portability of your data</li>
-                <li>Objection to processing</li>
-                <li>Withdrawal of consent</li>
-              </ul>
-            </section>
+            <h2>5. Sharing</h2>
+            <ul>
+              <li>Service providers: cloud hosting, AI model providers, analytics strictly necessary to run LoveAI.</li>
+              <li>Payments: your card details are processed by Square (or other processor you select); we never store full card PANs.</li>
+              <li>Legal: we may disclose data when required by applicable law or to protect users and the platform.</li>
+            </ul>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">7. Cookies and Tracking</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                We use cookies and similar tracking technologies to collect and use personal information about you. You can control cookies through your browser settings, but disabling cookies may affect the functionality of our Service.
-              </p>
-            </section>
+            <h2>6. Security</h2>
+            <p>
+              We use industry-standard security controls (encryption in transit, access controls, audit logging). No system is 100% secure,
+              but we continuously improve our defenses.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">8. Third-Party Services</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Our Service may contain links to third-party websites or services. We are not responsible for the privacy practices of these third parties. We encourage you to read their privacy policies.
-              </p>
-            </section>
+            <h2>7. Data retention</h2>
+            <p>
+              Account and usage data are retained for as long as your account remains active and as required for legal/accounting purposes.
+              You may request deletion of your account, subject to obligations we have under law.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">9. Children's Privacy</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Our Service is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.
-              </p>
-            </section>
+            <h2>8. Your rights</h2>
+            <p>
+              Depending on your location, you may have rights to access, rectify, or delete your data. Contact us and we will assist.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">10. International Transfers</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place to protect your personal information in accordance with this Privacy Policy.
-              </p>
-            </section>
+            <h2>9. Children</h2>
+            <p>
+              LoveAI is for adults. You must be at least 18 (or the age of majority in your jurisdiction) to use the service.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">11. Changes to This Policy</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
-              </p>
-            </section>
+            <h2>10. Changes</h2>
+            <p>
+              We may update this policy to reflect product, legal, or regulatory changes. Material updates will be posted on this page.
+            </p>
 
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">12. Contact Us</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                If you have any questions about this Privacy Policy, please contact us at:
-                <br />
-                Email: privacy@loveaicompanion.com
-                <br />
-                Address: [Your Business Address]
-              </p>
-            </section>
+            <h2>11. Contact</h2>
+            <p>
+              Questions or requests? Contact our support via the help link in the app.
+            </p>
           </CardContent>
         </Card>
       </div>
     </div>
   );
-};
+}
