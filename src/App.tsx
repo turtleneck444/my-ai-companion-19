@@ -88,5 +88,5 @@ const App = () => (
 
 
 export default App;
-import { TermsOfService } from './pages/TermsOfService';
-import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
