@@ -1,31 +1,22 @@
 // Real Payment processing API endpoints with Square and Stripe integration
 const express = require('express');
-
-// Make Stripe completely optional (only used when provider==='stripe')
+// Make Stripe optional (only used when provider==='stripe')
 let stripe = null;
-if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'your_stripe_secret_key') {
+if (process.env.STRIPE_SECRET_KEY) {
   try {
     stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
   } catch (e) {
     console.warn('Stripe SDK load failed, continuing without Stripe:', e?.message);
   }
 }
-
-// Make Square optional too
-let squareClient = null;
-if (process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_ACCESS_TOKEN !== 'your_square_access_token') {
-  try {
-    const { Client, Environment } = require('squareup');
-    squareClient = new Client({
-      accessToken: process.env.SQUARE_ACCESS_TOKEN,
-      environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox
-    });
-  } catch (e) {
-    console.warn('Square SDK load failed, continuing without Square:', e?.message);
-  }
-}
-
+const { Client, Environment } = require('squareup');
 const router = express.Router();
+
+// Initialize Square client
+const squareClient = new Client({
+  accessToken: process.env.SQUARE_ACCESS_TOKEN,
+  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox
+});
 
 // Payment provider configurations
 const PAYMENT_CONFIG = {
@@ -37,35 +28,53 @@ const PAYMENT_CONFIG = {
   square: {
     applicationId: process.env.SQUARE_APPLICATION_ID,
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    locationId: process.env.SQUARE_LOCATION_ID,
-    environment: process.env.SQUARE_ENVIRONMENT,
-    webhookSecret: process.env.SQUARE_WEBHOOK_SECRET
+    environment: process.env.SQUARE_ENVIRONMENT || 'sandbox',
+    locationId: process.env.SQUARE_LOCATION_ID
   }
 };
 
-// Create payment intent endpoint
+// Subscription plans configuration
+const SUBSCRIPTION_PLANS = {
+  premium: {
+    priceId: process.env.STRIPE_PREMIUM_PRICE_ID || 'price_premium_monthly',
+    amount: 1900, // $19.00 in cents
+    currency: 'usd',
+    interval: 'month'
+  },
+  pro: {
+    priceId: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_monthly', 
+    amount: 4900, // $49.00 in cents
+    currency: 'usd',
+    interval: 'month'
+  }
+};
+
+// Create payment intent for one-time payments
 router.post('/create-intent', async (req, res) => {
   try {
-    const { planId, userId, amount, currency = 'usd', provider = 'square', sourceId } = req.body;
-
+    const { planId, userId, amount, currency = 'usd', provider = 'stripe' } = req.body;
+    
     if (provider === 'stripe') {
       if (!stripe || !process.env.STRIPE_SECRET_KEY) {
         return res.status(500).json({ error: 'Stripe not configured' });
       }
+
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100),
         currency: currency.toLowerCase(),
         metadata: { planId, userId: userId || 'anonymous' },
         automatic_payment_methods: { enabled: true },
       });
+
       return res.json({ id: paymentIntent.id, clientSecret: paymentIntent.client_secret, status: paymentIntent.status });
     }
 
     if (provider === 'square') {
-      if (!squareClient || !process.env.SQUARE_LOCATION_ID) {
+      if (!process.env.SQUARE_ACCESS_TOKEN || !process.env.SQUARE_LOCATION_ID) {
         return res.status(500).json({ error: 'Square not configured' });
       }
 
+      const { sourceId } = req.body || {};
       if (!sourceId || typeof sourceId !== 'string') {
         return res.status(400).json({ error: 'Missing sourceId from Square card tokenization' });
       }
@@ -93,41 +102,4 @@ router.post('/create-intent', async (req, res) => {
   }
 });
 
-// Webhook endpoint for payment confirmations
-router.post('/webhook', async (req, res) => {
-  try {
-    const { provider = 'square' } = req.query;
-
-    if (provider === 'stripe' && stripe) {
-      const sig = req.headers['stripe-signature'];
-      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-      
-      let event;
-      try {
-        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-      } catch (err) {
-        console.error('Webhook signature verification failed:', err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-      }
-
-      if (event.type === 'payment_intent.succeeded') {
-        const paymentIntent = event.data.object;
-        console.log('Payment succeeded:', paymentIntent.id);
-        // Handle successful payment
-      }
-    }
-
-    if (provider === 'square') {
-      const body = req.body;
-      console.log('Square webhook received:', body);
-      // Handle Square webhook
-    }
-
-    res.json({ received: true });
-  } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
-  }
-});
-
-module.exports = router;
+module.exports = router; 
