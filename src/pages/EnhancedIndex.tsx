@@ -254,7 +254,19 @@ const EnhancedIndex = () => {
       // clear state so back nav doesn't retrigger
       navigate('/app', { replace: true, state: {} });
     }
-  }, [location?.state?.startChatWith, navigate]);
+    // Support default start from signup success
+    const startDefault = location?.state?.startChatDefault;
+    if (startDefault) {
+      const first = (databaseCharacters && databaseCharacters.length > 0)
+        ? databaseCharacters[0]
+        : CHARACTERS[0];
+      if (first) {
+        setSelectedCharacter(first);
+        setCurrentView('chat');
+      }
+      navigate('/app', { replace: true, state: {} });
+    }
+  }, [location?.state?.startChatWith, location?.state?.startChatDefault, navigate, databaseCharacters]);
 
   // Plan handoff: if URL contains ?plan=, handle auto-upgrade or redirect to auth
   useEffect(() => {

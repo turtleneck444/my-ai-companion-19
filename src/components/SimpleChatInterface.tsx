@@ -30,6 +30,7 @@ import { EmojiPicker } from "@/components/EmojiPicker";
 import { InteractiveGames } from "@/components/InteractiveGames";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { PaymentModal } from "@/components/PaymentModal";
 
 // Using ChatMessage from ai-chat.ts instead of local Message interface
 
@@ -93,6 +94,8 @@ export const SimpleChatInterface = ({
     remainingMessages,
     isLoading: usageLoading
   } = useSupabaseUsageTracking();
+  const [showUpgradePayment, setShowUpgradePayment] = useState(false);
+  const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
   // Generate initial message based on character personality
   const getInitialMessage = () => {
     const name = userPreferences.preferredName;
@@ -218,9 +221,11 @@ export const SimpleChatInterface = ({
     if (!canSendMessage) {
       toast({
         title: "Daily message limit reached",
-        description: `Your plan (${currentPlan}) limit has been reached${remainingMessages === 0 ? '' : ''}. Upgrade for more messages.`,
+        description: `You've used all ${currentPlan} messages for today. Upgrade to continue chatting instantly.`,
         variant: "destructive"
       });
+      setUpgradePlan('premium');
+      setShowUpgradePayment(true);
       return;
     }
 
@@ -379,7 +384,7 @@ export const SimpleChatInterface = ({
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10">
+    <div className="min-h-screen flex flex-col">
       {/* Enhanced Header */}
       <div className="flex items-center justify-between p-4 bg-background/95 backdrop-blur-xl border-b shadow-sm">
         <div className="flex items-center gap-3">
@@ -728,6 +733,19 @@ export const SimpleChatInterface = ({
           </Button>
         </div>
       </div>
+
+      {upgradePlan && (
+        <PaymentModal
+          isOpen={showUpgradePayment}
+          onClose={() => { setShowUpgradePayment(false); setUpgradePlan(null); }}
+          selectedPlan={upgradePlan}
+          onSuccess={() => {
+            setShowUpgradePayment(false);
+            setUpgradePlan(null);
+            toast({ title: 'Upgraded!', description: 'You can now continue chatting.' });
+          }}
+        />
+      )}
     </div>
   );
 }; 

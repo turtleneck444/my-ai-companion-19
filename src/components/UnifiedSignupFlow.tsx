@@ -188,6 +188,10 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
             ? `Development mode: Account created with ${selectedPlanDetails.name} plan!`
             : `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
         });
+
+        // Immediately take user into their first chat to avoid dead-ends
+        navigate('/app', { replace: true, state: { startChatDefault: true } });
+        return;
       } else {
         console.error('Payment failed:', paymentResult.error);
         toast({
