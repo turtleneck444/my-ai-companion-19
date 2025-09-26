@@ -8,9 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UnifiedSignupFlow } from '@/components/UnifiedSignupFlow';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, LogIn, ArrowRight, Shield, Sparkles, Chrome, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, LogIn, ArrowRight, Shield, Sparkles, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
@@ -62,19 +61,7 @@ export default function Auth() {
     }
   };
 
-  const handleGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/app'
-        }
-      });
-      if (error) throw error;
-    } catch (e: any) {
-      toast({ title: 'Google sign-in failed', description: e?.message || 'Please try again', variant: 'destructive' });
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-10 px-4">
@@ -96,15 +83,6 @@ export default function Auth() {
               <TabsContent value="signin" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <Button variant="outline" className="w-full" onClick={handleGoogle}>
-                      <Chrome className="w-4 h-4 mr-2" />
-                      Continue with Google
-                    </Button>
-                    <div className="relative text-center text-xs text-muted-foreground">
-                      <span className="px-2 bg-background relative z-10">or</span>
-                      <div className="absolute inset-x-0 top-1/2 border-t" />
-                    </div>
-                    
                     <form onSubmit={handleSignIn} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
@@ -170,13 +148,7 @@ export default function Auth() {
                           <p>Powered by Supabase with enterprise-grade security</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <Sparkles className="w-5 h-5 text-primary mt-0.5" />
-                        <div>
-                          <p className="font-medium text-foreground">One-Click Access</p>
-                          <p>Sign in with Google for the fastest experience</p>
-                        </div>
-                      </div>
+
                       <div className="flex items-start gap-3">
                         <Mail className="w-5 h-5 text-primary mt-0.5" />
                         <div>
