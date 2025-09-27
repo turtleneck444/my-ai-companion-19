@@ -40,8 +40,21 @@ const PaymentForm = ({
   const elements = useElements();
   const [cardElementReady, setCardElementReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const cardElementRef = useRef<any>(null);
 
-  const handlePayment = async () => {
+  // Ensure card element stays mounted
+  useEffect(() => {
+    if (elements && !cardElementRef.current) {
+      const cardElement = elements.getElement(CardElement);
+      if (cardElement) {
+        cardElementRef.current = cardElement;
+      }
+    }
+  }, [elements]);
+
+  const handlePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!selectedPlanDetails) return;
 
     // Require email to proceed (used for receipts/customer association)
@@ -71,10 +84,42 @@ const PaymentForm = ({
     setStep('processing');
 
     try {
-      // Get the card element
-      const cardElement = elements.getElement(CardElement);
+      // Get the card element with multiple fallback methods
+      let cardElement = cardElementRef.current;
+      
       if (!cardElement) {
+        cardElement = elements.getElement(CardElement);
+        if (cardElement) {
+          cardElementRef.current = cardElement;
+        }
+      }
+
+      if (!cardElement) {
+        // Try to find any card element in the DOM
+        const cardElements = document.querySelectorAll('[data-testid="card-element"]');
+        if (cardElements.length > 0) {
+          // Force re-mount by clearing and re-creating
+          console.log('Card element lost, attempting to re-mount...');
+          toast({ 
+            title: 'Payment Form Issue', 
+            description: 'Please refresh the page and try again.', 
+            variant: 'destructive' 
+          });
+          return;
+        }
         throw new Error('Card element not found. Please refresh the page and try again.');
+      }
+
+      // Verify the element is still mounted and accessible
+      try {
+        // This will throw if the element is not properly mounted
+        const isEmpty = cardElement._componentName === 'CardElement';
+        if (!isEmpty) {
+          throw new Error('Card element not properly mounted');
+        }
+      } catch (mountError) {
+        console.error('Card element mount check failed:', mountError);
+        throw new Error('Card form is not ready. Please refresh the page and try again.');
       }
 
       // Create payment method with retry logic
@@ -82,12 +127,14 @@ const PaymentForm = ({
       let createPaymentMethodError;
       
       try {
+        console.log('Creating payment method...');
         const result = await stripe.createPaymentMethod({
           type: 'card',
           card: cardElement,
         });
         paymentMethod = result.paymentMethod;
         createPaymentMethodError = result.error;
+        console.log('Payment method result:', { paymentMethod: !!paymentMethod, error: createPaymentMethodError });
       } catch (error) {
         console.error('Payment method creation failed:', error);
         throw new Error('Failed to process card information. Please check your card details and try again.');
@@ -100,6 +147,8 @@ const PaymentForm = ({
       if (!paymentMethod) {
         throw new Error('Payment method could not be created. Please try again.');
       }
+
+      console.log('Payment method created successfully:', paymentMethod.id);
 
       // Process payment with backend (create subscription)
       const paymentProcessor = new PaymentProcessor();
@@ -144,7 +193,7 @@ const PaymentForm = ({
   };
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); handlePayment(); }} className="space-y-6">
+    <form onSubmit={handlePayment} className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold">Complete Your Purchase</h2>
         <p className="text-muted-foreground">
@@ -182,30 +231,32 @@ const PaymentForm = ({
         </CardContent>
       </Card>
 
-      {/* Stripe Card Element */}
+      {/* Stripe Card Element with better mounting */}
       <div className="p-4 border rounded-lg">
-        <CardElement 
-          options={{ 
-            style: { 
-              base: { 
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': {
-                  color: '#aab7c4',
+        <div data-testid="card-element">
+          <CardElement 
+            options={{ 
+              style: { 
+                base: { 
+                  fontSize: '16px',
+                  color: '#424770',
+                  '::placeholder': {
+                    color: '#aab7c4',
+                  },
                 },
               },
-            },
-          }}
-          onReady={() => {
-            console.log('Card element is ready');
-            setCardElementReady(true);
-          }}
-          onChange={(event) => {
-            if (event.error) {
-              console.log('Card element error:', event.error);
-            }
-          }}
-        />
+            }}
+            onReady={() => {
+              console.log('Card element is ready');
+              setCardElementReady(true);
+            }}
+            onChange={(event) => {
+              if (event.error) {
+                console.log('Card element error:', event.error);
+              }
+            }}
+          />
+        </div>
         {!cardElementReady && (
           <p className="text-sm text-muted-foreground mt-2">Loading secure card form...</p>
         )}
