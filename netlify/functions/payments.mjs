@@ -53,7 +53,6 @@ export async function handler(event) {
     };
   }
 
-    }
   }
 
   try {
@@ -75,7 +74,6 @@ export async function handler(event) {
       return await handleGetSubscription(path, headers);
     } else if (path.includes('/customer/') && path.includes('/subscriptions')) {
       return await handleGetCustomerSubscriptions(path, headers);
-    }
 
     return {
       statusCode: 404,
@@ -116,5 +114,4 @@ async function handleCreateIntent(data, headers) {
         automatic_payment_methods: { enabled: true },
       });
       return { statusCode: 200, headers, body: JSON.stringify({ id: paymentIntent.id, clientSecret: paymentIntent.client_secret, status: paymentIntent.status }) };
-    }
 
