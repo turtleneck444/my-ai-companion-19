@@ -38,6 +38,7 @@ const PaymentForm = ({
 }: any) => {
   const stripe = useStripe();
   const elements = useElements();
+  const [cardElementReady, setCardElementReady] = useState(false);
 
   const handlePayment = async () => {
     if (!selectedPlanDetails) return;
@@ -60,6 +61,11 @@ const PaymentForm = ({
       return;
     }
 
+    if (!cardElementReady) {
+      toast({ title: 'Payment Error', description: 'Card form not ready. Please wait a moment and try again.', variant: 'destructive' });
+      return;
+    }
+
     setStep('processing');
     setIsLoading(true);
 
@@ -67,7 +73,7 @@ const PaymentForm = ({
       // Get the card element
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) {
-        throw new Error('Card element not found');
+        throw new Error('Card element not found. Please refresh the page and try again.');
       }
 
       // Create payment method
@@ -173,8 +179,20 @@ const PaymentForm = ({
                 },
               },
             },
-          }} 
+          }}
+          onReady={() => {
+            console.log('Card element is ready');
+            setCardElementReady(true);
+          }}
+          onChange={(event) => {
+            if (event.error) {
+              console.log('Card element error:', event.error);
+            }
+          }}
         />
+        {!cardElementReady && (
+          <p className="text-sm text-muted-foreground mt-2">Loading secure card form...</p>
+        )}
       </div>
 
       {/* Password field */}
@@ -218,10 +236,10 @@ const PaymentForm = ({
         </Button>
         <Button 
           onClick={handlePayment}
-          disabled={isLoading || !stripe || !elements}
+          disabled={isLoading || !stripe || !elements || !cardElementReady}
           className="flex-1"
         >
-          Complete Purchase
+          {isLoading ? 'Processing...' : 'Complete Purchase'}
         </Button>
       </div>
     </div>
