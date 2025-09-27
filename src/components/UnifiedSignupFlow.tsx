@@ -10,11 +10,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { PaymentProcessor, SUBSCRIPTION_PLANS } from '@/lib/payments';
+import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 
 interface UnifiedSignupFlowProps {
   preselectedPlan?: string;
   onClose?: () => void;
 }
+
+// Load Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: UnifiedSignupFlowProps) => {
   const { signUp } = useAuth();
@@ -162,74 +167,80 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
 
   const handlePayment = async () => {
     if (!selectedPlanDetails) return;
-    
+
     // Require email to proceed (used for receipts/customer association)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
       return;
     }
-    
+
+    // Require password for account creation
+    if (!formData.password || formData.password.length < 6) {
+      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
+      return;
+    }
+
     setStep('processing');
     setIsLoading(true);
 
     try {
-      let sourceId: string | undefined;
-      if (selectedPlan !== 'free') {
-        // Tokenize Square card
-        if (!squareCard) {
-          await mountSquareCard();
-        }
-        const result = await squareCard.tokenize();
-        if (result.status !== 'OK') {
-          throw new Error(result.errors?.[0]?.message || 'Card tokenization failed');
-        }
-        sourceId = result.token;
+      // Stripe payment processing
+      const stripe = await stripePromise;
+      if (!stripe) {
+        throw new Error('Stripe.js has not loaded yet.');
       }
 
-      // Process payment with backend
-      const paymentResult = await paymentProcessor.processPayment({
-        amount: selectedPlanDetails.price,
-        currency: selectedPlanDetails.currency,
-        planId: selectedPlan,
-        customerEmail: formData.email,
-        sourceId
+      // Create payment method
+      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: {
+          // We'll get the card element from the form
+        },
       });
 
-      if (paymentResult.success) {
+      if (createPaymentMethodError) {
+        throw new Error(createPaymentMethodError.message);
+      }
+
+      // Process payment with backend (create subscription)
+      const subscriptionResult = await paymentProcessor.createSubscription(
+        selectedPlan,
+        paymentMethod.id,
+        formData.email,
+        formData.preferredName,
+        formData.age
+      );
+
+      if (subscriptionResult.success) {
         // Payment successful - create account with paid plan
         await createAccount(selectedPlan);
-        
-        const isDevelopment = paymentResult.paymentIntentId?.startsWith('dev_pi_');
-        
+
         toast({
           title: "Payment Successful! 🎉",
-          description: isDevelopment 
-            ? `Development mode: Account created with ${selectedPlanDetails.name} plan!`
-            : `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
+          description: `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
         });
 
         navigate('/app', { replace: true, state: { startChatDefault: true } });
         return;
       } else {
-        console.error('Payment failed:', paymentResult.error);
+        console.error('Payment failed:', subscriptionResult.error);
         toast({
           title: "Payment Failed",
-          description: paymentResult.error || "Payment could not be processed. Please try again.",
+          description: subscriptionResult.error || "Payment could not be processed. Please try again.",
           variant: "destructive"
         });
-        setStep('payment');
       }
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error('Payment processing error:', error);
       toast({
-        title: "Payment Error",
-        description: error.message || "An unexpected error occurred. Please try again.",
+        title: "Payment Failed",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive"
       });
-      setStep('payment');
     } finally {
       setIsLoading(false);
+      setStep('payment');
     }
   };
 
@@ -407,38 +418,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     </div>
   );
 
-  const [squareCard, setSquareCard] = useState<any>(null);
-  const [squareReady, setSquareReady] = useState(false);
-
-  const mountSquareCard = async () => {
-    try {
-      // Ensure Square is properly initialized
-      const isInitialized = await paymentProcessor.ensureStripeInitialized();
-      if (!isInitialized) {
-        throw new Error("Stripe not properly configured");
-      }
-      
-      const card = await paymentProcessor.createStripeCard();
-      await card.attach("#square-card");
-      setSquareCard(card);
-      setSquareReady(true);
-    } catch (e) {
-      console.error("Square init error", e);
-      toast({ 
-        title: "Payment Error", 
-        description: e.message || "Failed to load payment form. Please check your Stripe configuration.", 
-        variant: "destructive" 
-      });
-    }
-  };
-  // Auto-mount card when we enter the payment step
-  useEffect(() => {
-    if (step === 'payment' && !squareReady) {
-      mountSquareCard();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
-
   const renderPayment = () => (
     <div className="space-y-6">
       <div className="text-center">
@@ -477,12 +456,52 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
         </CardContent>
       </Card>
 
-      {/* Square Card Element */}
+      {/* Stripe Card Element */}
       <div className="p-4 border rounded-lg">
-        <div id="square-card" className="min-h-[56px]"></div>
-        {!squareReady && (
-          <p className="text-sm text-muted-foreground mt-2">Loading secure card form…</p>
-        )}
+        <CardElement 
+          options={{ 
+            style: { 
+              base: { 
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+            },
+          }} 
+        />
+      </div>
+
+      {/* Password field */}
+      <div className="space-y-2">
+        <Label htmlFor="passwordForPayment">Password *</Label>
+        <div className="relative">
+          <Input
+            id="passwordForPayment"
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            placeholder="Enter your password"
+            required
+            minLength={6}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword((prev) => !prev)}
+            disabled={isLoading}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">Minimum 6 characters</p>
       </div>
 
       <div className="flex gap-3">
@@ -495,7 +514,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
         </Button>
         <Button 
           onClick={handlePayment}
-          disabled={isLoading || !squareReady}
+          disabled={isLoading}
           className="flex-1"
         >
           Complete Purchase
@@ -519,20 +538,22 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
   );
 
   return (
-    <div className="w-full" ref={containerRef}>
-      {step === 'plan' ? (
-        <div className="w-full">
-          {renderPlanSelection()}
-        </div>
-      ) : (
-        <Card className="w-full max-w-2xl mx-auto">
-          <CardContent className="p-8">
-            {step === 'details' && renderAccountDetails()}
-            {step === 'payment' && renderPayment()}
-            {step === 'processing' && renderProcessing()}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    <Elements stripe={stripePromise}>
+      <div className="w-full" ref={containerRef}>
+        {step === 'plan' ? (
+          <div className="w-full">
+            {renderPlanSelection()}
+          </div>
+        ) : (
+          <Card className="w-full max-w-2xl mx-auto">
+            <CardContent className="p-8">
+              {step === 'details' && renderAccountDetails()}
+              {step === 'payment' && renderPayment()}
+              {step === 'processing' && renderProcessing()}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </Elements>
   );
-}; 
+};
