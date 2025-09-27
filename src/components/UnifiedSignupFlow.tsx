@@ -40,6 +40,16 @@ const PaymentForm = ({
   const elements = useElements();
   const [cardElementReady, setCardElementReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cardElementError, setCardElementError] = useState<string | null>(null);
+  const cardElementRef = useRef<any>(null);
+
+  // Reset card element state when step changes to payment
+  useEffect(() => {
+    if (cardElementRef.current) {
+      setCardElementReady(true);
+      setCardElementError(null);
+    }
+  }, []);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +74,8 @@ const PaymentForm = ({
       return;
     }
 
-    if (!cardElementReady) {
-      toast({ title: 'Payment Error', description: 'Card form not ready. Please wait a moment and try again.', variant: 'destructive' });
+    if (!cardElementReady || cardElementError) {
+      toast({ title: 'Payment Error', description: 'Card form has errors. Please check your card details and try again.', variant: 'destructive' });
       return;
     }
 
@@ -73,6 +83,9 @@ const PaymentForm = ({
     setStep('processing');
 
     try {
+      // Wait a bit to ensure the element is fully ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Get the card element
       const cardElement = elements.getElement(CardElement);
       
@@ -82,11 +95,20 @@ const PaymentForm = ({
 
       console.log('Creating payment method...');
 
-      // Create payment method
-      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+      // Create payment method with timeout
+      const paymentMethodPromise = stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
       });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Payment method creation timed out')), 10000);
+      });
+
+      const { error: createPaymentMethodError, paymentMethod } = await Promise.race([
+        paymentMethodPromise,
+        timeoutPromise
+      ]) as any;
 
       if (createPaymentMethodError) {
         throw new Error(createPaymentMethodError.message);
@@ -192,19 +214,30 @@ const PaymentForm = ({
                 },
               },
             },
+            hidePostalCode: true,
           }}
           onReady={() => {
             console.log('Card element is ready');
             setCardElementReady(true);
+            setCardElementError(null);
+            cardElementRef.current = true;
           }}
           onChange={(event) => {
             if (event.error) {
               console.log('Card element error:', event.error);
+              setCardElementError(event.error.message);
+              setCardElementReady(false);
+            } else {
+              setCardElementError(null);
+              setCardElementReady(true);
             }
           }}
         />
         {!cardElementReady && (
           <p className="text-sm text-muted-foreground mt-2">Loading secure card form...</p>
+        )}
+        {cardElementError && (
+          <p className="text-sm text-red-500 mt-2">{cardElementError}</p>
         )}
       </div>
 
@@ -251,7 +284,7 @@ const PaymentForm = ({
         </Button>
         <Button 
           type="submit"
-          disabled={isProcessing || !stripe || !elements || !cardElementReady}
+          disabled={isProcessing || !stripe || !elements || !cardElementReady || !!cardElementError}
           className="flex-1"
         >
           {isProcessing ? 'Processing...' : 'Complete Purchase'}
