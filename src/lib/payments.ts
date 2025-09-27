@@ -57,8 +57,8 @@ export interface Subscription {
 
 // Payment configuration
 export const PAYMENT_CONFIG: PaymentConfig = {
-  provider: (import.meta.env.VITE_PAYMENT_PROVIDER as any) || 'stripe',
-  publishableKey: import.meta.env.VITE_PAYMENT_PUBLISHABLE_KEY || '',
+  provider: 'stripe',
+  publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
   environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test',
   locationId: (import.meta.env.VITE_SQUARE_LOCATION_ID || import.meta.env.VITE_PAYMENT_LOCATION_ID || '') as string
 };
