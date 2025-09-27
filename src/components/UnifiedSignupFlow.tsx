@@ -21,6 +21,213 @@ interface UnifiedSignupFlowProps {
 // Load Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
+// Payment form component that uses Stripe Elements
+const PaymentForm = ({ 
+  selectedPlan, 
+  selectedPlanDetails, 
+  formData, 
+  handleInputChange, 
+  showPassword, 
+  setShowPassword, 
+  isLoading, 
+  setIsLoading, 
+  setStep, 
+  createAccount, 
+  toast, 
+  navigate 
+}: any) => {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handlePayment = async () => {
+    if (!selectedPlanDetails) return;
+
+    // Require email to proceed (used for receipts/customer association)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
+      return;
+    }
+
+    // Require password for account creation
+    if (!formData.password || formData.password.length < 6) {
+      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
+      return;
+    }
+
+    if (!stripe || !elements) {
+      toast({ title: 'Payment Error', description: 'Payment system not ready. Please try again.', variant: 'destructive' });
+      return;
+    }
+
+    setStep('processing');
+    setIsLoading(true);
+
+    try {
+      // Get the card element
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+
+      // Create payment method
+      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+      });
+
+      if (createPaymentMethodError) {
+        throw new Error(createPaymentMethodError.message);
+      }
+
+      // Process payment with backend (create subscription)
+      const paymentProcessor = new PaymentProcessor();
+      const subscriptionResult = await paymentProcessor.createSubscription(
+        selectedPlan,
+        paymentMethod.id,
+        formData.email,
+        formData.preferredName,
+        formData.age
+      );
+
+      if (subscriptionResult.success) {
+        // Payment successful - create account with paid plan
+        await createAccount(selectedPlan);
+
+        toast({
+          title: "Payment Successful! 🎉",
+          description: `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
+        });
+
+        navigate('/app', { replace: true, state: { startChatDefault: true } });
+        return;
+      } else {
+        console.error('Payment failed:', subscriptionResult.error);
+        toast({
+          title: "Payment Failed",
+          description: subscriptionResult.error || "Payment could not be processed. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('Payment processing error:', error);
+      toast({
+        title: "Payment Failed",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+      setStep('payment');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">Complete Your Purchase</h2>
+        <p className="text-muted-foreground">
+          {selectedPlanDetails?.name} - ${selectedPlanDetails?.price}/{selectedPlanDetails?.interval}
+        </p>
+      </div>
+
+      {/* Ensure we have an email for receipts/customer mapping */}
+      <div className="space-y-2">
+        <Label htmlFor="emailForPayment">Email Address *</Label>
+        <Input
+          id="emailForPayment"
+          type="email"
+          value={formData.email}
+          onChange={(e) => handleInputChange('email', e.target.value)}
+          placeholder="your@email.com"
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between">
+            <span>{selectedPlanDetails?.name} Plan</span>
+            <span>${selectedPlanDetails?.price}</span>
+          </div>
+          <Separator />
+          <div className="flex justify-between font-semibold">
+            <span>Total</span>
+            <span>${selectedPlanDetails?.price}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stripe Card Element */}
+      <div className="p-4 border rounded-lg">
+        <CardElement 
+          options={{ 
+            style: { 
+              base: { 
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+            },
+          }} 
+        />
+      </div>
+
+      {/* Password field */}
+      <div className="space-y-2">
+        <Label htmlFor="passwordForPayment">Password *</Label>
+        <div className="relative">
+          <Input
+            id="passwordForPayment"
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            placeholder="Enter your password"
+            required
+            minLength={6}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword((prev) => !prev)}
+            disabled={isLoading}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">Minimum 6 characters</p>
+      </div>
+
+      <div className="flex gap-3">
+        <Button 
+          variant="outline" 
+          onClick={() => setStep('details')}
+          className="flex-1"
+        >
+          Back
+        </Button>
+        <Button 
+          onClick={handlePayment}
+          disabled={isLoading || !stripe || !elements}
+          className="flex-1"
+        >
+          Complete Purchase
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: UnifiedSignupFlowProps) => {
   const { signUp } = useAuth();
   const { toast } = useToast();
@@ -42,7 +249,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedPlanDetails = SUBSCRIPTION_PLANS.find(plan => plan.id === selectedPlan);
-  const paymentProcessor = new PaymentProcessor();
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -162,85 +368,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handlePayment = async () => {
-    if (!selectedPlanDetails) return;
-
-    // Require email to proceed (used for receipts/customer association)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
-      return;
-    }
-
-    // Require password for account creation
-    if (!formData.password || formData.password.length < 6) {
-      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
-      return;
-    }
-
-    setStep('processing');
-    setIsLoading(true);
-
-    try {
-      // Stripe payment processing
-      const stripe = await stripePromise;
-      if (!stripe) {
-        throw new Error('Stripe.js has not loaded yet.');
-      }
-
-      // Create payment method
-      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: {
-          // We'll get the card element from the form
-        },
-      });
-
-      if (createPaymentMethodError) {
-        throw new Error(createPaymentMethodError.message);
-      }
-
-      // Process payment with backend (create subscription)
-      const subscriptionResult = await paymentProcessor.createSubscription(
-        selectedPlan,
-        paymentMethod.id,
-        formData.email,
-        formData.preferredName,
-        formData.age
-      );
-
-      if (subscriptionResult.success) {
-        // Payment successful - create account with paid plan
-        await createAccount(selectedPlan);
-
-        toast({
-          title: "Payment Successful! 🎉",
-          description: `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
-        });
-
-        navigate('/app', { replace: true, state: { startChatDefault: true } });
-        return;
-      } else {
-        console.error('Payment failed:', subscriptionResult.error);
-        toast({
-          title: "Payment Failed",
-          description: subscriptionResult.error || "Payment could not be processed. Please try again.",
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      console.error('Payment processing error:', error);
-      toast({
-        title: "Payment Failed",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-      setStep('payment');
     }
   };
 
@@ -418,111 +545,6 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
     </div>
   );
 
-  const renderPayment = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold">Complete Your Purchase</h2>
-        <p className="text-muted-foreground">
-          {selectedPlanDetails?.name} - ${selectedPlanDetails?.price}/{selectedPlanDetails?.interval}
-        </p>
-      </div>
-
-      {/* Ensure we have an email for receipts/customer mapping */}
-      <div className="space-y-2">
-        <Label htmlFor="emailForPayment">Email Address *</Label>
-        <Input
-          id="emailForPayment"
-          type="email"
-          value={formData.email}
-          onChange={(e) => handleInputChange('email', e.target.value)}
-          placeholder="your@email.com"
-        />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Payment Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-between">
-            <span>{selectedPlanDetails?.name} Plan</span>
-            <span>${selectedPlanDetails?.price}</span>
-          </div>
-          <Separator />
-          <div className="flex justify-between font-semibold">
-            <span>Total</span>
-            <span>${selectedPlanDetails?.price}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Stripe Card Element */}
-      <div className="p-4 border rounded-lg">
-        <CardElement 
-          options={{ 
-            style: { 
-              base: { 
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': {
-                  color: '#aab7c4',
-                },
-              },
-            },
-          }} 
-        />
-      </div>
-
-      {/* Password field */}
-      <div className="space-y-2">
-        <Label htmlFor="passwordForPayment">Password *</Label>
-        <div className="relative">
-          <Input
-            id="passwordForPayment"
-            type={showPassword ? 'text' : 'password'}
-            value={formData.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            placeholder="Enter your password"
-            required
-            minLength={6}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword((prev) => !prev)}
-            disabled={isLoading}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground">Minimum 6 characters</p>
-      </div>
-
-      <div className="flex gap-3">
-        <Button 
-          variant="outline" 
-          onClick={() => setStep('details')}
-          className="flex-1"
-        >
-          Back
-        </Button>
-        <Button 
-          onClick={handlePayment}
-          disabled={isLoading}
-          className="flex-1"
-        >
-          Complete Purchase
-        </Button>
-      </div>
-    </div>
-  );
-
   const renderProcessing = () => (
     <div className="text-center space-y-6 py-8">
       <div className="animate-pulse">
@@ -548,7 +570,22 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
           <Card className="w-full max-w-2xl mx-auto">
             <CardContent className="p-8">
               {step === 'details' && renderAccountDetails()}
-              {step === 'payment' && renderPayment()}
+              {step === 'payment' && (
+                <PaymentForm
+                  selectedPlan={selectedPlan}
+                  selectedPlanDetails={selectedPlanDetails}
+                  formData={formData}
+                  handleInputChange={handleInputChange}
+                  showPassword={showPassword}
+                  setShowPassword={setShowPassword}
+                  isLoading={isLoading}
+                  setIsLoading={setIsLoading}
+                  setStep={setStep}
+                  createAccount={createAccount}
+                  toast={toast}
+                  navigate={navigate}
+                />
+              )}
               {step === 'processing' && renderProcessing()}
             </CardContent>
           </Card>
