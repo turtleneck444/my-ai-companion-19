@@ -412,29 +412,24 @@ export class PaymentProcessor {
   }
 
   // Check if Square is properly configured and initialized
-  async ensureSquareInitialized(): Promise<boolean> {
-    if (this.config.provider !== "square") return false;
+  async ensureStripeInitialized(): Promise<boolean> {
+    if (this.config.provider !== "stripe") return false;
     
     if (!this.config.publishableKey) {
-      console.error("Square Application ID not configured");
+      console.error("Stripe publishable key not configured");
       return false;
     }
     
-    if (!this.config.locationId) {
-      console.error("Square Location ID not configured");
-      return false;
-    }
-    
-    if (!this.squarePayments) {
+    if (!this.stripe) {
       try {
-        await this.initializeSquare();
+        await this.initializePaymentProvider();
       } catch (error) {
-        console.error("Failed to initialize Square:", error);
+        console.error("Failed to initialize Stripe:", error);
         return false;
       }
     }
     
-    return !!this.squarePayments;
+    return !!this.stripe;
   }
   // Process payment (for unified signup flow)
   async processPayment(options: {
