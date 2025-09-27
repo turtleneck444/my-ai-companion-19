@@ -43,14 +43,6 @@ const PaymentForm = ({
   const [cardElementError, setCardElementError] = useState<string | null>(null);
   const cardElementRef = useRef<any>(null);
 
-  // Reset card element state when step changes to payment
-  useEffect(() => {
-    if (cardElementRef.current) {
-      setCardElementReady(true);
-      setCardElementError(null);
-    }
-  }, []);
-
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -83,32 +75,48 @@ const PaymentForm = ({
     setStep('processing');
 
     try {
-      // Wait a bit to ensure the element is fully ready
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Starting payment process...');
+      console.log('Stripe:', !!stripe);
+      console.log('Elements:', !!elements);
+      console.log('Card element ready:', cardElementReady);
 
-      // Get the card element
-      const cardElement = elements.getElement(CardElement);
+      // Try multiple methods to get the card element
+      let cardElement = null;
       
+      // Method 1: Direct from elements
+      try {
+        cardElement = elements.getElement(CardElement);
+        console.log('Method 1 - Direct getElement:', !!cardElement);
+      } catch (error) {
+        console.log('Method 1 failed:', error);
+      }
+
+      // Method 2: From ref if available
+      if (!cardElement && cardElementRef.current) {
+        cardElement = cardElementRef.current;
+        console.log('Method 2 - From ref:', !!cardElement);
+      }
+
+      // Method 3: Try to find in DOM
+      if (!cardElement) {
+        const cardElementNode = document.querySelector('[data-testid="card-element"] .__PrivateStripeElement');
+        if (cardElementNode) {
+          // Try to get the element from the DOM node
+          console.log('Method 3 - Found in DOM');
+        }
+      }
+
       if (!cardElement) {
         throw new Error('Card element not found. Please refresh the page and try again.');
       }
 
-      console.log('Creating payment method...');
+      console.log('Card element found, creating payment method...');
 
-      // Create payment method with timeout
-      const paymentMethodPromise = stripe.createPaymentMethod({
+      // Create payment method
+      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
       });
-
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Payment method creation timed out')), 10000);
-      });
-
-      const { error: createPaymentMethodError, paymentMethod } = await Promise.race([
-        paymentMethodPromise,
-        timeoutPromise
-      ]) as any;
 
       if (createPaymentMethodError) {
         throw new Error(createPaymentMethodError.message);
@@ -202,7 +210,7 @@ const PaymentForm = ({
       </Card>
 
       {/* Stripe Card Element */}
-      <div className="p-4 border rounded-lg">
+      <div className="p-4 border rounded-lg" data-testid="card-element">
         <CardElement 
           options={{ 
             style: { 
@@ -216,11 +224,11 @@ const PaymentForm = ({
             },
             hidePostalCode: true,
           }}
-          onReady={() => {
+          onReady={(element) => {
             console.log('Card element is ready');
             setCardElementReady(true);
             setCardElementError(null);
-            cardElementRef.current = true;
+            cardElementRef.current = element;
           }}
           onChange={(event) => {
             if (event.error) {
