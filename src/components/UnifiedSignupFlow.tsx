@@ -39,6 +39,7 @@ const PaymentForm = ({
   const stripe = useStripe();
   const elements = useElements();
   const [cardElementReady, setCardElementReady] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handlePayment = async () => {
     if (!selectedPlanDetails) return;
@@ -66,8 +67,8 @@ const PaymentForm = ({
       return;
     }
 
+    setIsProcessing(true);
     setStep('processing');
-    setIsLoading(true);
 
     try {
       // Get the card element
@@ -76,14 +77,28 @@ const PaymentForm = ({
         throw new Error('Card element not found. Please refresh the page and try again.');
       }
 
-      // Create payment method
-      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-      });
+      // Create payment method with retry logic
+      let paymentMethod;
+      let createPaymentMethodError;
+      
+      try {
+        const result = await stripe.createPaymentMethod({
+          type: 'card',
+          card: cardElement,
+        });
+        paymentMethod = result.paymentMethod;
+        createPaymentMethodError = result.error;
+      } catch (error) {
+        console.error('Payment method creation failed:', error);
+        throw new Error('Failed to process card information. Please check your card details and try again.');
+      }
 
       if (createPaymentMethodError) {
         throw new Error(createPaymentMethodError.message);
+      }
+
+      if (!paymentMethod) {
+        throw new Error('Payment method could not be created. Please try again.');
       }
 
       // Process payment with backend (create subscription)
@@ -123,13 +138,13 @@ const PaymentForm = ({
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
       setStep('payment');
     }
   };
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={(e) => { e.preventDefault(); handlePayment(); }} className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold">Complete Your Purchase</h2>
         <p className="text-muted-foreground">
@@ -146,6 +161,7 @@ const PaymentForm = ({
           value={formData.email}
           onChange={(e) => handleInputChange('email', e.target.value)}
           placeholder="your@email.com"
+          autoComplete="email"
         />
       </div>
 
@@ -207,6 +223,7 @@ const PaymentForm = ({
             placeholder="Enter your password"
             required
             minLength={6}
+            autoComplete="new-password"
           />
           <Button
             type="button"
@@ -214,7 +231,7 @@ const PaymentForm = ({
             size="sm"
             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
             onClick={() => setShowPassword((prev) => !prev)}
-            disabled={isLoading}
+            disabled={isProcessing}
           >
             {showPassword ? (
               <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -228,6 +245,7 @@ const PaymentForm = ({
 
       <div className="flex gap-3">
         <Button 
+          type="button"
           variant="outline" 
           onClick={() => setStep('details')}
           className="flex-1"
@@ -235,14 +253,14 @@ const PaymentForm = ({
           Back
         </Button>
         <Button 
-          onClick={handlePayment}
-          disabled={isLoading || !stripe || !elements || !cardElementReady}
+          type="submit"
+          disabled={isProcessing || !stripe || !elements || !cardElementReady}
           className="flex-1"
         >
-          {isLoading ? 'Processing...' : 'Complete Purchase'}
+          {isProcessing ? 'Processing...' : 'Complete Purchase'}
         </Button>
       </div>
-    </div>
+    </form>
   );
 };
 
@@ -495,6 +513,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
             value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
             placeholder="your@email.com"
+            autoComplete="email"
           />
         </div>
 
@@ -507,6 +526,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
               value={formData.password}
               onChange={(e) => handleInputChange('password', e.target.value)}
               placeholder="Choose a secure password"
+              autoComplete="new-password"
             />
             <Button
               type="button"
