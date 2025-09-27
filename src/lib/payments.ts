@@ -352,25 +352,25 @@ export class PaymentProcessor {
   }
 
   // Create Square card payment form
-  async createSquareCard(): Promise<any> {
-    if (!this.squarePayments) {
-      throw new Error('Square payments not initialized');
+  async createStripeCard(): Promise<any> {
+    if (!this.stripe) {
+      throw new Error('Stripe not initialized');
     }
-    return await this.squarePayments.card();
+    return this.stripe;
   }
 
   // Create Square Apple Pay
   async createSquareApplePay(): Promise<any> {
-    if (!this.squarePayments) {
-      throw new Error('Square payments not initialized');
+    if (!this.stripe) {
+      throw new Error('Stripe not initialized');
     }
     return await this.squarePayments.applePay();
   }
 
   // Create Square Google Pay
   async createSquareGooglePay(): Promise<any> {
-    if (!this.squarePayments) {
-      throw new Error('Square payments not initialized');
+    if (!this.stripe) {
+      throw new Error('Stripe not initialized');
     }
     return await this.squarePayments.googlePay();
   }
