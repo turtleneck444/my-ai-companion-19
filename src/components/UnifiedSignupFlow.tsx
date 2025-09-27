@@ -413,12 +413,12 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
   const mountSquareCard = async () => {
     try {
       // Ensure Square is properly initialized
-      const isInitialized = await paymentProcessor.ensureSquareInitialized();
+      const isInitialized = await paymentProcessor.ensureStripeInitialized();
       if (!isInitialized) {
-        throw new Error("Square not properly configured");
+        throw new Error("Stripe not properly configured");
       }
       
-      const card = await paymentProcessor.createSquareCard();
+      const card = await paymentProcessor.createStripeCard();
       await card.attach("#square-card");
       setSquareCard(card);
       setSquareReady(true);
@@ -426,7 +426,7 @@ export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: Unified
       console.error("Square init error", e);
       toast({ 
         title: "Payment Error", 
-        description: e.message || "Failed to load payment form. Please check your Square configuration.", 
+        description: e.message || "Failed to load payment form. Please check your Stripe configuration.", 
         variant: "destructive" 
       });
     }
