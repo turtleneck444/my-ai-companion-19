@@ -41,6 +41,7 @@ const PaymentForm = ({
   const [cardElementReady, setCardElementReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardElementError, setCardElementError] = useState<string | null>(null);
+  const [cardDataComplete, setCardDataComplete] = useState(false);
   const cardElementRef = useRef<any>(null);
 
   const handlePayment = async (e: React.FormEvent) => {
@@ -66,8 +67,8 @@ const PaymentForm = ({
       return;
     }
 
-    if (!cardElementReady || cardElementError) {
-      toast({ title: 'Payment Error', description: 'Card form has errors. Please check your card details and try again.', variant: 'destructive' });
+    if (!cardElementReady || cardElementError || !cardDataComplete) {
+      toast({ title: 'Payment Error', description: 'Please complete all card details before proceeding.', variant: 'destructive' });
       return;
     }
 
@@ -79,54 +80,58 @@ const PaymentForm = ({
       console.log('Stripe:', !!stripe);
       console.log('Elements:', !!elements);
       console.log('Card element ready:', cardElementReady);
+      console.log('Card data complete:', cardDataComplete);
 
-      // Try multiple methods to get the card element
-      let cardElement = null;
+      // Get the card element
+      const cardElement = elements.getElement(CardElement);
       
-      // Method 1: Direct from elements
-      try {
-        cardElement = elements.getElement(CardElement);
-        console.log('Method 1 - Direct getElement:', !!cardElement);
-      } catch (error) {
-        console.log('Method 1 failed:', error);
-      }
-
-      // Method 2: From ref if available
-      if (!cardElement && cardElementRef.current) {
-        cardElement = cardElementRef.current;
-        console.log('Method 2 - From ref:', !!cardElement);
-      }
-
-      // Method 3: Try to find in DOM
-      if (!cardElement) {
-        const cardElementNode = document.querySelector('[data-testid="card-element"] .__PrivateStripeElement');
-        if (cardElementNode) {
-          // Try to get the element from the DOM node
-          console.log('Method 3 - Found in DOM');
-        }
-      }
-
       if (!cardElement) {
         throw new Error('Card element not found. Please refresh the page and try again.');
       }
 
       console.log('Card element found, creating payment method...');
 
-      // Create payment method
-      const { error: createPaymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-      });
+      // Wait a moment to ensure the element is fully ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Create payment method with retry logic
+      let paymentMethod = null;
+      let createPaymentMethodError = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts && !paymentMethod) {
+        attempts++;
+        console.log(`Payment method creation attempt ${attempts}/${maxAttempts}`);
+        
+        try {
+          const result = await stripe.createPaymentMethod({
+            type: 'card',
+            card: cardElement,
+          });
+          
+          paymentMethod = result.paymentMethod;
+          createPaymentMethodError = result.error;
+          
+          if (paymentMethod) {
+            console.log('Payment method created successfully:', paymentMethod.id);
+            break;
+          }
+        } catch (error) {
+          console.log(`Attempt ${attempts} failed:`, error);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
 
       if (createPaymentMethodError) {
         throw new Error(createPaymentMethodError.message);
       }
 
       if (!paymentMethod) {
-        throw new Error('Payment method could not be created. Please try again.');
+        throw new Error('Payment method could not be created after multiple attempts. Please try again.');
       }
-
-      console.log('Payment method created successfully:', paymentMethod.id);
 
       // Process payment with backend (create subscription)
       const paymentProcessor = new PaymentProcessor();
@@ -235,9 +240,17 @@ const PaymentForm = ({
               console.log('Card element error:', event.error);
               setCardElementError(event.error.message);
               setCardElementReady(false);
+              setCardDataComplete(false);
             } else {
               setCardElementError(null);
               setCardElementReady(true);
+              // Check if card data is complete
+              if (event.complete) {
+                setCardDataComplete(true);
+                console.log('Card data is complete');
+              } else {
+                setCardDataComplete(false);
+              }
             }
           }}
         />
@@ -246,6 +259,9 @@ const PaymentForm = ({
         )}
         {cardElementError && (
           <p className="text-sm text-red-500 mt-2">{cardElementError}</p>
+        )}
+        {cardElementReady && !cardDataComplete && (
+          <p className="text-sm text-amber-500 mt-2">Please complete your card details</p>
         )}
       </div>
 
@@ -292,7 +308,7 @@ const PaymentForm = ({
         </Button>
         <Button 
           type="submit"
-          disabled={isProcessing || !stripe || !elements || !cardElementReady || !!cardElementError}
+          disabled={isProcessing || !stripe || !elements || !cardElementReady || !!cardElementError || !cardDataComplete}
           className="flex-1"
         >
           {isProcessing ? 'Processing...' : 'Complete Purchase'}
