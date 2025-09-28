@@ -268,32 +268,61 @@ async function handleCreateSubscription(data, headers) {
     const customers = await stripe.customers.list({ email: customerEmail, limit: 1 });
     if (customers.data.length > 0) {
       customer = customers.data[0];
+      console.log('👤 Found existing customer:', customer.id);
     } else {
       customer = await stripe.customers.create({
-        payment_method: paymentMethodId,
         email: customerEmail,
         name: customerName,
         metadata: { age: customerAge, planId: planId },
-        invoice_settings: { default_payment_method: paymentMethodId },
       });
+      console.log('👤 Created new customer:', customer.id);
     }
 
-    // Attach payment method to customer if not already attached
-    if (paymentMethodId && !customer.invoice_settings.default_payment_method) {
-      await stripe.paymentMethods.attach(paymentMethodId, { customer: customer.id });
-      await stripe.customers.update(customer.id, {
-        invoice_settings: { default_payment_method: paymentMethodId },
-      });
+    // Attach payment method to customer
+    if (paymentMethodId) {
+      try {
+        await stripe.paymentMethods.attach(paymentMethodId, { customer: customer.id });
+        console.log('💳 Attached payment method to customer');
+        
+        // Set as default payment method
+        await stripe.customers.update(customer.id, {
+          invoice_settings: { default_payment_method: paymentMethodId },
+        });
+        console.log('💳 Set as default payment method');
+      } catch (attachError) {
+        console.error('❌ Failed to attach payment method:', attachError.message);
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Failed to attach payment method', 
+            details: attachError.message 
+          }),
+        };
+      }
     }
 
     // Create subscription with immediate payment
+    console.log('🔄 Creating subscription...');
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: plan.priceId }],
       expand: ['latest_invoice.payment_intent'],
       payment_behavior: 'default_incomplete',
-      payment_settings: { save_default_payment_method: 'on_subscription' },
+      payment_settings: { 
+        save_default_payment_method: 'on_subscription',
+        payment_method_options: {
+          card: {
+            request_three_d_secure: 'automatic'
+          }
+        }
+      },
       collection_method: 'charge_automatically'
+    });
+
+    console.log('📋 Subscription created:', {
+      id: subscription.id,
+      status: subscription.status
     });
 
     const latestInvoice = subscription.latest_invoice;
@@ -308,7 +337,7 @@ async function handleCreateSubscription(data, headers) {
       latestInvoiceId: latestInvoice?.id
     });
 
-    // Confirm the payment intent immediately
+    // Try to confirm the payment intent if it exists and requires confirmation
     if (paymentIntent && paymentIntent.status === 'requires_confirmation') {
       try {
         console.log('🔄 Confirming payment intent:', paymentIntent.id);
