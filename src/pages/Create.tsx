@@ -403,13 +403,13 @@ const Create = () => {
       toast({
         title: "Voice preview played! 🎉",
         description: `You just heard ${character.voice.name}'s voice`,
-      };
+      });
     } catch (error) {
       console.error('Voice preview error:', error);
       toast({
         title: "Voice preview",
         description: "Using browser voice. Premium ElevenLabs voices available when connected.",
-      };
+      });
     } finally {
       setIsPlayingVoice(false);
     }
