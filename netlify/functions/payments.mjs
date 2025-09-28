@@ -248,17 +248,8 @@ async function handleCreatePaymentIntent(data, headers) {
   }
   
   // Reject test payment methods in production
-  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
-    console.log('❌ Test payment method rejected in production');
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Test payment methods not allowed in production',
-        success: false
-      })
-    };
-  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
     return { 
       statusCode: 500, 
       headers, 
@@ -335,17 +326,8 @@ async function handleCreateSubscription(data, headers) {
   }
   
   // Reject test payment methods in production
-  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
-    console.log('❌ Test payment method rejected in production');
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Test payment methods not allowed in production',
-        success: false
-      })
-    };
-  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
     return { 
       statusCode: 500, 
       headers, 
@@ -602,6 +584,7 @@ async function handleCreateSubscription(data, headers) {
         }
         
         console.log('✅ Payment verified, proceeding with activation');
+        // End of payment verification block
         console.log('✅ Subscription active, activating user...');
         
         // Activate user in Supabase
@@ -696,17 +679,8 @@ async function handleConfirmPayment(data, headers) {
   }
   
   // Reject test payment methods in production
-  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
-    console.log('❌ Test payment method rejected in production');
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Test payment methods not allowed in production',
-        success: false
-      })
-    };
-  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
       return { 
         statusCode: 500, 
         headers, 
@@ -768,17 +742,8 @@ async function handleCancelSubscription(data, headers) {
   }
   
   // Reject test payment methods in production
-  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
-    console.log('❌ Test payment method rejected in production');
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Test payment methods not allowed in production',
-        success: false
-      })
-    };
-  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
       return { 
         statusCode: 500, 
         headers, 
@@ -827,17 +792,8 @@ async function handleGetSubscription(subscriptionId, headers) {
   }
   
   // Reject test payment methods in production
-  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
-    console.log('❌ Test payment method rejected in production');
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Test payment methods not allowed in production',
-        success: false
-      })
-    };
-  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
       return { 
         statusCode: 500, 
         headers, 
@@ -886,17 +842,8 @@ async function handleGetCustomerSubscriptions(customerId, headers) {
   }
   
   // Reject test payment methods in production
-  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
-    console.log('❌ Test payment method rejected in production');
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Test payment methods not allowed in production',
-        success: false
-      })
-    };
-  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
       return { 
         statusCode: 500, 
         headers, 
