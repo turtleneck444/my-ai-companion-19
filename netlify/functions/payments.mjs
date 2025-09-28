@@ -324,11 +324,19 @@ async function handleCreateSubscription(data, headers) {
         } else {
           console.log('❌ Payment confirmation failed:', {
             paymentIntentStatus: confirmedPaymentIntent.status,
+            subscriptionStatus: subscription.status,
+            lastPaymentError: confirmedPaymentIntent.last_payment_error
+            paymentIntentStatus: confirmedPaymentIntent.status,
             subscriptionStatus: subscription.status
           });
         }
       } catch (confirmError) {
-        console.error('Payment confirmation error:', confirmError);
+        console.error('💥 Payment confirmation error:', {
+          error: confirmError.message,
+          type: confirmError.type,
+          code: confirmError.code,
+          decline_code: confirmError.decline_code
+        });
       }
     } else if (paymentIntent && isPaymentSuccessful(paymentIntent)) {
       console.log('✅ Payment already successful, activating user:', customer.id, planId);
