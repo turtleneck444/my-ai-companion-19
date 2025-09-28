@@ -45,7 +45,7 @@ interface Character {
   isFavorite?: boolean;
 }
 
-export default CompanionLibrary = () => {
+const CompanionLibrary = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -237,4 +237,4 @@ export default CompanionLibrary = () => {
     </div>
   );
 };
-// Export removed - already exported above
+export default CompanionLibrary;
