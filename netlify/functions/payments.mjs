@@ -325,17 +325,21 @@ async function handleCreateSubscription(data, headers) {
 
       console.log('📋 Subscription created:', {
         id: subscription.id,
-        status: subscription.status
+        status: subscription.status,
+        hasLatestInvoice: !!subscription.latest_invoice,
+        hasPaymentIntent: !!subscription.latest_invoice?.payment_intent
       });
 
       // Check if subscription needs payment confirmation
       if (subscription.status === 'incomplete') {
         console.log('💳 Subscription requires payment confirmation');
+        console.log('💳 Latest invoice:', subscription.latest_invoice);
         
         // Get the payment intent from the expanded invoice
-        const paymentIntent = subscription.latest_invoice.payment_intent;
+        const paymentIntent = subscription.latest_invoice?.payment_intent;
         
         if (paymentIntent) {
+          console.log('💳 Payment intent found:', paymentIntent.id);
           return {
             statusCode: 200,
             headers,
@@ -355,6 +359,7 @@ async function handleCreateSubscription(data, headers) {
           };
         } else {
           console.log('❌ No payment intent found for incomplete subscription');
+          console.log('❌ Latest invoice details:', JSON.stringify(subscription.latest_invoice, null, 2));
           return {
             statusCode: 200,
             headers,
