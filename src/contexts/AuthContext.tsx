@@ -77,18 +77,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, userData?: any) => {
     // Handle case when Supabase is not configured
     if (!isSupabaseConfigured || !supabase) {
-      console.warn('Supabase not configured, using demo mode');
+      console.error('Supabase not configured');
       
-      // Demo mode - simulate successful signup
-      const demoUser = {
-        id: 'demo-' + Date.now(),
-        email,
-        preferred_name: userData?.preferred_name || 'User',
-        treatment_style: userData?.treatment_style || 'romantic'
-      };
+      // Return error if Supabase not configured
       
-      // Store demo user in localStorage
-      localStorage.setItem('loveai-demo-user', JSON.stringify(demoUser));
+      // Return error instead of demo mode
+      return { error: new Error('Supabase not configured') as AuthError };
       
       // Simulate user state update immediately (no timeout)
       setUser({
@@ -128,32 +122,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     // Handle case when Supabase is not configured
     if (!isSupabaseConfigured || !supabase) {
-      console.warn('Supabase not configured, checking demo mode');
+      console.error('Supabase not configured');
       
-      // Check for demo user
-      const demoUserData = localStorage.getItem('loveai-demo-user');
-      if (demoUserData) {
-        const demoUser = JSON.parse(demoUserData);
-        if (demoUser.email === email) {
-          // Immediately update user state (no timeout or redirect here)
-          setUser({
-            id: demoUser.id,
-            email: demoUser.email,
-            user_metadata: {
-              preferred_name: demoUser.preferred_name,
-              treatment_style: demoUser.treatment_style
-            },
-            app_metadata: {},
-            aud: 'authenticated',
-            created_at: new Date().toISOString()
-          } as unknown as User);
-          
-          console.log('✅ Demo user signed in successfully');
-          return { error: null };
-        }
-      }
-      
-      return { error: new Error('Invalid credentials or demo user not found') as AuthError };
+      // Return error if Supabase not configured
     }
     
     try {
@@ -178,9 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    // Always clear local demo state
+    // Clear any local state
     try {
-      localStorage.removeItem('loveai-demo-user');
+      // Clear any local state if needed
       setUser(null);
       setSession(null);
     } catch {}

@@ -31,7 +31,7 @@ export const UpgradePrompt = ({
   const handleUpgradeClick = async () => {
     const success = await handleUpgrade({
       planId: selectedPlan,
-      paymentMethodId: 'test_payment_method', // In real app, get from payment form
+      paymentMethodId: null, // Will be set by payment form
       customerEmail: 'user@example.com' // In real app, get from user context
     });
     

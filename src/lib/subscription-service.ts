@@ -1,103 +1,71 @@
-// Subscription Management Service
-import { supabase } from './supabase';
+import { supabase } from '../integrations/supabase/client';
 
 export interface SubscriptionData {
   userId: string;
   planId: string;
-  stripeCustomerId: string;
-  stripeCardId: string;
-}
-
-export interface PaymentData {
-  amount: number;
-  currency: string;
-  planId: string;
   customerEmail: string;
-  sourceId: string;
+  customerName?: string;
+  paymentMethodId: string;
+  stripeCustomerId?: string;
+  stripeCardId?: string;
 }
 
-class SubscriptionService {
-  private apiBase = import.meta.env.DEV 
-    ? 'http://localhost:3000/api' 
-    : 'https://loveaicompanion.com/.netlify/functions';
+export interface SubscriptionResult {
+  success: boolean;
+  subscriptionId?: string;
+  customerId?: string;
+  error?: string;
+}
 
-  // Create subscription with payment processing (handles customer creation internally)
-  async createSubscriptionWithPayment(subscriptionData: {
+export class SubscriptionService {
+  async createSubscriptionWithPayment(data: {
     userId: string;
     planId: string;
     customerEmail: string;
     customerName?: string;
-    customerAge?: string;
     paymentMethodId: string;
-  }): Promise<{ success: boolean; error?: string; subscriptionId?: string; customerId?: string; cardId?: string }> {
-    
-    // Test mode: bypass payment processing for testing
-    if (subscriptionData.paymentMethodId === 'test_payment_method') {
-      console.log('🧪 Test mode: Bypassing payment processing');
-      return {
-        success: true,
-        subscriptionId: `test_sub_${Date.now()}`,
-        customerId: `test_customer_${Date.now()}`,
-        cardId: 'test_payment_method'
-      };
+  }): Promise<SubscriptionResult> {
+    if (!data.paymentMethodId) {
+      throw new Error('Payment method required for subscription');
     }
 
     try {
-      const response = await fetch(`${this.apiBase}/payments/create-subscription`, {
+      const response = await fetch('/.netlify/functions/payments/create-subscription', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          planId: subscriptionData.planId,
-          userId: subscriptionData.userId,
-          customerEmail: subscriptionData.customerEmail,
-          customerName: subscriptionData.customerName,
-          customerAge: subscriptionData.customerAge,
-          paymentMethodId: subscriptionData.paymentMethodId,
+          planId: data.planId,
+          paymentMethodId: data.paymentMethodId,
+          customerEmail: data.customerEmail,
+          customerName: data.customerName,
           provider: 'stripe'
-        })
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        return { success: false, error: error.error || 'Subscription creation failed' };
+        throw new Error(error.error || 'Subscription creation failed');
       }
 
       const result = await response.json();
-      return { 
-        success: true, 
-        subscriptionId: result.subscriptionId,
-        customerId: result.customerId,
-        cardId: result.paymentMethodId
-      };
-    } catch (error: any) {
-      console.error('Subscription creation error:', error);
-      return { success: false, error: error.message || 'Subscription creation failed' };
-    }
-  }
-
-  // Create subscription in database (legacy method - kept for compatibility)
-  async createSubscription(subscriptionData: SubscriptionData): Promise<{ success: boolean; error?: string; subscriptionId?: string }> {
-    try {
-      const { data, error } = await supabase.rpc('create_subscription', {
-        p_user_id: subscriptionData.userId,
-        p_plan_id: subscriptionData.planId,
-        p_stripe_customer_id: subscriptionData.stripeCustomerId,
-        p_stripe_card_id: subscriptionData.stripeCardId
-      });
-
-      if (error) {
-        console.error('Subscription creation error:', error);
-        return { success: false, error: error.message };
+      
+      if (result.success) {
+        return {
+          success: true,
+          subscriptionId: result.subscription.id,
+          customerId: result.subscription.customerId
+        };
+      } else {
+        throw new Error(result.error || 'Subscription creation failed');
       }
-
-      return { success: true, subscriptionId: data };
     } catch (error: any) {
       console.error('Subscription creation error:', error);
-      return { success: false, error: error.message || 'Subscription creation failed' };
+      throw new Error(error.message || 'Subscription creation failed');
     }
   }
 
-  // Cancel subscription
   async cancelSubscription(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabase.rpc('cancel_subscription', {
@@ -106,37 +74,39 @@ class SubscriptionService {
 
       if (error) {
         console.error('Subscription cancellation error:', error);
-        return { success: false, error: error.message };
+        throw new Error(error.message || 'Subscription cancellation failed');
       }
 
       return { success: true };
     } catch (error: any) {
       console.error('Subscription cancellation error:', error);
-      return { success: false, error: error.message || 'Subscription cancellation failed' };
+      return { 
+        success: false, 
+        error: error.message || 'Subscription cancellation failed' 
+      };
     }
   }
 
-  // Get subscription status
   async getSubscriptionStatus(userId: string): Promise<{ status: string; planId: string; nextBillingDate?: string } | null> {
     try {
       const { data, error } = await supabase
-        .from('subscriptions')
-        .select('status, plan_id, current_period_end')
-        .eq('user_id', userId)
+        .from('user_profiles')
+        .select('subscription_plan_id, subscription_status, next_billing_date')
+        .eq('id', userId)
         .single();
 
       if (error) {
-        console.error('Subscription status error:', error);
+        console.error('Error fetching subscription status:', error);
         return null;
       }
 
       return {
-        status: data.status,
-        planId: data.plan_id,
-        nextBillingDate: data.current_period_end
+        status: data.subscription_status || 'inactive',
+        planId: data.subscription_plan_id || 'free',
+        nextBillingDate: data.next_billing_date
       };
-    } catch (error: any) {
-      console.error('Subscription status error:', error);
+    } catch (error) {
+      console.error('Error fetching subscription status:', error);
       return null;
     }
   }

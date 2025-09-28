@@ -719,7 +719,7 @@ export const SimpleChatInterface = ({
               <Button
                 onClick={() => handleUpgrade({
                   planId: 'premium',
-                  paymentMethodId: 'test_payment_method',
+                  paymentMethodId: null,
                   customerEmail: user?.email
                 })}
                 disabled={isUpgrading}
@@ -730,7 +730,7 @@ export const SimpleChatInterface = ({
               <Button
                 onClick={() => handleUpgrade({
                   planId: 'pro',
-                  paymentMethodId: 'test_payment_method',
+                  paymentMethodId: null,
                   customerEmail: user?.email
                 })}
                 disabled={isUpgrading}

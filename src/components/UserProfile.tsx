@@ -37,6 +37,7 @@ interface PlanDetails {
 }
 
 export const UserProfile = () => {
+  const { usage } = useEnhancedUsageTracking();
   const { user, signOut, updateProfile } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -88,11 +89,11 @@ export const UserProfile = () => {
     }
   });
 
-  // Mock usage statistics
-  const [usageStats] = useState({
-    totalMessages: 2847,
-    totalCalls: 127,
-    totalMinutes: 3420,
+  // Real usage statistics from database
+  const [usageStats, setUsageStats] = useState({
+    totalMessages: usage?.messagesUsed || 0,
+    totalCalls: usage?.voiceCallsUsed || 0,
+    totalMinutes: (usage?.voiceCallsUsed || 0) * 5,
     favoriteCompanions: 3,
     daysActive: 45,
     level: 12,
@@ -103,8 +104,8 @@ export const UserProfile = () => {
   // Current plan (launch week dynamic)
   const formatDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric' });
   const nextBillingDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-  const [currentPlan] = useState<PlanDetails>({
-    name: 'Free Launch Week',
+  const [currentPlan, setCurrentPlan] = useState<PlanDetails>({
+    name: usage?.plan || 'free',
     tier: 'free',
     price: 0,
     features: [
