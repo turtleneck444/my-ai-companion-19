@@ -423,42 +423,92 @@ async function handleCreateSubscription(data, headers) {
             clientSecret: !!paymentIntent.client_secret
           });
           
-          // Return the payment intent for confirmation, regardless of status
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({
-              success: false,
-              subscription: {
-                id: subscription.id,
-                status: subscription.status,
-                customerId: customer.id,
-                currentPeriodStart: subscription.current_period_start,
-                currentPeriodEnd: subscription.current_period_end,
-                planId: planId,
-              },
-              clientSecret: paymentIntent.client_secret,
-              paymentStatus: 'requires_confirmation'
-            }),
-          };
-        } else {
-          console.log('❌ No payment intent available for confirmation');
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({
-              success: false,
-              subscription: {
-                id: subscription.id,
-                status: subscription.status,
-                customerId: customer.id,
-                planId: planId,
-              },
-              paymentStatus: 'incomplete',
-              error: 'No payment intent available for confirmation'
-            }),
-          };
+          // Only return for confirmation if we have a client secret
+          if (paymentIntent.client_secret) {
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                success: false,
+                subscription: {
+                  id: subscription.id,
+                  status: subscription.status,
+                  customerId: customer.id,
+                  currentPeriodStart: subscription.current_period_start,
+                  currentPeriodEnd: subscription.current_period_end,
+                  planId: planId,
+                },
+                clientSecret: paymentIntent.client_secret,
+                paymentStatus: 'requires_confirmation'
+              }),
+            };
+          } else {
+            console.log('💳 Payment intent found but no client secret available');
+            // Try to create a new payment intent for this subscription
+            try {
+              const newPaymentIntent = await stripe.paymentIntents.create({
+                amount: Math.round(plan.price * 100),
+                currency: plan.currency.toLowerCase(),
+                customer: customer.id,
+                payment_method: paymentMethodId,
+                confirm: true,
+                metadata: {
+                  planId: planId,
+                  customerId: customer.id,
+                  subscriptionId: subscription.id,
+                  type: 'subscription_payment'
+                }
+              });
+              
+              console.log('💳 New payment intent created:', {
+                id: newPaymentIntent.id,
+                status: newPaymentIntent.status,
+                clientSecret: !!newPaymentIntent.client_secret
+              });
+              
+              if (newPaymentIntent.client_secret) {
+                return {
+                  statusCode: 200,
+                  headers,
+                  body: JSON.stringify({
+                    success: false,
+                    subscription: {
+                      id: subscription.id,
+                      status: subscription.status,
+                      customerId: customer.id,
+                      currentPeriodStart: subscription.current_period_start,
+                      currentPeriodEnd: subscription.current_period_end,
+                      planId: planId,
+                    },
+                    clientSecret: newPaymentIntent.client_secret,
+                    paymentStatus: 'requires_confirmation'
+                  }),
+                };
+              }
+            } catch (newPaymentError) {
+              console.log('💳 Failed to create new payment intent:', newPaymentError.message);
+            }
+          }
         }
+        
+        // If we get here, no valid payment intent was found
+        console.log('❌ No payment intent available for confirmation');
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: false,
+            subscription: {
+              id: subscription.id,
+              status: subscription.status,
+              customerId: customer.id,
+              planId: planId,
+            },
+            paymentStatus: 'incomplete',
+            error: 'No payment intent available for confirmation'
+          }),
+        };
+        
       } else if (subscription.status === 'active') {
         console.log('✅ Subscription active, activating user...');
         
