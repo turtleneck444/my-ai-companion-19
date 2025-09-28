@@ -23,7 +23,7 @@ import {
   MoreHorizontal
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
+import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
 import { personalityAI, type ChatMessage, type ChatContext } from "@/lib/ai-chat";
 import { voiceCallManager } from "@/lib/voice-call";
 import { EmojiPicker } from "@/components/EmojiPicker";
@@ -89,15 +89,23 @@ export const SimpleChatInterface = ({
   }
 }: SimpleChatInterfaceProps) => {
   const { user } = useAuth();
+  
+  // Use the new enhanced usage tracking
   const {
-    currentPlan,
+    usage,
     incrementMessages,
-    canSendMessage,
-    remainingMessages,
+    incrementVoiceCalls,
     isLoading: usageLoading
-  } = useSupabaseUsageTracking();
-  const [showUpgradePayment, setShowUpgradePayment] = useState(false);
-  const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
+  } = useEnhancedUsageTracking();
+  
+  // Use the enhanced upgrade system
+  const { 
+    showUpgradePrompt, 
+    setShowUpgradePrompt, 
+    handleUpgrade,
+    isUpgrading 
+  } = useUpgrade();
+
   // Generate initial message based on character personality
   const getInitialMessage = () => {
     const name = userPreferences.preferredName;
@@ -142,9 +150,6 @@ export const SimpleChatInterface = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { handleUpgrade, isUpgrading } = useUpgrade();
-
-  // Plan is now loaded automatically from Supabase by useSupabaseUsageTracking
 
   // Environment check for debugging
   useEffect(() => {
@@ -220,21 +225,10 @@ export const SimpleChatInterface = ({
     const currentInput = messageContent || inputValue.trim();
     if (!currentInput || isAiTyping) return;
 
-    // Check if user has hit their message limit
-    if (!canSendMessage) {
-      const plan = getPlanById(currentPlan);
-      const limit = plan?.limits.messagesPerDay || 0;
-      const remaining = getRemainingMessages(currentPlan, usage.messagesUsed);
-      
-      toast({
-        title: "Daily message limit reached",
-        description: `You've used all ${limit} messages for today. Upgrade to continue chatting!`,
-        variant: "destructive"
-      });
-      
-      // Show upgrade prompt
-      setUpgradePlan('premium');
-      setShowUpgradePayment(true);
+    // Use the enhanced usage tracking - it will automatically check limits
+    const canSend = await incrementMessages();
+    if (!canSend) {
+      // User has hit their limit, upgrade prompt will be shown automatically
       return;
     }
 
@@ -247,12 +241,6 @@ export const SimpleChatInterface = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
-    
-    // Track usage in database
-    const usageTracked = await incrementMessages();
-    if (!usageTracked) {
-      console.warn('Failed to track message usage in database');
-    }
     
     // Persist user message
     persistMessage(userMessage);
@@ -271,27 +259,10 @@ export const SimpleChatInterface = ({
 
     try {
       // Thinking delay
-      const thinkingTime = Math.max(1200, Math.min(6000, currentInput.length * 80 + Math.random() * 2500));
+      const thinkingTime = Math.max(1000, Math.min(3000, currentInput.length * 50));
       await new Promise(resolve => setTimeout(resolve, thinkingTime));
 
-      // Timeout guard for AI generation (8s)
-      const withTimeout = <T,>(p: Promise<T>, ms: number) => new Promise<T>((resolve, reject) => {
-        const t = setTimeout(() => reject(new Error('timeout')), ms);
-        p.then(v => { clearTimeout(t); resolve(v); }).catch(e => { clearTimeout(t); reject(e); });
-      });
-
-      let aiResponse = '';
-      try {
-        aiResponse = await withTimeout(personalityAI.generateResponse(currentInput, chatContext), 8000) as unknown as string;
-      } catch (e) {
-        console.warn('AI response timed out, using fallback');
-      }
-
-      // Ensure non-empty, meaningful content
-      if (!aiResponse || aiResponse.trim().length < 2) {
-        const name = userPreferences.preferredName;
-        aiResponse = `I’m here with you, ${name}. From what you said, it sounds important—tell me a bit more and I’ll share something real about how I see it.`;
-      }
+      const aiResponse = await personalityAI(chatContext);
       
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -302,17 +273,15 @@ export const SimpleChatInterface = ({
 
       setMessages(prev => [...prev, aiMessage]);
       persistMessage(aiMessage);
-      setRelationshipLevel(prev => Math.min(prev + 1, 100));
     } catch (error) {
-      console.error('💥 Error generating AI response:', error);
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      const fallbackMessage: ChatMessage = {
+      console.error('AI response error:', error);
+      const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: `I’m still here. I was thinking about that… could you share one more detail so I can give you something thoughtful? 💕`,
+        content: "I'm sorry, I'm having trouble thinking right now. Could you try again?",
         sender: 'ai',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, fallbackMessage]);
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsAiTyping(false);
     }
@@ -743,16 +712,16 @@ export const SimpleChatInterface = ({
         </div>
       </div>
 
-      {upgradePlan && (
+      {/* Upgrade Prompt */}
+      {showUpgradePrompt && (
         <UpgradePrompt
-          isOpen={showUpgradePayment}
-          onClose={() => { setShowUpgradePayment(false); setUpgradePlan(null); }}
+          isOpen={showUpgradePrompt}
+          onClose={() => setShowUpgradePrompt(false)}
           limitType="messages"
-          currentPlan={currentPlan}
-          remaining={getRemainingMessages(currentPlan, usage.messagesUsed)}
+          currentPlan={usage.plan}
+          remaining={usage.remainingMessages}
           onUpgradeSuccess={() => {
-            setShowUpgradePayment(false);
-            setUpgradePlan(null);
+            setShowUpgradePrompt(false);
             toast({ title: 'Upgraded!', description: 'You can now continue chatting.' });
           }}
         />

@@ -15,7 +15,8 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { speakText } from "@/lib/voice";
 import { generateAvatarImage, validateImagePrompt, examplePrompts } from "@/lib/image-generation";
 import { useNavigate } from "react-router-dom";
-import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
+import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
+import { useUpgrade } from "@/hooks/useUpgrade";
 import { useAuth } from "@/contexts/AuthContext";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { getPlanById, getRemainingCompanions, checkCompanionLimit } from "@/lib/payments";
@@ -84,9 +85,19 @@ const Create = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { currentPlan, usage, refreshLimits } = useSupabaseUsageTracking();
+  
+  // Use the new enhanced usage tracking
+  const { usage, isLoading: usageLoading } = useEnhancedUsageTracking();
+  
+  // Use the enhanced upgrade system
+  const { 
+    showUpgradePrompt, 
+    setShowUpgradePrompt, 
+    handleUpgrade,
+    isUpgrading 
+  } = useUpgrade();
+  
   const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
@@ -139,16 +150,16 @@ const Create = () => {
 
   // Check companion limit before saving
   const canCreateCompanion = () => {
-    return checkCompanionLimit(currentPlan, usage.companionsCreated);
+    return checkCompanionLimit(usage.plan, usage.companionsCreated || 0);
   };
 
   const getRemainingCompanionsCount = () => {
-    return getRemainingCompanions(currentPlan, usage.companionsCreated);
+    return getRemainingCompanions(usage.plan, usage.companionsCreated || 0);
   };
 
   // AI Image generation handler
   const generateAvatar = async () => {
-    if (currentPlan === 'free') {
+    if (usage.plan === 'free') {
       toast({ title: 'Upgrade required', description: 'AI avatar generation is included with Premium and Pro plans.', variant: 'destructive' });
       navigate('/pricing?plan=premium');
       return;
@@ -234,7 +245,7 @@ const Create = () => {
   const save = async () => {
     // Check companion limit before saving
     if (!canCreateCompanion()) {
-      const plan = getPlanById(currentPlan);
+      const plan = getPlanById(usage.plan);
       const limit = plan?.limits.companions || 0;
       const remaining = getRemainingCompanionsCount();
       
@@ -295,15 +306,10 @@ const Create = () => {
         description: `${payload.name} is ready to meet you!` 
       });
 
-      // Refresh usage data to update companion count
-      if (refreshLimits) {
-        refreshLimits();
-      }
-
       // Navigate to success page with character data
       navigate('/app', { 
         state: { startChatWith: characterForSuccess } 
-      };
+      });
     } catch (e: any) {
       toast({ title: "Error", description: String(e?.message || e) });
     } finally {
@@ -314,7 +320,7 @@ const Create = () => {
   const togglePersonality = (trait: string) => {
     setCharacter(prev => {
       const has = prev.personality.includes(trait);
-      if (!has && currentPlan === 'free' && prev.personality.length >= 3) {
+      if (!has && usage.plan === 'free' && prev.personality.length >= 3) {
         toast({ title: 'Upgrade for more traits', description: 'Free plan allows up to 3 personality traits. Upgrade to add more.', variant: 'destructive' });
         return prev;
       }
@@ -324,7 +330,7 @@ const Create = () => {
           ? prev.personality.filter(p => p !== trait)
           : [...prev.personality, trait]
       };
-    };
+    });
   };
 
   const updatePersonalityTrait = (key: string, value: number[]) => {
@@ -494,10 +500,6 @@ const Create = () => {
       title: "Upgrade Successful!",
       description: `Welcome to ${newPlan} plan! Your limits have been updated.`,
     });
-    // Refresh usage data
-    if (refreshLimits) {
-      refreshLimits();
-    }
   };
 
   return (
@@ -604,7 +606,7 @@ const Create = () => {
                           
                           <div className="space-y-4">
                             <Label className="text-base font-medium">Fine-tune Personality</Label>
-                            {currentPlan === 'free' ? (
+                            {usage.plan === 'free' ? (
                               <div className="text-sm text-muted-foreground p-3 border rounded-md">
                                 Personality fine-tuning is available on Premium and Pro plans.
                                 <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span>
@@ -635,11 +637,11 @@ const Create = () => {
                       )}
 
                       {stepName === "Voice" && (
-                        currentPlan === 'free' ? (
+                        usage.plan === 'free' ? (
                           <Card className="p-6 text-center">
                             <h3 className="font-semibold mb-2">Premium Feature</h3>
                             <p className="text-sm text-muted-foreground mb-4">Select from premium voices with a Premium or Pro plan.</p>
-                            <Button onClick={() => navigate('/pricing?plan=premium')}>Upgrade to Unlock</Button>
+                            <Button onClick={() => { setUpgradePlan('premium'); setShowUpgradePrompt(true); }}>Upgrade to Unlock</Button>
                           </Card>
                         ) : (
                           <div className="space-y-6">
@@ -699,7 +701,7 @@ const Create = () => {
                             onDragOver={handleDrag}
                             onDrop={handleDrop}
                           >
-                            {currentPlan === 'free' ? (
+                            {usage.plan === 'free' ? (
                               <div className="space-y-2">
                                 <p className="text-sm text-muted-foreground">Custom avatar upload is a Premium feature. <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span></p>
                                 <Button onClick={() => { setUpgradePlan('premium'); setShowUpgradePrompt(true); }}>Upgrade to Unlock</Button>
@@ -848,15 +850,13 @@ const Create = () => {
         </div>
       </div>
 
-      {/* Inline Payment Modal for Upgrades */}
+      {/* Upgrade Prompt Modal */}
       {upgradePlan && (
         <UpgradePrompt
           isOpen={showUpgradePrompt}
           onClose={() => { setShowUpgradePrompt(false); setUpgradePlan(null); }}
           limitType="companions"
-          currentPlan={currentPlan}
-          remaining={getRemainingCompanionsCount()}
-          onUpgradeSuccess={handleUpgradeSuccess}
+          currentPlan={usage.plan}
         />
       )}
     </div>
