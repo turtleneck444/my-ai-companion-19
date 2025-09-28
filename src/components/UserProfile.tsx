@@ -20,6 +20,7 @@ import {
   Pause
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEnhancedUsageTracking } from '../hooks/useEnhancedUsageTracking';
 import { useToast } from '@/hooks/use-toast';
 import { PaymentModal } from '@/components/PaymentModal';
 
@@ -1216,3 +1217,4 @@ export const UserProfile = () => {
     </div>
   );
 };
+
