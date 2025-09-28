@@ -390,3 +390,16 @@ export class PaymentProcessor {
 
 // Export default instance
 export const paymentProcessor = new PaymentProcessor();
+
+// Helper function to get plan by ID
+export function getPlanById(planId: string): SubscriptionPlan | undefined {
+  return SUBSCRIPTION_PLANS.find(plan => plan.id === planId);
+}
+
+// Helper function to format price
+export function formatPrice(price: number, currency: string = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+  }).format(price);
+}
