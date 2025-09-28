@@ -61,6 +61,18 @@ const PaymentForm = ({
       return;
     }
 
+    // Require name for customer information
+    if (!formData.preferredName || formData.preferredName.trim().length < 2) {
+      toast({ title: 'Name required', description: 'Enter your full name to continue', variant: 'destructive' });
+      return;
+    }
+
+    // Require age for customer information
+    if (!formData.age || parseInt(formData.age) < 18) {
+      toast({ title: 'Age required', description: 'You must be 18 or older to continue', variant: 'destructive' });
+      return;
+    }
+
     if (!stripe || !elements) {
       toast({ title: 'Payment Error', description: 'Payment system not ready. Please try again.', variant: 'destructive' });
       return;
@@ -72,7 +84,7 @@ const PaymentForm = ({
     }
 
     setIsProcessing(true);
-    setStep('processing');
+    // DON'T call setStep('processing') here - it will unmount the CardElement!
 
     try {
       console.log('Starting payment process...');
@@ -109,6 +121,9 @@ const PaymentForm = ({
       }
 
       console.log('Payment method created successfully:', paymentMethod.id);
+
+      // NOW it's safe to switch to processing step since we have the payment method
+      setStep('processing');
 
       // Process payment with backend (create subscription)
       const paymentProcessor = new PaymentProcessor();
@@ -161,17 +176,53 @@ const PaymentForm = ({
         </p>
       </div>
 
-      {/* Ensure we have an email for receipts/customer mapping */}
-      <div className="space-y-2">
-        <Label htmlFor="emailForPayment">Email Address *</Label>
-        <Input
-          id="emailForPayment"
-          type="email"
-          value={formData.email}
-          onChange={(e) => handleInputChange('email', e.target.value)}
-          placeholder="your@email.com"
-          autoComplete="email"
-        />
+      {/* Customer Information */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Customer Information</h3>
+        
+        {/* Email field */}
+        <div className="space-y-2">
+          <Label htmlFor="emailForPayment">Email Address *</Label>
+          <Input
+            id="emailForPayment"
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleInputChange('email', e.target.value)}
+            placeholder="your@email.com"
+            autoComplete="email"
+            required
+          />
+        </div>
+
+        {/* Name field */}
+        <div className="space-y-2">
+          <Label htmlFor="nameForPayment">Full Name *</Label>
+          <Input
+            id="nameForPayment"
+            type="text"
+            value={formData.preferredName}
+            onChange={(e) => handleInputChange('preferredName', e.target.value)}
+            placeholder="Enter your full name"
+            autoComplete="name"
+            required
+          />
+        </div>
+
+        {/* Age field */}
+        <div className="space-y-2">
+          <Label htmlFor="ageForPayment">Age *</Label>
+          <Input
+            id="ageForPayment"
+            type="number"
+            value={formData.age}
+            onChange={(e) => handleInputChange('age', e.target.value)}
+            placeholder="18+"
+            min="18"
+            max="120"
+            required
+          />
+          <p className="text-sm text-muted-foreground">Must be 18 or older</p>
+        </div>
       </div>
 
       <Card>
@@ -191,54 +242,57 @@ const PaymentForm = ({
         </CardContent>
       </Card>
 
-      {/* Stripe Card Element - FIXED: Removed dynamic key prop */}
-      <div className="p-4 border rounded-lg" data-testid="card-element">
-        <CardElement 
-          options={{ 
-            style: { 
-              base: { 
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': {
-                  color: '#aab7c4',
+      {/* Stripe Card Element */}
+      <div className="space-y-2">
+        <Label>Payment Information *</Label>
+        <div className="p-4 border rounded-lg" data-testid="card-element">
+          <CardElement 
+            options={{ 
+              style: { 
+                base: { 
+                  fontSize: '16px',
+                  color: '#424770',
+                  '::placeholder': {
+                    color: '#aab7c4',
+                  },
                 },
               },
-            },
-            hidePostalCode: true,
-          }}
-          onReady={(element) => {
-            console.log('Card element is ready');
-            setCardElementReady(true);
-            setCardElementError(null);
-          }}
-          onChange={(event) => {
-            if (event.error) {
-              console.log('Card element error:', event.error);
-              setCardElementError(event.error.message);
-              setCardElementReady(false);
-              setCardDataComplete(false);
-            } else {
-              setCardElementError(null);
+              hidePostalCode: true,
+            }}
+            onReady={(element) => {
+              console.log('Card element is ready');
               setCardElementReady(true);
-              // Check if card data is complete
-              if (event.complete) {
-                setCardDataComplete(true);
-                console.log('Card data is complete');
-              } else {
+              setCardElementError(null);
+            }}
+            onChange={(event) => {
+              if (event.error) {
+                console.log('Card element error:', event.error);
+                setCardElementError(event.error.message);
+                setCardElementReady(false);
                 setCardDataComplete(false);
+              } else {
+                setCardElementError(null);
+                setCardElementReady(true);
+                // Check if card data is complete
+                if (event.complete) {
+                  setCardDataComplete(true);
+                  console.log('Card data is complete');
+                } else {
+                  setCardDataComplete(false);
+                }
               }
-            }
-          }}
-        />
-        {!cardElementReady && (
-          <p className="text-sm text-muted-foreground mt-2">Loading secure card form...</p>
-        )}
-        {cardElementError && (
-          <p className="text-sm text-red-500 mt-2">{cardElementError}</p>
-        )}
-        {cardElementReady && !cardDataComplete && (
-          <p className="text-sm text-amber-500 mt-2">Please complete your card details</p>
-        )}
+            }}
+          />
+          {!cardElementReady && (
+            <p className="text-sm text-muted-foreground mt-2">Loading secure card form...</p>
+          )}
+          {cardElementError && (
+            <p className="text-sm text-red-500 mt-2">{cardElementError}</p>
+          )}
+          {cardElementReady && !cardDataComplete && (
+            <p className="text-sm text-amber-500 mt-2">Please complete your card details</p>
+          )}
+        </div>
       </div>
 
       {/* Password field */}

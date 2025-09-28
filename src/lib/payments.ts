@@ -261,6 +261,9 @@ export class PaymentProcessor {
   async createSubscription(
     planId: string, 
     paymentMethodId: string, 
+    customerEmail?: string,
+    customerName?: string,
+    customerAge?: string,
     userId?: string,
     customerId?: string
   ): Promise<Subscription> {
@@ -274,6 +277,9 @@ export class PaymentProcessor {
         userId,
         paymentMethodId,
         customerId,
+        customerEmail,
+        customerName,
+        customerAge,
         provider: this.config.provider
       })
     });

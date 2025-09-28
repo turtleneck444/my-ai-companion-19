@@ -62,7 +62,7 @@ function isSubscriptionActive(subscription) {
 }
 
 // Activate user in Supabase after successful payment
-async function activateSupabaseUser(customerId, planId) {
+async function activateSupabaseUser(customerId, planId, paymentMethod = null) {
   try {
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
@@ -71,6 +71,16 @@ async function activateSupabaseUser(customerId, planId) {
       console.error('Supabase configuration missing');
       return false;
     }
+
+    // Prepare payment method data for storage
+    const paymentData = paymentMethod ? {
+      payment_method_id: paymentMethod.id,
+      card_brand: paymentMethod.card?.brand,
+      card_last4: paymentMethod.card?.last4,
+      card_exp_month: paymentMethod.card?.exp_month,
+      card_exp_year: paymentMethod.card?.exp_year,
+      payment_method_created: new Date(paymentMethod.created * 1000).toISOString(),
+    } : {};
 
     const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles`, {
       method: 'PATCH',
@@ -84,6 +94,7 @@ async function activateSupabaseUser(customerId, planId) {
         subscription_plan: planId,
         subscription_status: 'active',
         subscription_customer_id: customerId,
+        ...paymentData,
         updated_at: new Date().toISOString()
       })
     });
@@ -93,7 +104,7 @@ async function activateSupabaseUser(customerId, planId) {
       return false;
     }
 
-    console.log('✅ User activated in Supabase:', customerId, planId);
+    console.log('✅ User activated in Supabase with payment method:', customerId, planId, paymentData);
     return true;
   } catch (error) {
     console.error('Error activating user in Supabase:', error);
@@ -283,7 +294,7 @@ async function handleCreateSubscription(data, headers) {
       });
     }
 
-    // Create subscription
+    // Create subscription with immediate payment
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: plan.priceId }],
@@ -296,10 +307,36 @@ async function handleCreateSubscription(data, headers) {
     const latestInvoice = subscription.latest_invoice;
     const paymentIntent = latestInvoice?.payment_intent;
 
-    // SECURITY: Only activate user if payment is actually successful
-    if (paymentIntent && isPaymentSuccessful(paymentIntent)) {
-      console.log('✅ Payment successful, activating user:', customer.id, planId);
-      await activateSupabaseUser(customer.id, planId);
+    // Confirm the payment intent immediately
+    if (paymentIntent && paymentIntent.status === 'requires_confirmation') {
+      try {
+        const confirmedPaymentIntent = await stripe.paymentIntents.confirm(paymentIntent.id, {
+          payment_method: paymentMethodId
+        });
+        
+        if (isPaymentSuccessful(confirmedPaymentIntent)) {
+          console.log('✅ Payment confirmed and successful, activating user:', customer.id, planId);
+          
+          // Get the payment method details for storage
+          const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+          
+          await activateSupabaseUser(customer.id, planId, paymentMethod);
+        } else {
+          console.log('❌ Payment confirmation failed:', {
+            paymentIntentStatus: confirmedPaymentIntent.status,
+            subscriptionStatus: subscription.status
+          });
+        }
+      } catch (confirmError) {
+        console.error('Payment confirmation error:', confirmError);
+      }
+    } else if (paymentIntent && isPaymentSuccessful(paymentIntent)) {
+      console.log('✅ Payment already successful, activating user:', customer.id, planId);
+      
+      // Get the payment method details for storage
+      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+      
+      await activateSupabaseUser(customer.id, planId, paymentMethod);
     } else {
       console.log('❌ Payment not successful, not activating user:', {
         paymentIntentStatus: paymentIntent?.status,
