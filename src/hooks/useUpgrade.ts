@@ -106,8 +106,8 @@ export const useUpgrade = () => {
       const subscriptionResult = await subscriptionService.createSubscription({
         userId: user.id,
         planId: plan.id,
-        squareCustomerId: customerResult.customerId!,
-        squareCardId: customerResult.cardId!
+        stripeCustomerId: customerResult.customerId!,
+        stripeCardId: customerResult.cardId!
       });
 
       if (!subscriptionResult.success) {

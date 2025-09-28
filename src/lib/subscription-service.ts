@@ -4,8 +4,8 @@ import { supabase } from './supabase';
 export interface SubscriptionData {
   userId: string;
   planId: string;
-  squareCustomerId: string;
-  squareCardId: string;
+  stripeCustomerId: string;
+  stripeCardId: string;
 }
 
 export interface PaymentData {
@@ -21,7 +21,7 @@ class SubscriptionService {
     ? 'http://localhost:3000/api' 
     : 'https://loveaicompanion.com/.netlify/functions';
 
-  // Process real payment with Square
+  // Process real payment with Stripe
   async processPayment(paymentData: PaymentData): Promise<{ success: boolean; error?: string; paymentId?: string }> {
     try {
       const response = await fetch(`${this.apiBase}/payments/create-intent`, {
@@ -29,7 +29,7 @@ class SubscriptionService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...paymentData,
-          provider: 'square'
+          provider: 'stripe'
         })
       });
 
@@ -55,7 +55,8 @@ class SubscriptionService {
         body: JSON.stringify({
           email,
           sourceId,
-          planId
+          planId,
+          provider: 'stripe'
         })
       });
 
@@ -82,8 +83,8 @@ class SubscriptionService {
       const { data, error } = await supabase.rpc('create_subscription', {
         p_user_id: subscriptionData.userId,
         p_plan_id: subscriptionData.planId,
-        p_square_customer_id: subscriptionData.squareCustomerId,
-        p_square_card_id: subscriptionData.squareCardId
+        p_square_customer_id: subscriptionData.stripeCustomerId,
+        p_square_card_id: subscriptionData.stripeCardId
       });
 
       if (error) {

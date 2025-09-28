@@ -22,8 +22,8 @@ BEGIN
       s.id as subscription_id,
       s.user_id,
       s.plan_id,
-      s.square_customer_id,
-      s.square_card_id,
+      s.stripe_customer_id,
+      s.stripe_card_id,
       s.current_period_end,
       up.email,
       p.price
@@ -50,7 +50,7 @@ BEGIN
       -- Create payment record
       INSERT INTO subscription_payments (
         subscription_id,
-        square_payment_id,
+        stripe_payment_id,
         amount,
         currency,
         status,
@@ -122,8 +122,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION upgrade_user_subscription(
   p_user_id UUID,
   p_new_plan_id TEXT,
-  p_square_customer_id TEXT DEFAULT NULL,
-  p_square_card_id TEXT DEFAULT NULL
+  p_stripe_customer_id TEXT DEFAULT NULL,
+  p_stripe_card_id TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
   current_subscription RECORD;
@@ -156,16 +156,16 @@ BEGIN
       user_id,
       plan_id,
       status,
-      square_customer_id,
-      square_card_id,
+      stripe_customer_id,
+      stripe_card_id,
       current_period_start,
       current_period_end
     ) VALUES (
       p_user_id,
       p_new_plan_id,
       'active',
-      p_square_customer_id,
-      p_square_card_id,
+      p_stripe_customer_id,
+      p_stripe_card_id,
       billing_start_date,
       next_billing_date
     ) RETURNING id INTO new_subscription_id;
@@ -177,7 +177,7 @@ BEGIN
     subscription_plan_id = p_new_plan_id,
     subscription_status = 'active',
     subscription_plan = p_new_plan_id,
-    customer_id = p_square_customer_id,
+    customer_id = p_stripe_customer_id,
     subscription_id = new_subscription_id,
     billing_cycle_start = billing_start_date,
     next_billing_date = CASE WHEN p_new_plan_id = 'free' THEN NULL ELSE next_billing_date END,
