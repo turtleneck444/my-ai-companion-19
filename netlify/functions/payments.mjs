@@ -9,7 +9,7 @@ const headers = {
 };
 
 // Subscription plans configuration
-export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+export const SUBSCRIPTION_PLANS = [
   {
     id: 'free',
     name: 'Free',
@@ -705,7 +705,7 @@ async function handleGetCustomerSubscriptions(customerId, headers) {
 }
 
 // Plan limit checking functions
-export function checkMessageLimit(planId: string, messagesUsed: number): boolean {
+export function checkMessageLimit(planId, messagesUsed) {
   const plan = getPlanById(planId);
   if (!plan) return false;
   
@@ -715,7 +715,7 @@ export function checkMessageLimit(planId: string, messagesUsed: number): boolean
   return messagesUsed < plan.limits.messagesPerDay;
 }
 
-export function checkVoiceCallLimit(planId: string, voiceCallsUsed: number): boolean {
+export function checkVoiceCallLimit(planId, voiceCallsUsed) {
   const plan = getPlanById(planId);
   if (!plan) return false;
   
@@ -725,7 +725,7 @@ export function checkVoiceCallLimit(planId: string, voiceCallsUsed: number): boo
   return voiceCallsUsed < plan.limits.voiceCallsPerDay;
 }
 
-export function getRemainingMessages(planId: string, messagesUsed: number): number {
+export function getRemainingMessages(planId, messagesUsed) {
   const plan = getPlanById(planId);
   if (!plan) return 0;
   
@@ -735,7 +735,7 @@ export function getRemainingMessages(planId: string, messagesUsed: number): numb
   return Math.max(0, plan.limits.messagesPerDay - messagesUsed);
 }
 
-export function getRemainingVoiceCalls(planId: string, voiceCallsUsed: number): number {
+export function getRemainingVoiceCalls(planId, voiceCallsUsed) {
   const plan = getPlanById(planId);
   if (!plan) return 0;
   
@@ -745,7 +745,7 @@ export function getRemainingVoiceCalls(planId: string, voiceCallsUsed: number): 
   return Math.max(0, plan.limits.voiceCallsPerDay - voiceCallsUsed);
 }
 
-export function checkCompanionLimit(planId: string, companionsCreated: number): boolean {
+export function checkCompanionLimit(planId, companionsCreated) {
   const plan = getPlanById(planId);
   if (!plan) return false;
   
@@ -755,7 +755,7 @@ export function checkCompanionLimit(planId: string, companionsCreated: number): 
   return companionsCreated < plan.limits.companions;
 }
 
-export function getRemainingCompanions(planId: string, companionsCreated: number): number {
+export function getRemainingCompanions(planId, companionsCreated) {
   const plan = getPlanById(planId);
   if (!plan) return 0;
   
