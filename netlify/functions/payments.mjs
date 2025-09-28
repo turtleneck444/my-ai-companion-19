@@ -302,107 +302,43 @@ async function handleCreateSubscription(data, headers) {
       }
     }
 
-    // SIMPLIFIED APPROACH: Just create the subscription and let Stripe handle payment
-    console.log('🔄 Creating subscription...');
-    const subscription = await stripe.subscriptions.create({
+    // NEW APPROACH: Create Setup Intent first, then subscription
+    console.log('�� Creating Setup Intent for subscription...');
+    const setupIntent = await stripe.setupIntents.create({
       customer: customer.id,
-      items: [{ price: plan.priceId }],
-      default_payment_method: paymentMethodId,
-      collection_method: 'charge_automatically',
-      payment_behavior: 'default_incomplete',
-      expand: ['latest_invoice.payment_intent']
-    });
-
-    console.log('📋 Subscription created:', {
-      id: subscription.id,
-      status: subscription.status
-    });
-
-    const latestInvoice = subscription.latest_invoice;
-    const paymentIntent = latestInvoice?.payment_intent;
-
-    console.log('🔍 Payment Intent Details:', {
-      paymentIntentId: paymentIntent?.id,
-      paymentIntentStatus: paymentIntent?.status,
-      subscriptionStatus: subscription.status,
-      hasPaymentIntent: !!paymentIntent
-    });
-
-    // If we have a payment intent, try to confirm it
-    if (paymentIntent && paymentIntent.status === 'requires_confirmation') {
-      try {
-        console.log('🔄 Confirming payment intent...');
-        const confirmedPaymentIntent = await stripe.paymentIntents.confirm(paymentIntent.id, {
-          payment_method: paymentMethodId
-        });
-        
-        console.log('💳 Payment confirmed:', {
-          id: confirmedPaymentIntent.id,
-          status: confirmedPaymentIntent.status
-        });
-
-        if (isPaymentSuccessful(confirmedPaymentIntent)) {
-          console.log('✅ Payment successful, activating user...');
-          
-          // Get payment method details and activate user
-          const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-          await activateSupabaseUser(customer.id, planId, paymentMethod);
-
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({
-              success: true,
-              subscription: {
-                id: subscription.id,
-                status: 'active',
-                customerId: customer.id,
-                currentPeriodStart: subscription.current_period_start,
-                currentPeriodEnd: subscription.current_period_end,
-                planId: planId,
-              },
-              paymentStatus: confirmedPaymentIntent.status
-            }),
-          };
-        } else {
-          console.log('❌ Payment failed:', confirmedPaymentIntent.last_payment_error);
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({
-              success: false,
-              subscription: {
-                id: subscription.id,
-                status: subscription.status,
-                customerId: customer.id,
-                planId: planId,
-              },
-              paymentStatus: confirmedPaymentIntent.status,
-              error: confirmedPaymentIntent.last_payment_error?.message || 'Payment failed'
-            }),
-          };
-        }
-      } catch (confirmError) {
-        console.error('💥 Payment confirmation error:', confirmError.message);
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            success: false,
-            subscription: {
-              id: subscription.id,
-              status: subscription.status,
-              customerId: customer.id,
-              planId: planId,
-            },
-            paymentStatus: 'failed',
-            error: confirmError.message
-          }),
-        };
+      payment_method: paymentMethodId,
+      confirm: true,
+      usage: 'off_session',
+      metadata: {
+        planId: planId,
+        customerId: customer.id,
+        type: 'subscription_setup'
       }
-    } else if (paymentIntent && isPaymentSuccessful(paymentIntent)) {
-      console.log('✅ Payment already successful, activating user...');
+    });
+
+    console.log('💳 Setup Intent created:', {
+      id: setupIntent.id,
+      status: setupIntent.status
+    });
+
+    // Check if setup was successful
+    if (setupIntent.status === 'succeeded') {
+      console.log('✅ Setup Intent successful, creating subscription...');
       
+      // Create subscription after successful setup
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: plan.priceId }],
+        default_payment_method: paymentMethodId,
+        collection_method: 'charge_automatically'
+      });
+
+      console.log('📋 Subscription created:', {
+        id: subscription.id,
+        status: subscription.status
+      });
+
+      // Activate user in Supabase
       const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
       await activateSupabaseUser(customer.id, planId, paymentMethod);
 
@@ -413,30 +349,35 @@ async function handleCreateSubscription(data, headers) {
           success: true,
           subscription: {
             id: subscription.id,
-            status: 'active',
+            status: subscription.status,
             customerId: customer.id,
             currentPeriodStart: subscription.current_period_start,
             currentPeriodEnd: subscription.current_period_end,
             planId: planId,
           },
-          paymentStatus: paymentIntent.status
+          paymentStatus: 'succeeded'
         }),
       };
     } else {
-      console.log('❌ No payment intent or payment not successful');
+      console.log('❌ Setup Intent failed:', {
+        setupIntentId: setupIntent.id,
+        status: setupIntent.status,
+        lastSetupError: setupIntent.last_setup_error
+      });
+
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: false,
           subscription: {
-            id: subscription.id,
-            status: subscription.status,
+            id: null,
+            status: 'incomplete',
             customerId: customer.id,
             planId: planId,
           },
-          paymentStatus: paymentIntent?.status || 'unknown',
-          error: 'No payment intent created'
+          paymentStatus: setupIntent.status,
+          error: setupIntent.last_setup_error?.message || 'Setup failed'
         }),
       };
     }
@@ -553,7 +494,7 @@ async function handleCancelSubscription(data, headers) {
 }
 
 async function handleGetSubscription(subscriptionId, headers) {
-  console.log('�� Get subscription request:', { subscriptionId });
+  console.log('💳 Get subscription request:', { subscriptionId });
 
   try {
     if (!stripe || !process.env.STRIPE_SECRET_KEY) {
