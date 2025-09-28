@@ -9,32 +9,85 @@ const headers = {
 };
 
 // Subscription plans configuration
-const SUBSCRIPTION_PLANS = {
-  free: {
+export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    id: 'free',
     name: 'Free',
     price: 0,
-    amount: 0,
-    currency: 'usd',
+    currency: 'USD',
     interval: 'forever',
-    priceId: null
+    features: [
+      '5 messages per day',
+      '1 voice call per day',
+      '1 AI Companion',
+      'Basic personality options',
+      'Standard response time'
+    ],
+    limits: {
+      messagesPerDay: 5,
+      voiceCallsPerDay: 1,
+      companions: 1,
+      customPersonalities: false,
+      advancedFeatures: false
+    }
   },
-  premium: {
+  {
+    id: 'premium',
     name: 'Premium',
     price: 19.00,
-    amount: 1900, // $19.00 in cents
-    currency: 'usd',
+    priceId: 'price_1SBmcwFNMtIBKmjmouhnghrv', // Add your actual Stripe Price ID
+    currency: 'USD',
     interval: 'month',
-    priceId: process.env.STRIPE_PREMIUM_PRICE_ID
+    features: [
+      '50 messages per day',
+      '5 voice calls per day',
+      'Up to 3 AI Companions',
+      'Custom personality creation',
+      'Advanced voice features',
+      'Priority support',
+      'Early access to new features'
+    ],
+    limits: {
+      messagesPerDay: 50,
+      voiceCallsPerDay: 5,
+      companions: 3,
+      customPersonalities: true,
+      advancedFeatures: true
+    },
+    popular: true
   },
-  pro: {
+  {
+    id: 'pro',
     name: 'Pro',
     price: 49.00,
-    amount: 4900, // $49.00 in cents
-    currency: 'usd',
+    priceId: 'price_1SBmeXFNMtIBKmjmCNdli6HG', // Add your actual Stripe Price ID for Pro plan
+    currency: 'USD',
     interval: 'month',
-    priceId: process.env.STRIPE_PRO_PRICE_ID
+    features: [
+      'Unlimited messages',
+      'Unlimited voice calls',
+      'Unlimited AI Companions',
+      'Advanced AI training',
+      'Custom voice creation',
+      'Advanced analytics API access insights',
+      'Exclusive companion themes',
+      'Dedicated support',
+      'Premium customer support'
+    ],
+    limits: {
+      messagesPerDay: -1, // -1 means unlimited
+      voiceCallsPerDay: -1, // -1 means unlimited
+      companions: -1, // -1 means unlimited
+      customPersonalities: true,
+      advancedFeatures: true
+    }
   }
-};
+];
+
+// Helper function to get plan by ID
+function getPlanById(planId) {
+  return SUBSCRIPTION_PLANS.find(plan => plan.id === planId);
+}
 
 // Security: Validate payment success
 function isPaymentSuccessful(paymentIntent) {
@@ -195,7 +248,7 @@ async function handleCreatePaymentIntent(data, headers) {
   }
 
   try {
-    const plan = SUBSCRIPTION_PLANS[planId];
+    const plan = getPlanById(planId);
     if (!plan) {
       return { 
         statusCode: 400, 
@@ -205,7 +258,7 @@ async function handleCreatePaymentIntent(data, headers) {
     }
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: plan.amount,
+      amount: Math.round(plan.price * 100), // Convert to cents
       currency: currency.toLowerCase(),
       metadata: { 
         planId, 
@@ -245,7 +298,7 @@ async function handleCreateSubscription(data, headers) {
     hasPaymentMethod: !!paymentMethodId
   });
 
-  const plan = SUBSCRIPTION_PLANS[planId];
+  const plan = getPlanById(planId);
   if (!plan) {
     return { 
       statusCode: 400, 
@@ -649,4 +702,65 @@ async function handleGetCustomerSubscriptions(customerId, headers) {
       }),
     };
   }
+}
+
+// Plan limit checking functions
+export function checkMessageLimit(planId: string, messagesUsed: number): boolean {
+  const plan = getPlanById(planId);
+  if (!plan) return false;
+  
+  // -1 means unlimited
+  if (plan.limits.messagesPerDay === -1) return true;
+  
+  return messagesUsed < plan.limits.messagesPerDay;
+}
+
+export function checkVoiceCallLimit(planId: string, voiceCallsUsed: number): boolean {
+  const plan = getPlanById(planId);
+  if (!plan) return false;
+  
+  // -1 means unlimited
+  if (plan.limits.voiceCallsPerDay === -1) return true;
+  
+  return voiceCallsUsed < plan.limits.voiceCallsPerDay;
+}
+
+export function getRemainingMessages(planId: string, messagesUsed: number): number {
+  const plan = getPlanById(planId);
+  if (!plan) return 0;
+  
+  // -1 means unlimited
+  if (plan.limits.messagesPerDay === -1) return -1;
+  
+  return Math.max(0, plan.limits.messagesPerDay - messagesUsed);
+}
+
+export function getRemainingVoiceCalls(planId: string, voiceCallsUsed: number): number {
+  const plan = getPlanById(planId);
+  if (!plan) return 0;
+  
+  // -1 means unlimited
+  if (plan.limits.voiceCallsPerDay === -1) return -1;
+  
+  return Math.max(0, plan.limits.voiceCallsPerDay - voiceCallsUsed);
+}
+
+export function checkCompanionLimit(planId: string, companionsCreated: number): boolean {
+  const plan = getPlanById(planId);
+  if (!plan) return false;
+  
+  // -1 means unlimited
+  if (plan.limits.companions === -1) return true;
+  
+  return companionsCreated < plan.limits.companions;
+}
+
+export function getRemainingCompanions(planId: string, companionsCreated: number): number {
+  const plan = getPlanById(planId);
+  if (!plan) return 0;
+  
+  // -1 means unlimited
+  if (plan.limits.companions === -1) return -1;
+  
+  return Math.max(0, plan.limits.companions - companionsCreated);
 }
