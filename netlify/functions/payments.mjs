@@ -302,7 +302,7 @@ async function handleCreateSubscription(data, headers) {
       }
     }
 
-    // NEW APPROACH: Create a payment intent for the first payment, then create subscription
+    // FIXED: Create payment intent with proper configuration
     console.log('🔄 Creating payment intent for first payment...');
     const paymentIntent = await stripe.paymentIntents.create({
       amount: plan.amount,
@@ -311,6 +311,11 @@ async function handleCreateSubscription(data, headers) {
       payment_method: paymentMethodId,
       confirmation_method: 'manual',
       confirm: true,
+      return_url: 'https://loveaicompanion.com/success', // Added return URL
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: 'never' // Disable redirect-based payment methods
+      },
       metadata: {
         planId: planId,
         customerId: customer.id,
