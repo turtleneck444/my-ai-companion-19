@@ -167,6 +167,12 @@ export class PersonalityAI {
 
     } catch (error) {
       console.error('💥 AI API Error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        endpoint: this.apiEndpoint
+      });
       console.warn('🔄 Using enhanced personality fallback');
       const sessionMemory = this.getSessionMemory(context.character.id);
       return this.generatePersonalityFallback(message, context, sessionMemory);

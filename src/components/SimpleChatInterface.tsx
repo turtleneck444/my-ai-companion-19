@@ -270,6 +270,11 @@ export const SimpleChatInterface = ({
       persistMessage(aiMessage);
     } catch (error) {
       console.error('AI response error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: "I'm sorry, I'm having trouble thinking right now. Could you try again?",
