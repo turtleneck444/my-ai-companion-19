@@ -335,8 +335,16 @@ async function handleCreateSubscription(data, headers) {
         console.log('💳 Subscription requires payment confirmation');
         console.log('💳 Latest invoice:', subscription.latest_invoice);
         
-        // Get the payment intent from the expanded invoice
-        const paymentIntent = subscription.latest_invoice?.payment_intent;
+        // Finalize the invoice to create payment intent
+        const finalizedInvoice = await stripe.invoices.finalizeInvoice(subscription.latest_invoice.id);
+        console.log('💳 Invoice finalized:', {
+          id: finalizedInvoice.id,
+          status: finalizedInvoice.status,
+          hasPaymentIntent: !!finalizedInvoice.payment_intent
+        });
+        
+        // Get the payment intent from the finalized invoice
+        const paymentIntent = finalizedInvoice.payment_intent;
         
         if (paymentIntent) {
           console.log('💳 Payment intent found:', paymentIntent.id);
@@ -358,8 +366,7 @@ async function handleCreateSubscription(data, headers) {
             }),
           };
         } else {
-          console.log('❌ No payment intent found for incomplete subscription');
-          console.log('❌ Latest invoice details:', JSON.stringify(subscription.latest_invoice, null, 2));
+          console.log('❌ No payment intent found after finalizing invoice');
           return {
             statusCode: 200,
             headers,
@@ -372,7 +379,7 @@ async function handleCreateSubscription(data, headers) {
                 planId: planId,
               },
               paymentStatus: 'incomplete',
-              error: 'No payment intent available'
+              error: 'No payment intent available after finalizing invoice'
             }),
           };
         }
