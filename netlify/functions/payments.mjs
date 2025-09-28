@@ -329,26 +329,49 @@ async function handleCreateSubscription(data, headers) {
       });
 
       // Check if subscription needs payment confirmation
-      if (subscription.status === 'incomplete' && subscription.latest_invoice?.payment_intent) {
+      if (subscription.status === 'incomplete') {
         console.log('💳 Subscription requires payment confirmation');
         
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            success: false,
-            subscription: {
-              id: subscription.id,
-              status: subscription.status,
-              customerId: customer.id,
-              currentPeriodStart: subscription.current_period_start,
-              currentPeriodEnd: subscription.current_period_end,
-              planId: planId,
-            },
-            clientSecret: subscription.latest_invoice.payment_intent.client_secret,
-            paymentStatus: 'requires_confirmation'
-          }),
-        };
+        // Get the latest invoice to access payment intent
+        const latestInvoice = await stripe.invoices.retrieve(subscription.latest_invoice);
+        const paymentIntent = latestInvoice.payment_intent;
+        
+        if (paymentIntent) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              success: false,
+              subscription: {
+                id: subscription.id,
+                status: subscription.status,
+                customerId: customer.id,
+                currentPeriodStart: subscription.current_period_start,
+                currentPeriodEnd: subscription.current_period_end,
+                planId: planId,
+              },
+              clientSecret: paymentIntent.client_secret,
+              paymentStatus: 'requires_confirmation'
+            }),
+          };
+        } else {
+          console.log('❌ No payment intent found for incomplete subscription');
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              success: false,
+              subscription: {
+                id: subscription.id,
+                status: subscription.status,
+                customerId: customer.id,
+                planId: planId,
+              },
+              paymentStatus: 'incomplete',
+              error: 'No payment intent available'
+            }),
+          };
+        }
       } else if (subscription.status === 'active') {
         console.log('✅ Subscription active, activating user...');
         
