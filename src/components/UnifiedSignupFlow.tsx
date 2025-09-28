@@ -135,7 +135,7 @@ const PaymentForm = ({
         formData.age
       );
 
-      if (subscriptionResult.success) {
+      if (subscriptionResult && subscriptionResult.id) {
         // Payment successful - create account with paid plan
         await createAccount(selectedPlan);
 
@@ -147,10 +147,10 @@ const PaymentForm = ({
         navigate('/app', { replace: true, state: { startChatDefault: true } });
         return;
       } else {
-        console.error('Payment failed:', subscriptionResult.error);
+        console.error('Payment failed:', subscriptionResult);
         toast({
           title: "Payment Failed",
-          description: subscriptionResult.error || "Payment could not be processed. Please try again.",
+          description: "Payment could not be processed. Please try again.",
           variant: "destructive"
         });
       }
