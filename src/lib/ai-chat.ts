@@ -54,7 +54,7 @@ export class PersonalityAI {
 
   constructor() {
     // Use correct API endpoint based on environment
-    this.apiEndpoint = process.env.NODE_ENV === 'development' 
+    this.apiEndpoint = '/.netlify/functions/openai-chat' 
       ? '/api/openai-chat' 
       : '/.netlify/functions/openai-chat';
     
@@ -678,4 +678,10 @@ Remember: Stay in character as ${character.name}. Reference memories and show em
 }
 
 // Export singleton instance
-export const personalityAI = new PersonalityAI(); 
+export const personalityAI = new PersonalityAI();
+
+// Fallback function for debugging
+export const testPersonalityAI = () => {
+  console.log('🧪 Testing personalityAI function');
+  return personalityAI;
+}; 
