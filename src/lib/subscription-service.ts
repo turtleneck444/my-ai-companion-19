@@ -25,7 +25,7 @@ export class SubscriptionService {
     customerName?: string;
     paymentMethodId: string;
   }): Promise<SubscriptionResult> {
-    if (!data.paymentMethodId) {
+    if (!data.paymentMethodId || data.paymentMethodId === 'test_payment_method' || data.paymentMethodId.startsWith('pm_test_')) {
       throw new Error('Payment method required for subscription');
     }
 

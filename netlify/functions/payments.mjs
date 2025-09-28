@@ -246,6 +246,25 @@ async function handleCreatePaymentIntent(data, headers) {
       body: JSON.stringify({ error: 'Stripe not configured' }) 
     };
   }
+  
+  // Reject test payment methods in production
+  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
+    console.log('❌ Test payment method rejected in production');
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Test payment methods not allowed in production',
+        success: false
+      })
+    };
+  }
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
+    };
+  }
 
   try {
     const plan = getPlanById(planId);
@@ -308,6 +327,25 @@ async function handleCreateSubscription(data, headers) {
   }
 
   if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
+    };
+  }
+  
+  // Reject test payment methods in production
+  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
+    console.log('❌ Test payment method rejected in production');
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Test payment methods not allowed in production',
+        success: false
+      })
+    };
+  }
     return { 
       statusCode: 500, 
       headers, 
@@ -510,6 +548,60 @@ async function handleCreateSubscription(data, headers) {
         };
         
       } else if (subscription.status === 'active') {
+        // Verify payment actually succeeded before activating user
+        console.log('🔍 Verifying payment status for subscription:', subscription.id);
+        
+        try {
+          // Get the latest invoice to check payment status
+          const invoices = await stripe.invoices.list({
+            subscription: subscription.id,
+            limit: 1
+          });
+          
+          if (invoices.data.length > 0) {
+            const latestInvoice = invoices.data[0];
+            console.log('📄 Latest invoice status:', latestInvoice.status, latestInvoice.payment_intent?.status);
+            
+            // Only activate if payment actually succeeded
+            if (latestInvoice.status !== 'paid' || latestInvoice.payment_intent?.status !== 'succeeded') {
+              console.log('❌ Payment not successful, not activating user');
+              return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                  success: false,
+                  subscription: {
+                    id: subscription.id,
+                    status: subscription.status,
+                    customerId: customer.id,
+                    planId: planId,
+                  },
+                  paymentStatus: 'failed',
+                  error: 'Payment was not successful'
+                }),
+              };
+            }
+          }
+        } catch (paymentCheckError) {
+          console.error('❌ Error checking payment status:', paymentCheckError);
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              success: false,
+              subscription: {
+                id: subscription.id,
+                status: subscription.status,
+                customerId: customer.id,
+                planId: planId,
+              },
+              paymentStatus: 'error',
+              error: 'Could not verify payment status'
+            }),
+          };
+        }
+        
+        console.log('✅ Payment verified, proceeding with activation');
         console.log('✅ Subscription active, activating user...');
         
         // Activate user in Supabase
@@ -596,6 +688,25 @@ async function handleConfirmPayment(data, headers) {
 
   try {
     if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
+    };
+  }
+  
+  // Reject test payment methods in production
+  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
+    console.log('❌ Test payment method rejected in production');
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Test payment methods not allowed in production',
+        success: false
+      })
+    };
+  }
       return { 
         statusCode: 500, 
         headers, 
@@ -649,6 +760,25 @@ async function handleCancelSubscription(data, headers) {
 
   try {
     if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
+    };
+  }
+  
+  // Reject test payment methods in production
+  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
+    console.log('❌ Test payment method rejected in production');
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Test payment methods not allowed in production',
+        success: false
+      })
+    };
+  }
       return { 
         statusCode: 500, 
         headers, 
@@ -689,6 +819,25 @@ async function handleGetSubscription(subscriptionId, headers) {
 
   try {
     if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
+    };
+  }
+  
+  // Reject test payment methods in production
+  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
+    console.log('❌ Test payment method rejected in production');
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Test payment methods not allowed in production',
+        success: false
+      })
+    };
+  }
       return { 
         statusCode: 500, 
         headers, 
@@ -729,6 +878,25 @@ async function handleGetCustomerSubscriptions(customerId, headers) {
 
   try {
     if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
+    };
+  }
+  
+  // Reject test payment methods in production
+  if (paymentMethodId === 'test_payment_method' || paymentMethodId.startsWith('pm_test_')) {
+    console.log('❌ Test payment method rejected in production');
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Test payment methods not allowed in production',
+        success: false
+      })
+    };
+  }
       return { 
         statusCode: 500, 
         headers, 
