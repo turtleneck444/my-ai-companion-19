@@ -105,7 +105,7 @@ export const useUpgrade = () => {
       return {
         success: true,
         subscriptionId: subscriptionResult.subscriptionId,
-        nextBillingDate: nextBillingDate.toISOString()
+        nextBillingDate: new Date().toISOString()
       };
     } catch (error) {
       console.error('Subscription creation error:', error);
@@ -132,7 +132,7 @@ export const useUpgrade = () => {
       const plan = SUBSCRIPTION_PLANS.find(p => p.id === upgradeData.planId);
       toast({
         title: "Upgrade Successful!",
-        description: `Welcome to ${plan?.name}! You'll be billed $${plan?.price} monthly starting ${new Date(result.nextBillingDate).toLocaleDateString()}.`,
+        description: `Welcome to ${plan?.name}! You'll be billed $${plan?.price} monthly starting ${new Date().toLocaleDateString()}.`,
       });
 
       setShowUpgradePrompt(false);
