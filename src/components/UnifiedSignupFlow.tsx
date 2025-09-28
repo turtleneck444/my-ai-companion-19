@@ -135,7 +135,7 @@ const PaymentForm = ({
         formData.age
       );
 
-      if (subscriptionResult && subscriptionResult.id) {
+      if (subscriptionResult && subscriptionResult.success) {
         // Payment successful - create account with paid plan
         await createAccount(selectedPlan);
 
@@ -148,6 +148,11 @@ const PaymentForm = ({
         return;
       } else {
         console.error('Payment failed:', subscriptionResult);
+        console.error('Payment details:', {
+          success: subscriptionResult.success,
+          paymentStatus: subscriptionResult.paymentStatus,
+          subscriptionStatus: subscriptionResult.subscription?.status
+        });
         toast({
           title: "Payment Failed",
           description: "Payment could not be processed. Please try again.",
