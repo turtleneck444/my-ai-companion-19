@@ -35,7 +35,7 @@ export const SUBSCRIPTION_PLANS = [
     id: 'premium',
     name: 'Premium',
     price: 19.00,
-    priceId: 'price_1SBmcwFNMtIBKmjmouhnghrv', // Add your actual Stripe Price ID
+    priceId: 'price_1SBmcwFNMtIBKmjmouhnghrv',
     currency: 'USD',
     interval: 'month',
     features: [
@@ -390,25 +390,40 @@ async function handleCreateSubscription(data, headers) {
         // Try to get payment intent from expanded data first
         let paymentIntent = subscription.latest_invoice?.payment_intent;
         
-        // If no payment intent, try to pay the invoice
+        // If no payment intent, try to finalize and pay the invoice
         if (!paymentIntent) {
-          console.log('💳 No payment intent found, attempting to pay invoice...');
+          console.log('💳 No payment intent found, attempting to finalize invoice...');
           try {
-            const paidInvoice = await stripe.invoices.pay(subscription.latest_invoice.id);
-            paymentIntent = paidInvoice.payment_intent;
-            console.log('💳 Invoice payment attempted:', {
-              id: paidInvoice.id,
-              status: paidInvoice.status,
-              hasPaymentIntent: !!paymentIntent
+            // First finalize the invoice to create payment intent
+            const finalizedInvoice = await stripe.invoices.finalizeInvoice(subscription.latest_invoice.id);
+            paymentIntent = finalizedInvoice.payment_intent;
+            
+            // If still no payment intent, try to pay
+            if (!paymentIntent) {
+              console.log('💳 Still no payment intent, attempting to pay invoice...');
+              const paidInvoice = await stripe.invoices.pay(subscription.latest_invoice.id);
+              paymentIntent = paidInvoice.payment_intent;
+            }
+            
+            console.log('💳 Invoice processing attempted:', {
+              id: subscription.latest_invoice.id,
+              hasPaymentIntent: !!paymentIntent,
+              paymentIntentStatus: paymentIntent?.status
             });
           } catch (payError) {
-            console.log('💳 Invoice payment failed:', payError.message);
-            // If payment fails, the subscription will remain incomplete
+            console.log('💳 Invoice processing failed:', payError.message);
+            // Continue to check if we have a payment intent anyway
           }
         }
         
         if (paymentIntent) {
-          console.log('💳 Payment intent found:', paymentIntent.id);
+          console.log('💳 Payment intent found:', {
+            id: paymentIntent.id,
+            status: paymentIntent.status,
+            clientSecret: !!paymentIntent.client_secret
+          });
+          
+          // Return the payment intent for confirmation, regardless of status
           return {
             statusCode: 200,
             headers,

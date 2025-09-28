@@ -99,9 +99,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     currency: 'USD',
     interval: 'month',
     features: [
-      'Unlimited messages',
-      '10 voice calls per day',
-      '3 AI Companions',
+      '50 messages per day',
+      '5 voice calls per day',
+      'Up to 3 AI Companions',
       'Custom personality creation',
       'Advanced voice features',
       'Priority support',
@@ -402,4 +402,65 @@ export function formatPrice(price: number, currency: string = 'USD'): string {
     style: 'currency',
     currency: currency,
   }).format(price);
+}
+
+// Plan limit checking functions
+export function checkMessageLimit(planId: string, messagesUsed: number): boolean {
+  const plan = getPlanById(planId);
+  if (!plan) return false;
+  
+  // -1 means unlimited
+  if (plan.limits.messagesPerDay === -1) return true;
+  
+  return messagesUsed < plan.limits.messagesPerDay;
+}
+
+export function checkVoiceCallLimit(planId: string, voiceCallsUsed: number): boolean {
+  const plan = getPlanById(planId);
+  if (!plan) return false;
+  
+  // -1 means unlimited
+  if (plan.limits.voiceCallsPerDay === -1) return true;
+  
+  return voiceCallsUsed < plan.limits.voiceCallsPerDay;
+}
+
+export function getRemainingMessages(planId: string, messagesUsed: number): number {
+  const plan = getPlanById(planId);
+  if (!plan) return 0;
+  
+  // -1 means unlimited
+  if (plan.limits.messagesPerDay === -1) return -1;
+  
+  return Math.max(0, plan.limits.messagesPerDay - messagesUsed);
+}
+
+export function getRemainingVoiceCalls(planId: string, voiceCallsUsed: number): number {
+  const plan = getPlanById(planId);
+  if (!plan) return 0;
+  
+  // -1 means unlimited
+  if (plan.limits.voiceCallsPerDay === -1) return -1;
+  
+  return Math.max(0, plan.limits.voiceCallsPerDay - voiceCallsUsed);
+}
+
+export function checkCompanionLimit(planId: string, companionsCreated: number): boolean {
+  const plan = getPlanById(planId);
+  if (!plan) return false;
+  
+  // -1 means unlimited
+  if (plan.limits.companions === -1) return true;
+  
+  return companionsCreated < plan.limits.companions;
+}
+
+export function getRemainingCompanions(planId: string, companionsCreated: number): number {
+  const plan = getPlanById(planId);
+  if (!plan) return 0;
+  
+  // -1 means unlimited
+  if (plan.limits.companions === -1) return -1;
+  
+  return Math.max(0, plan.limits.companions - companionsCreated);
 }
