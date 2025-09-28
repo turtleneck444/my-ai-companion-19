@@ -1,25 +1,10 @@
-// Enhanced payment processing with Square and Stripe support
+// Enhanced payment processing with Stripe support
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 
-// Square Web Payments SDK types
-declare global {
-  interface Window {
-    Square?: {
-      payments: (appId: string, locationId?: string) => {
-        card: () => Promise<any>;
-        applePay: () => Promise<any>;
-        googlePay: () => Promise<any>;
-        ach: () => Promise<any>;
-      };
-    };
-  }
-}
-
 export interface PaymentConfig {
-  provider: 'stripe' | 'square' | 'paypal' | 'razorpay';
+  provider: 'stripe';
   publishableKey: string;
-  environment: 'test' | 'live' | 'sandbox' | 'production';
-  locationId?: string; // Required for Square
+  environment: 'test' | 'live' | 'production';
 }
 
 export interface SubscriptionPlan {
@@ -50,9 +35,31 @@ export interface Subscription {
   status: string;
   customerId: string;
   clientSecret?: string;
-  currentPeriodStart: string;
-  currentPeriodEnd: string;
+  currentPeriodStart: number;
+  currentPeriodEnd: number;
   planId: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  type: string;
+  card: {
+    brand: string;
+    last4: string;
+    exp_month: number;
+    exp_year: number;
+  };
+  created: number;
+}
+
+export interface CreateSubscriptionOptions {
+  planId: string;
+  paymentMethodId: string;
+  customerEmail?: string;
+  customerName?: string;
+  customerAge?: string;
+  userId?: string;
+  customerId?: string;
 }
 
 // Payment configuration
@@ -60,7 +67,6 @@ export const PAYMENT_CONFIG: PaymentConfig = {
   provider: 'stripe',
   publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
   environment: (import.meta.env.VITE_PAYMENT_ENVIRONMENT as any) || 'test',
-  locationId: (import.meta.env.VITE_SQUARE_LOCATION_ID || import.meta.env.VITE_PAYMENT_LOCATION_ID || '') as string
 };
 
 // Updated subscription plans with detailed features matching the reference guide
@@ -73,15 +79,14 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     interval: 'forever',
     features: [
       '5 messages per day',
+      '1 voice call per day',
       '1 AI Companion',
-      'Basic personalities only',
-      'Text chat only',
-      'Community support',
-      'Limited customization'
+      'Basic personality options',
+      'Standard response time'
     ],
     limits: {
       messagesPerDay: 5,
-      voiceCallsPerDay: 0,
+      voiceCallsPerDay: 1,
       companions: 1,
       customPersonalities: false,
       advancedFeatures: false
@@ -94,9 +99,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     currency: 'USD',
     interval: 'month',
     features: [
-      '50 messages per day',
-      '5 voice calls per day',
-      'Up to 3 AI Companions',
+      'Unlimited messages',
+      '10 voice calls per day',
+      '3 AI Companions',
       'Custom personality creation',
       'Advanced voice features',
       'Priority support',
@@ -145,7 +150,6 @@ export class PaymentProcessor {
   private config: PaymentConfig;
   private stripe: Stripe | null = null;
   private elements: StripeElements | null = null;
-  private squarePayments: any = null;
 
   constructor() {
     this.config = PAYMENT_CONFIG;
@@ -155,37 +159,10 @@ export class PaymentProcessor {
   public async initializePaymentProvider() {
     if (this.config.provider === 'stripe' && this.config.publishableKey) {
       this.stripe = await loadStripe(this.config.publishableKey);
-    } else if (this.config.provider === 'square' && this.config.publishableKey) {
-      await this.initializeSquare();
     }
   }
 
-  private async initializeSquare() {
-    // Load Square Web Payments SDK for the configured environment
-    if (!window.Square) {
-      const script = document.createElement('script');
-      const isProd = (this.config.environment === 'production');
-      script.src = isProd
-        ? 'https://web.squarecdn.com/v1/square.js'
-        : 'https://sandbox.web.squarecdn.com/v1/square.js';
-      script.async = true;
-      document.head.appendChild(script);
-      
-      await new Promise((resolve, reject) => {
-        script.onload = resolve as any;
-        script.onerror = reject as any;
-      });
-    }
-
-    if (!window.Square) throw new Error('Square SDK failed to load');
-
-    this.squarePayments = window.Square.payments(
-      this.config.publishableKey,
-      this.config.locationId
-    );
-  }
-
-  // Create payment intent for one-time payments (Stripe or server preflight). For Square, we don't require this in prod.
+  // Create payment intent for one-time payments (Stripe)
   async createPaymentIntent(planId: string, userId?: string): Promise<PaymentIntent> {
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
     if (!plan) {
@@ -352,72 +329,12 @@ export class PaymentProcessor {
     return this.stripe;
   }
 
-  // Get Square payments instance for frontend integration
-  getSquarePayments(): any {
-    return this.squarePayments;
-  }
-
-  // Create Square card payment form
-  async createStripeCard(): Promise<any> {
-    if (!this.stripe) {
-      throw new Error('Stripe not initialized');
-    }
-    return this.stripe;
-  }
-
-  // Create Square Apple Pay
-  async createSquareApplePay(): Promise<any> {
-    if (!this.stripe) {
-      throw new Error('Stripe not initialized');
-    }
-    return await this.squarePayments.applePay();
-  }
-
-  // Create Square Google Pay
-  async createSquareGooglePay(): Promise<any> {
-    if (!this.stripe) {
-      throw new Error('Stripe not initialized');
-    }
-    return await this.squarePayments.googlePay();
-  }
-
-  // Check if payment provider is configured
-  isConfigured(): boolean {
-    if (this.config.provider === 'stripe') {
-      return !!this.config.publishableKey;
-    } else if (this.config.provider === 'square') {
-      return !!this.config.publishableKey && !!this.config.locationId;
-    }
-    return false;
-  }
-
-  // Get available payment methods
-  getPaymentMethods(): string[] {
-    switch (this.config.provider) {
-      case 'stripe':
-        return ['card', 'apple_pay', 'google_pay'];
-      case 'square':
-        return ['card', 'apple_pay', 'google_pay'];
-      case 'paypal':
-        return ['paypal'];
-      case 'razorpay':
-        return ['card', 'netbanking', 'upi', 'wallet'];
-      default:
-        return ['card'];
-    }
-  }
-
-  // Get payment provider
-  getProvider(): string {
-    return this.config.provider;
-  }
-
   // Get configuration
   getConfig(): PaymentConfig {
     return { ...this.config };
   }
 
-  // Check if Square is properly configured and initialized
+  // Check if Stripe is properly configured and initialized
   async ensureStripeInitialized(): Promise<boolean> {
     if (this.config.provider !== "stripe") return false;
     
@@ -425,56 +342,26 @@ export class PaymentProcessor {
       console.error("Stripe publishable key not configured");
       return false;
     }
-    
+
     if (!this.stripe) {
-      try {
-        await this.initializePaymentProvider();
-      } catch (error) {
-        console.error("Failed to initialize Stripe:", error);
-        return false;
-      }
+      console.error("Stripe not initialized");
+      return false;
     }
-    
-    return !!this.stripe;
+
+    return true;
   }
+
   // Process payment (for unified signup flow)
   async processPayment(options: {
     amount: number;
     currency: string;
     planId: string;
     customerEmail: string;
-    sourceId?: string; // Square card token
   }): Promise<{ success: boolean; error?: string; paymentIntentId?: string }> {
     try {
       // For free plans, return success immediately
       if (options.amount === 0) {
         return { success: true, paymentIntentId: 'free-plan' };
-      }
-
-      // Handle Square directly (no preflight intent) to avoid dev simulation in prod
-      if (this.config.provider === 'square') {
-        if (!options.sourceId) return { success: false, error: 'Missing card token (sourceId)' };
-        const response = await fetch(`${API_BASE}/create-intent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            planId: options.planId,
-            amount: options.amount,
-            currency: options.currency.toLowerCase(),
-            provider: 'square',
-            sourceId: options.sourceId,
-            email: options.customerEmail
-          })
-        });
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          return { success: false, error: err.error || 'Square payment failed' };
-        }
-        const json = await response.json();
-        // Check if Square payment was actually successful
-        if (json.status && !['COMPLETED', 'APPROVED'].includes(json.status.toUpperCase())) {
-          return { success: false, error: `Payment failed: ${json.status}` };
-        }        return { success: true, paymentIntentId: json.id || ('square-' + Date.now()) };
       }
 
       // For Stripe: Create and then confirm intent
@@ -486,15 +373,14 @@ export class PaymentProcessor {
         return { success: true, paymentIntentId: paymentIntent.id };
       }
 
-      if (this.config.provider === 'stripe' && this.stripe) {
-        if (this.config.publishableKey && this.config.publishableKey !== 'your_stripe_publishable_key') {
-          return { success: true, paymentIntentId: paymentIntent.id || 'stripe-' + Date.now() };
-        } else {
-          return { success: false, error: 'Stripe not properly configured' };
-        }
+      // In production, confirm the payment
+      const confirmedPayment = await this.confirmPayment(paymentIntent.id);
+      
+      if (confirmedPayment.status === 'succeeded') {
+        return { success: true, paymentIntentId: confirmedPayment.id };
+      } else {
+        return { success: false, error: `Payment failed with status: ${confirmedPayment.status}` };
       }
-
-      return { success: false, error: 'Payment provider not available' };
     } catch (error: any) {
       console.error('Payment processing error:', error);
       return { success: false, error: error.message || 'Payment processing failed' };
@@ -502,63 +388,5 @@ export class PaymentProcessor {
   }
 }
 
-// Export singleton instance
+// Export default instance
 export const paymentProcessor = new PaymentProcessor();
-
-// Helper function to format price
-export function formatPrice(price: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(price);
-}
-
-// Helper function to get plan by ID
-export function getPlanById(planId: string): SubscriptionPlan | undefined {
-  return SUBSCRIPTION_PLANS.find(plan => plan.id === planId);
-}
-
-// Helper function to check if user can access feature
-export function canAccessFeature(
-  userPlan: string, 
-  feature: keyof SubscriptionPlan['limits']
-): boolean {
-  const plan = getPlanById(userPlan);
-  if (!plan) return false;
-  
-  const limit = plan.limits[feature];
-  if (typeof limit === 'boolean') return limit;
-  if (typeof limit === 'number') return limit === -1 || limit > 0;
-  return false;
-}
-
-// Usage tracking helper functions
-export function checkMessageLimit(userPlan: string, messagesUsed: number): boolean {
-  const plan = getPlanById(userPlan);
-  if (!plan) return false;
-  const limit = plan.limits.messagesPerDay;
-  return limit === -1 || messagesUsed < limit;
-}
-
-export function checkVoiceCallLimit(userPlan: string, voiceCallsUsed: number): boolean {
-  const plan = getPlanById(userPlan);
-  if (!plan) return false;
-  const limit = plan.limits.voiceCallsPerDay;
-  return limit === -1 || voiceCallsUsed < limit;
-}
-
-export function getRemainingMessages(userPlan: string, messagesUsed: number): number {
-  const plan = getPlanById(userPlan);
-  if (!plan) return 0;
-  const limit = plan.limits.messagesPerDay;
-  if (limit === -1) return -1;
-  return Math.max(0, limit - messagesUsed);
-}
-
-export function getRemainingVoiceCalls(userPlan: string, voiceCallsUsed: number): number {
-  const plan = getPlanById(userPlan);
-  if (!plan) return 0;
-  const limit = plan.limits.voiceCallsPerDay;
-  if (limit === -1) return -1;
-  return Math.max(0, limit - voiceCallsUsed);
-}
