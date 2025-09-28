@@ -32,7 +32,6 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { getPlanById, getRemainingMessages } from '@/lib/payments';
-import { useUpgrade } from '@/hooks/useUpgrade';
 
 // Using ChatMessage from ai-chat.ts instead of local Message interface
 
@@ -90,21 +89,17 @@ export const SimpleChatInterface = ({
 }: SimpleChatInterfaceProps) => {
   const { user } = useAuth();
   
-  // Use the new enhanced usage tracking
+  // Use the enhanced usage tracking with upgrade system
   const {
     usage,
     incrementMessages,
     incrementVoiceCalls,
-    isLoading: usageLoading
-  } = useEnhancedUsageTracking();
-  
-  // Use the enhanced upgrade system
-  const { 
-    showUpgradePrompt, 
-    setShowUpgradePrompt, 
+    isLoading: usageLoading,
+    showUpgradePrompt,
+    setShowUpgradePrompt,
     handleUpgrade,
-    isUpgrading 
-  } = useUpgrade();
+    isUpgrading
+  } = useEnhancedUsageTracking();
 
   // Generate initial message based on character personality
   const getInitialMessage = () => {
@@ -712,19 +707,48 @@ export const SimpleChatInterface = ({
         </div>
       </div>
 
-      {/* Upgrade Prompt */}
+      {/* Upgrade Prompt Modal */}
       {showUpgradePrompt && (
-        <UpgradePrompt
-          isOpen={showUpgradePrompt}
-          onClose={() => setShowUpgradePrompt(false)}
-          limitType="messages"
-          currentPlan={usage.plan}
-          remaining={usage.remainingMessages}
-          onUpgradeSuccess={() => {
-            setShowUpgradePrompt(false);
-            toast({ title: 'Upgraded!', description: 'You can now continue chatting.' });
-          }}
-        />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Upgrade Your Plan</h3>
+            <p className="text-gray-600 mb-4">
+              You've reached your daily message limit. Choose a plan to continue:
+            </p>
+            <div className="space-y-2">
+              <Button
+                onClick={() => handleUpgrade({
+                  planId: 'premium',
+                  paymentMethodId: 'test_payment_method',
+                  customerEmail: user?.email
+                })}
+                disabled={isUpgrading}
+                className="w-full"
+              >
+                Premium - $19/month
+              </Button>
+              <Button
+                onClick={() => handleUpgrade({
+                  planId: 'pro',
+                  paymentMethodId: 'test_payment_method',
+                  customerEmail: user?.email
+                })}
+                disabled={isUpgrading}
+                variant="outline"
+                className="w-full"
+              >
+                Pro - $49/month
+              </Button>
+            </div>
+            <Button
+              onClick={() => setShowUpgradePrompt(false)}
+              variant="ghost"
+              className="w-full mt-2"
+            >
+              Maybe Later
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
