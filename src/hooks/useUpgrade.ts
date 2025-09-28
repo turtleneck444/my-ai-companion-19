@@ -91,9 +91,10 @@ export const useUpgrade = () => {
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({
-          subscription_plan: plan.id,
-          subscription_customer_id: subscriptionResult.customerId,
-          payment_method_id: subscriptionResult.subscriptionId,
+          subscription_plan_id: plan.id,
+          plan: plan.id,
+          customer_id: subscriptionResult.customerId,
+          subscription_id: subscriptionResult.subscriptionId,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
