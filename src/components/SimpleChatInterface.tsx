@@ -257,7 +257,26 @@ export const SimpleChatInterface = ({
       const thinkingTime = Math.max(1000, Math.min(3000, currentInput.length * 50));
       await new Promise(resolve => setTimeout(resolve, thinkingTime));
 
-      const aiResponse = await personalityAI(chatContext);
+      // Direct API call bypass for debugging
+      console.log('🧪 Bypassing personalityAI, calling API directly');
+      const response = await fetch('/.netlify/functions/openai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: `You are ${character.name}. ${character.bio}. Be ${character.personality.join(', ')}. Respond naturally and with personality.` },
+            { role: 'user', content: currentInput }
+          ]
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const aiResponse = data.message || 'Hello! How can I help you today?';
+      console.log('✅ Direct API response:', aiResponse);
       
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),

@@ -59,6 +59,7 @@ export class PersonalityAI {
       : '/.netlify/functions/openai-chat';
     
     console.log('🔧 PersonalityAI initialized with endpoint:', this.apiEndpoint);
+    console.log('🚀 AI Chat System v2.0 - Cache Bust');
   }
 
   async generateResponse(
