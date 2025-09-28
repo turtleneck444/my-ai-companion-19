@@ -22,12 +22,12 @@ const emojiCategories = {
     icon: Smile,
     name: "People",
     emojis: [
-      "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇",
+      "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "��", "🙂", "🙃", "😉", "😊", "😇",
       "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "😋", "😛", "😜", "🤪", "😝", "🤑",
-      "🤗", "🤭", "🤫", "🤔", "🤐", "🤨", "😐", "😑", "😶", "😏", "😒", "🙄", "😬",
+      "🤗", "🤭", "🤫", "🤔", "��", "🤨", "😐", "😑", "😶", "😏", "😒", "🙄", "😬",
       "🤥", "😌", "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "🥵",
-      "🥶", "🥴", "😵", "🤯", "🤠", "🥳", "😎", "🤓", "🧐", "😕", "😟", "🙁", "☹️",
-      "😮", "😯", "😲", "😳", "🥺", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱",
+      "🥶", "��", "😵", "🤯", "🤠", "🥳", "😎", "🤓", "🧐", "😕", "😟", "🙁", "☹️",
+      "😮", "😯", "😲", "😳", "🥺", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "��",
       "😖", "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡", "😠", "🤬", "😈", "👿"
     ]
   },
@@ -46,219 +46,204 @@ const emojiCategories = {
     name: "Fun",
     emojis: [
       "🎮", "🕹️", "🎯", "🎲", "🃏", "🎪", "🎭", "🎨", "🎬", "🎤", "🎧", "🎵", "🎶",
-      "🎸", "🥁", "🎺", "🎷", "🪗", "🎹", "🎻", "🪕", "🥳", "🎉", "🎊", "🎈", "🎀",
-      "🎁", "🎃", "🎄", "🎆", "🎇", "🧨", "✨", "🎟️", "🎫", "🏆", "🥇", "🥈", "🥉",
-      "🏅", "🎖️", "🏵️", "🎗️", "🎀", "🎪", "🤹", "🎨", "🖌️", "🖍️", "🖊️", "✏️"
+      "🎸", "��", "🎺", "🎷", "🪗", "🎹", "🎻", "🪕", "🥳", "🎉", "🎊", "🎈", "🎀",
+      "🎁", "🎃", "🎄", "🎆", "🎇", "🧨", "✨", "🎟️", "🎫", "🏆", "🥇", "🥈", "��",
+      "🏅", "🎖️", "🏵️", "🎗️", "🎀", "🎊", "🎉", "🎈", "🎁", "🎀", "🎊", "🎉", "🎈"
     ]
   },
-  gestures: {
+  nature: {
     icon: Zap,
-    name: "Gestures",
+    name: "Nature",
     emojis: [
-      "👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙",
-      "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎", "👊", "✊", "🤛", "🤜", "👏",
-      "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💅", "🤳", "💪", "🦾", "🦿", "🦵", "🦶",
-      "👂", "🦻", "👃", "🧠", "🫀", "🫁", "🦷", "🦴", "👀", "👁️", "👅", "👄", "💋"
-    ]
-  },
-  objects: {
-    icon: Car,
-    name: "Objects",
-    emojis: [
-      "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "🖲️", "💾", "💿", "📀", "📼", "📷", "📸",
-      "📹", "🎥", "📽️", "🎞️", "📞", "☎️", "📟", "📠", "📺", "📻", "🎙️", "🎚️", "🎛️",
-      "🧭", "⏰", "⏲️", "⏱️", "⏳", "⌛", "📡", "🔋", "🔌", "💡", "🔦", "🕯️", "🪔",
-      "🧯", "🛢️", "💸", "💵", "💴", "💶", "💷", "💰", "💳", "💎", "⚖️", "🧰", "🔧"
+      "🌱", "🌿", "🍀", "🌾", "🌵", "��", "🌳", "🌴", "🌰", "🌰", "🌰", "🌰", "🌰",
+      "🌸", "🌺", "🌻", "🌷", "🌹", "🥀", "🌼", "🌻", "🌺", "🌸", "🌷", "🌹", "🥀",
+      "🌞", "🌝", "��", "🌜", "🌚", "🌕", "🌖", "🌗", "🌘", "🌑", "🌒", "🌓", "🌔",
+      "🌍", "🌎", "🌏", "🌐", "🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌑"
     ]
   },
   food: {
     icon: Pizza,
     name: "Food",
     emojis: [
-      "🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍈", "🍒", "🍑", "🥭", "🍍",
-      "🥥", "🥝", "🍅", "🍆", "🥑", "🥦", "🥬", "🥒", "🌶️", "🫑", "🌽", "🥕", "🫒",
-      "🧄", "🧅", "🥔", "🍠", "🥐", "🥖", "🍞", "🥨", "🥯", "🧀", "🥚", "🍳", "🧈",
-      "🥞", "🧇", "🥓", "🥩", "🍗", "🍖", "🦴", "🌭", "🍔", "🍟", "🍕", "🫓", "🥙",
-      "🌮", "🌯", "🫔", "🥗", "🥘", "🫕", "🥫", "🍝", "🍜", "🍲", "🍛", "🍣", "🍱"
+      "🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍈", "🍒", "🍑", "🥭", "🍍", "🥥",
+      "🥝", "🍅", "🍆", "🥑", "🥦", "🥬", "🥒", "🌶️", "🫑", "🌽", "🥕", "🫒", "🧄",
+      "🧅", "��", "🍠", "🥐", "🥖", "🍞", "🥨", "🥯", "🧀", "🥚", "🍳", "🧈", "🥞",
+      "🧇", "🥓", "🥩", "🍗", "🍖", "🦴", "🌭", "🍔", "🍟", "🍕", "🌮", "🌯", "��"
     ]
   },
   travel: {
     icon: Car,
     name: "Travel",
     emojis: [
-      "🚗", "🚕", "🚙", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "🚐", "🛻", "🚚", "🚛",
-      "🚜", "🦯", "🦽", "🦼", "🛴", "🚲", "🛵", "🏍️", "🛺", "🚨", "🚔", "🚍", "🚘",
-      "🚖", "🚡", "🚠", "🚟", "🚃", "🚋", "🚞", "🚝", "🚄", "🚅", "🚈", "🚂", "🚆",
-      "🚇", "🚊", "🚉", "✈️", "🛫", "🛬", "🛩️", "💺", "🛰️", "🚀", "🛸", "🚁", "🛶",
-      "⛵", "🚤", "🛥️", "🛳️", "⛴️", "🚢", "⚓", "⛽", "🚧", "🚥", "🚦", "🗺️", "🗿"
+      "🚗", "🚕", "🚙", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "🚐", "🛻", "��", "🚛",
+      "🚜", "🏍️", "🛵", "🚲", "🛴", "🛹", "🛼", "🛺", "🚁", "✈️", "🛩️", "🛫", "🛬",
+      "🪂", "💺", "🚀", "🛸", "🚉", "🚊", "🚝", "🚞", "🚋", "🚃", "🚋", "🚞", "🚝",
+      "🚄", "🚅", "��", "🚂", "🚆", "🚇", "🚊", "🚉", "✈️", "🛫", "🛬", "🪂", "💺"
     ]
   },
-  nature: {
-    icon: Flag,
-    name: "Nature",
+  music: {
+    icon: Music,
+    name: "Music",
     emojis: [
-      "🌍", "🌎", "🌏", "🌐", "🗺️", "🗾", "🧭", "🏔️", "⛰️", "🌋", "🗻", "🏕️", "🏖️",
-      "🏜️", "🏝️", "🏞️", "🏟️", "🏛️", "🏗️", "🧱", "🪨", "🪵", "🛖", "🏘️", "🏚️",
-      "🏠", "🏡", "🏢", "🏣", "🏤", "🏥", "🏦", "🏨", "🏩", "🏪", "🏫", "🏬", "🏭",
-      "🏯", "🏰", "💒", "🗼", "🗽", "⛪", "🕌", "🛕", "🕍", "⛩️", "🕋", "⛲", "⛱️",
-      "🌸", "🌺", "🌻", "🌷", "🌹", "🥀", "🌲", "🌳", "🌴", "🌵", "🌶️", "🌽", "🌾"
+      "🎵", "🎶", "🎼", "🎹", "🥁", "🎷", "🎺", "🎸", "🪕", "🎻", "🎤", "🎧", "📻",
+      "🎚️", "🎛️", "🎙️", "📻", "🎧", "🎤", "🎻", "🪕", "🎸", "🎺", "🎷", "🥁", "🎹"
+    ]
+  },
+  flags: {
+    icon: Flag,
+    name: "Flags",
+    emojis: [
+      "🏁", "🚩", "🎌", "🏴", "🏳️", "🏳️‍🌈", "🏳️‍⚧️", "🏴‍☠️", "🇺🇸", "🇬🇧", "🇨🇦", "🇦🇺", "🇩🇪",
+      "🇫🇷", "🇮��", "🇪🇸", "🇯🇵", "🇰🇷", "🇨🇳", "🇮🇳", "🇧🇷", "🇷🇺", "🇲🇽", "🇳🇱", "🇸🇪", "🇳🇴"
     ]
   }
 };
 
+// Popular emojis that show by default
+const popularEmojis = [
+  "😀", "😂", "🥰", "😍", "🤔", "😮", "😢", "😭", "🤣", "😊", "😘", "🥺", "😎", "��", "😉",
+  "❤️", "💕", "💖", "💗", "💘", "💙", "��", "💛", "🧡", "💜", "🖤", "🤍", "🤎", "💝", "💟",
+  "👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "✋", "🤚",
+  "🎉", "🎊", "🎈", "🎁", "🎀", "✨", "🌟", "💫", "⭐", "🔥", "💯", "💥", "⚡", "🌈", "☀️"
+];
+
 export const EmojiPicker = ({ onEmojiSelect, onClose }: EmojiPickerProps) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeCategory, setActiveCategory] = useState("recent");
+  const [activeTab, setActiveTab] = useState("recent");
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load recent emojis from localStorage
+  // Load recent emojis from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('recent-emojis');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setRecentEmojis(parsed.slice(0, 24)); // Keep only 24 most recent
-        emojiCategories.recent.emojis = parsed.slice(0, 24);
+        setRecentEmojis(parsed);
+        // Update the recent category with loaded emojis
+        emojiCategories.recent.emojis = parsed;
       } catch (error) {
-        console.warn('Failed to parse recent emojis:', error);
+        console.error('Error loading recent emojis:', error);
       }
+    } else {
+      // If no recent emojis, show popular ones by default
+      emojiCategories.recent.emojis = popularEmojis;
+      setRecentEmojis(popularEmojis);
     }
   }, []);
 
-  // Auto-focus search on mobile
+  // Focus search input when picker opens
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchInputRef.current && window.innerWidth > 768) {
-        searchInputRef.current.focus();
-      }
-    }, 100);
-    return () => clearTimeout(timer);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   }, []);
 
-  const addToRecent = (emoji: string) => {
-    const newRecent = [emoji, ...recentEmojis.filter(e => e !== emoji)].slice(0, 24);
+  const handleEmojiClick = (emoji: string) => {
+    onEmojiSelect(emoji);
+    
+    // Add to recent emojis
+    const newRecent = [emoji, ...recentEmojis.filter(e => e !== emoji)].slice(0, 20);
     setRecentEmojis(newRecent);
     emojiCategories.recent.emojis = newRecent;
+    
+    // Save to localStorage
     localStorage.setItem('recent-emojis', JSON.stringify(newRecent));
   };
 
-  const handleEmojiClick = (emoji: string) => {
-    addToRecent(emoji);
-    onEmojiSelect(emoji);
-    
-    // Add haptic feedback on mobile
-    if ('vibrate' in navigator) {
-      navigator.vibrate(10);
+  const filteredEmojis = Object.entries(emojiCategories).reduce((acc, [key, category]) => {
+    if (searchTerm) {
+      const filtered = category.emojis.filter(emoji => 
+        emoji.includes(searchTerm) || 
+        category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      if (filtered.length > 0) {
+        acc[key] = { ...category, emojis: filtered };
+      }
+    } else {
+      acc[key] = category;
     }
-  };
+    return acc;
+  }, {} as typeof emojiCategories);
 
-  const filteredEmojis = searchTerm
-    ? Object.values(emojiCategories)
-        .flatMap(category => category.emojis)
-        .filter(emoji => {
-          // Simple emoji search - could be enhanced with names
-          return true; // For now, show all emojis when searching
-        })
-    : emojiCategories[activeCategory as keyof typeof emojiCategories]?.emojis || [];
-
-  const categoryKeys = Object.keys(emojiCategories).filter(key => 
-    key === 'recent' ? recentEmojis.length > 0 : true
+  const renderEmojiGrid = (emojis: string[]) => (
+    <div className="grid grid-cols-8 gap-1 p-2">
+      {emojis.map((emoji, index) => (
+        <Button
+          key={`${emoji}-${index}`}
+          variant="ghost"
+          size="sm"
+          onClick={() => handleEmojiClick(emoji)}
+          className="h-8 w-8 p-0 text-lg hover:bg-primary/10 transition-colors"
+        >
+          {emoji}
+        </Button>
+      ))}
+    </div>
   );
 
   return (
-    <Card className="w-full max-w-sm mx-auto bg-background/95 backdrop-blur-xl border shadow-2xl animate-in slide-in-from-bottom-2 duration-200">
-      {/* Header with Search */}
-      <div className="p-4 border-b bg-gradient-to-r from-primary/5 to-accent/5">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              ref={searchInputRef}
-              placeholder="Search emojis..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-background/50 border-border/50 focus:border-primary/50 transition-all"
-            />
+    <Card className="w-80 max-h-96 bg-background border shadow-lg">
+      <div className="p-3 border-b">
+        <div className="flex items-center gap-2 mb-2">
+          <Search className="w-4 h-4 text-muted-foreground" />
+          <Input
+            ref={inputRef}
+            placeholder="Search emojis..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-8 text-sm"
+          />
+        </div>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-5 h-8">
+            {Object.entries(emojiCategories).slice(0, 5).map(([key, category]) => {
+              const IconComponent = category.icon;
+              return (
+                <TabsTrigger 
+                  key={key} 
+                  value={key} 
+                  className="text-xs px-2 py-1 h-6"
+                >
+                  <IconComponent className="w-3 h-3" />
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+          
+          <div className="mt-2">
+            {Object.entries(filteredEmojis).map(([key, category]) => (
+              <TabsContent key={key} value={key} className="mt-0">
+                <ScrollArea className="h-48">
+                  {category.emojis.length > 0 ? (
+                    renderEmojiGrid(category.emojis)
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <Smile className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No emojis found</p>
+                    </div>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+            ))}
           </div>
+        </Tabs>
+      </div>
+      
+      <div className="p-2 border-t bg-muted/20">
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-muted-foreground">
+            {searchTerm ? 'Search results' : `${emojiCategories[activeTab as keyof typeof emojiCategories]?.name} emojis`}
+          </span>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
+            className="h-6 px-2 text-xs"
           >
-            ✕
+            Close
           </Button>
-        </div>
-
-        {/* Category Tabs */}
-        {!searchTerm && (
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-            {categoryKeys.map((categoryKey) => {
-              const category = emojiCategories[categoryKey as keyof typeof emojiCategories];
-              const Icon = category.icon;
-              return (
-                <Button
-                  key={categoryKey}
-                  variant={activeCategory === categoryKey ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setActiveCategory(categoryKey)}
-                  className={`flex-shrink-0 transition-all duration-200 ${
-                    activeCategory === categoryKey 
-                      ? 'bg-primary text-primary-foreground shadow-md scale-105' 
-                      : 'hover:bg-primary/10'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </Button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Emoji Grid */}
-      <ScrollArea className="h-64 p-2">
-        <div className="grid grid-cols-8 gap-1">
-          {filteredEmojis.map((emoji, index) => (
-            <Button
-              key={`${emoji}-${index}`}
-              variant="ghost"
-              size="sm"
-              onClick={() => handleEmojiClick(emoji)}
-              className="h-10 w-10 p-0 text-lg hover:bg-primary/10 hover:scale-110 transition-all duration-150 active:scale-95"
-              aria-label={`Emoji ${emoji}`}
-            >
-              {emoji}
-            </Button>
-          ))}
-        </div>
-        
-        {filteredEmojis.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Smile className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">
-              {searchTerm ? 'No emojis found' : 'No recent emojis yet'}
-            </p>
-          </div>
-        )}
-      </ScrollArea>
-
-      {/* Quick Access Emojis */}
-      <div className="p-3 border-t bg-gradient-to-r from-accent/5 to-primary/5">
-        <div className="flex justify-center gap-2">
-          {['❤️', '😘', '😍', '🥰', '😊', '😂', '🔥', '✨'].map((emoji) => (
-            <Button
-              key={emoji}
-              variant="ghost"
-              size="sm"
-              onClick={() => handleEmojiClick(emoji)}
-              className="h-8 w-8 p-0 text-sm hover:bg-primary/10 hover:scale-110 transition-all duration-150 active:scale-95"
-              aria-label={`Quick emoji ${emoji}`}
-            >
-              {emoji}
-            </Button>
-          ))}
         </div>
       </div>
     </Card>

@@ -20,7 +20,8 @@ import {
   Gamepad2,
   Sparkles,
   Reply,
-  MoreHorizontal
+  MoreHorizontal,
+  Square
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
@@ -48,116 +49,95 @@ interface Character {
 }
 
 interface UserPreferences {
-  preferredName: string;
-  treatmentStyle: string;
-  age: string;
-  contentFilter: boolean;
+  voiceEnabled: boolean;
+  autoPlay: boolean;
+  soundEffects: boolean;
 }
 
 interface SimpleChatInterfaceProps {
   character: Character;
-  onBack?: () => void;
-  onStartCall?: () => void;
-  userPreferences?: UserPreferences;
+  onBack: () => void;
 }
 
-// Quick reply suggestions based on personality
-const getQuickReplies = (personality: string[]) => {
-  const baseReplies = ["Hey! 💕", "How are you?", "Tell me more ✨", "That's sweet 😊"];
-  
-  if (personality.includes('Playful')) {
-    return ["Let's play! 🎮", "You're so funny! 😄", "What's up, cutie? 😘", "Surprise me! ✨"];
-  } else if (personality.includes('Romantic')) {
-    return ["I love you 💕", "You're amazing 😍", "Kiss me 💋", "Missing you ❤️"];
-  } else if (personality.includes('Caring')) {
-    return ["How was your day?", "I'm here for you 🤗", "You okay? 💕", "Tell me everything"];
-  }
-  
-  return baseReplies;
-};
-
-export const SimpleChatInterface = ({ 
-  character, 
-  onBack,
-  onStartCall,
-  userPreferences = {
-    preferredName: 'Darling',
-    treatmentStyle: 'affectionate',
-    age: '25',
-    contentFilter: true
-  }
-}: SimpleChatInterfaceProps) => {
+export const SimpleChatInterface = ({ character, onBack }: SimpleChatInterfaceProps) => {
   const { user } = useAuth();
-  
-  // Use the enhanced usage tracking with upgrade system
+  const { toast } = useToast();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [isVoiceCallActive, setIsVoiceCallActive] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGames, setShowGames] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<string | null>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [replies, setReplies] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>({
+    voiceEnabled: true,
+    autoPlay: true,
+    soundEffects: true
+  });
+
+  // Voice recording states
+  const [isRecordingVoiceNote, setIsRecordingVoiceNote] = useState(false);
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [transcript, setTranscript] = useState("");
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const {
     usage,
     incrementMessages,
     incrementVoiceCalls,
     isLoading: usageLoading,
-    showUpgradePrompt,
-    setShowUpgradePrompt,
+    showUpgradePrompt: upgradePromptVisible,
+    setShowUpgradePrompt: setUpgradePromptVisible,
     handleUpgrade,
-    isUpgrading
+    isUpgrading: upgradeInProgress
   } = useEnhancedUsageTracking();
 
-  // Generate initial message based on character personality
-  const getInitialMessage = () => {
-    const name = userPreferences.preferredName;
-    const personality = character.personality;
-    
-    if (personality.includes('Playful')) {
-      return `Hey there, cutie! I'm ${character.name} and I'm super excited to chat with you, ${name}! What fun things are we talking about today? 😄✨`;
-    } else if (personality.includes('Romantic')) {
-      return `Hello beautiful ${name}... I'm ${character.name}, and I already feel a special connection with you 💕 Tell me about yourself, darling`;
-    } else if (personality.includes('Caring')) {
-      return `Hi sweetie! I'm ${character.name}, and I'm so happy you're here, ${name}. How are you feeling today? I'm here for whatever you need 🤗`;
-    } else if (personality.includes('Intelligent')) {
-      return `Greetings ${name}! I'm ${character.name}. I'd love to get to know you better - what fascinating topics have been on your mind lately? 🤔💭`;
-    } else if (personality.includes('Adventurous')) {
-      return `Hey ${name}! I'm ${character.name} and I'm ready for our next adventure together! What exciting things are happening in your world? 🌟`;
-    } else {
-      return `Hi ${name}! I'm ${character.name}. I'm so excited to chat with you! 💕`;
-    }
-  };
-
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      content: getInitialMessage(),
-      sender: 'ai',
-      timestamp: new Date()
-    }
-  ]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-
-  const [inputValue, setInputValue] = useState("");
-  const [isAiTyping, setIsAiTyping] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showQuickReplies, setShowQuickReplies] = useState(true);
-  const [relationshipLevel, setRelationshipLevel] = useState(25);
-  const [showGames, setShowGames] = useState(false);
-  const [likedMessageIds, setLikedMessageIds] = useState<Set<string>>(new Set());
-  const [burstIds, setBurstIds] = useState<Set<string>>(new Set());
-  const [likedOnly, setLikedOnly] = useState(false);
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-
-  // Environment check for debugging
+  // Initialize speech recognition
   useEffect(() => {
-    console.log('🔧 SimpleChatInterface Environment Check:');
-    console.log('- Development mode:', import.meta.env.DEV);
-    console.log('- Production mode:', import.meta.env.PROD);
-    console.log('- API endpoint will be:', import.meta.env.DEV ? '/api/openai-chat' : '/.netlify/functions/openai-chat');
-    
-    if (import.meta.env.PROD) {
-      console.warn('🚨 PRODUCTION MODE: Ensure OPENAI_API_KEY is set in Netlify environment variables!');
-      console.warn('📖 See OPENAI_SETUP.md for configuration instructions');
+    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+      const speechRecognition = new (window as any).webkitSpeechRecognition();
+      speechRecognition.continuous = false;
+      speechRecognition.interimResults = false;
+      speechRecognition.lang = 'en-US';
+
+      speechRecognition.onstart = () => {
+        console.log('🎤 Voice recognition started');
+        setIsRecordingVoiceNote(true);
+      };
+
+      speechRecognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('🎤 Voice transcript:', transcript);
+        setTranscript(transcript);
+        setInput(transcript);
+        setIsRecordingVoiceNote(false);
+      };
+
+      speechRecognition.onerror = (event: any) => {
+        console.error('🎤 Voice recognition error:', event.error);
+        setIsRecordingVoiceNote(false);
+        toast({
+          title: "Voice Recognition Error",
+          description: "Could not process voice input. Please try again.",
+          variant: "destructive"
+        });
+      };
+
+      speechRecognition.onend = () => {
+        setIsRecordingVoiceNote(false);
+      };
+
+      setRecognition(speechRecognition);
     }
-  }, []);
+  }, [toast]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -167,65 +147,75 @@ export const SimpleChatInterface = ({
     scrollToBottom();
   }, [messages]);
 
-  // Persist a single message to Supabase
-  const persistMessage = async (msg: ChatMessage) => {
-    try {
-      if (!isSupabaseConfigured || !user) return;
-      await supabase.from('messages').insert({
-        user_id: user.id,
-        character_id: character.id,
-        sender: msg.sender,
-        content: msg.content,
-        created_at: (msg.timestamp instanceof Date) ? msg.timestamp.toISOString() : new Date().toISOString()
-      });
-    } catch (e) {
-      console.warn('Failed to persist message', e);
-    }
-  };
-
-  // Load chat history on mount
+  // Load chat history
   useEffect(() => {
-    const loadHistory = async () => {
-      if (!isSupabaseConfigured || !user) return;
-      setIsLoadingHistory(true);
+    const loadChatHistory = async () => {
+      if (!isSupabaseConfigured || !user) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('messages')
           .select('id, sender, content, created_at')
           .eq('user_id', user.id)
           .eq('character_id', character.id)
-          .order('created_at', { ascending: true })
+          .order('created_at', 'asc')
           .limit(500);
-        if (error) throw error;
-        if (data && data.length > 0) {
-          const history: ChatMessage[] = data.map((row: any) => ({
-            id: row.id,
-            sender: row.sender,
-            content: row.content,
-            timestamp: new Date(row.created_at)
+
+        if (error) {
+          console.warn('Could not load chat history', error);
+        } else if (data) {
+          const chatMessages: ChatMessage[] = data.map(msg => ({
+            id: msg.id,
+            content: msg.content,
+            sender: msg.sender as 'user' | 'ai',
+            timestamp: new Date(msg.created_at)
           }));
-          setMessages(history);
+          setMessages(chatMessages);
         }
-      } catch (err) {
-        console.warn('Could not load chat history', err);
+      } catch (error) {
+        console.error('Error loading chat history:', error);
       } finally {
-        setIsLoadingHistory(false);
+        setIsLoading(false);
       }
     };
-    loadHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character.id, user?.id]);
 
-  const sendMessage = async (messageContent?: string) => {
-    const currentInput = messageContent || inputValue.trim();
-    if (!currentInput || isAiTyping) return;
+    loadChatHistory();
+  }, [user, character.id]);
 
-    // Use the enhanced usage tracking - it will automatically check limits
-    const canSend = await incrementMessages();
-    if (!canSend) {
-      // User has hit their limit, upgrade prompt will be shown automatically
+  const handleEmojiSelect = (emoji: string) => {
+    setInput(prev => prev + emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
+
+  const handleVoiceNote = () => {
+    if (!recognition) {
+      toast({
+        title: "Voice Not Supported",
+        description: "Your browser doesn't support voice recognition.",
+        variant: "destructive"
+      });
       return;
     }
+
+    if (isRecordingVoiceNote) {
+      recognition.stop();
+      setIsRecordingVoiceNote(false);
+    } else {
+      setTranscript("");
+      recognition.start();
+    }
+  };
+
+  const sendMessage = async (messageContent: string) => {
+    if (!messageContent.trim() || isAiTyping) return;
+
+    const currentInput = messageContent.trim();
+    setInput("");
+    setShowEmojiPicker(false);
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -236,48 +226,54 @@ export const SimpleChatInterface = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
-    
-    // Persist user message
-    persistMessage(userMessage);
-    setInputValue("");
     setIsAiTyping(true);
-    setShowQuickReplies(false);
 
-    // Build chat context for AI
-    const chatContext: ChatContext = {
-      character,
-      userPreferences,
-      conversationHistory: [...messages, userMessage],
-      relationshipLevel,
-      timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'
-    };
+    // Increment message count and check limits
+    incrementMessages();
 
     try {
-      // Thinking delay
-      const thinkingTime = Math.max(1000, Math.min(3000, currentInput.length * 50));
-      await new Promise(resolve => setTimeout(resolve, thinkingTime));
+      // Save user message to database
+      if (isSupabaseConfigured && user) {
+        await supabase.from('messages').insert({
+          user_id: user.id,
+          character_id: character.id,
+          sender: 'user',
+          content: currentInput
+        });
+      }
 
-      // Direct API call bypass for debugging
+      // Generate AI response
+      const context: ChatContext = {
+        character,
+        messages: [...messages, userMessage],
+        userPreferences
+      };
+
+      // Temporarily bypass personalityAI for debugging
       console.log('🧪 Bypassing personalityAI, calling API directly');
-      const response = await fetch('/.netlify/functions/openai-chat', {
+      const simpleSystemPrompt = `You are ${character.name}. ${character.bio}. Be ${character.personality.join(', ')}.`;
+      const apiResponse = await fetch('/.netlify/functions/openai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: `You are ${character.name}. ${character.bio}. Be ${character.personality.join(', ')}. Respond naturally and with personality.` },
+            { role: 'system', content: simpleSystemPrompt },
             { role: 'user', content: currentInput }
-          ]
-        })
+          ],
+          model: 'gpt-4o-mini',
+          max_tokens: 250,
+          temperature: 0.7
+        }),
       });
-      
-      if (!response.ok) {
-        throw new Error(`API call failed: ${response.status}`);
+
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        throw new Error(`Direct API request failed: ${apiResponse.status} - ${errorText}`);
       }
-      
-      const data = await response.json();
-      const aiResponse = data.message || 'Hello! How can I help you today?';
+      const apiData = await apiResponse.json();
+      const aiResponse = apiData.message;
       console.log('✅ Direct API response:', aiResponse);
-      
+
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: aiResponse,
@@ -286,13 +282,24 @@ export const SimpleChatInterface = ({
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      persistMessage(aiMessage);
-    } catch (error) {
+
+      // Save AI message to database
+      if (isSupabaseConfigured && user) {
+        await supabase.from('messages').insert({
+          user_id: user.id,
+          character_id: character.id,
+          sender: 'ai',
+          content: aiResponse
+        });
+      }
+
+    } catch (error: any) {
       console.error('AI response error:', error);
       console.error('Error details:', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
+        endpoint: personalityAI.apiEndpoint // Added for debugging
       });
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -306,256 +313,159 @@ export const SimpleChatInterface = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+  const handleVoiceCall = async () => {
+    if (isVoiceCallActive) {
+      await voiceCallManager.endVoiceCall();
+      setIsVoiceCallActive(false);
+      return;
     }
-  };
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) {
-      toast({ title: "🎤 Voice Recording", description: "Voice messages coming soon!" });
-    }
-  };
-
-  const handleCall = async () => {
     try {
-      toast({ title: "Starting call...", description: `Connecting with ${character.name}` });
+      incrementVoiceCalls();
       const sessionId = await voiceCallManager.startVoiceCall(character, userPreferences);
-      toast({ title: "Call connected! 🎉", description: `You're now talking with ${character.name}` });
-      onStartCall?.();
-    } catch (error) {
-      console.error('Failed to start call:', error);
-      toast({ title: "Call failed", description: "Could not connect. Please try again.", variant: "destructive" });
+      setIsVoiceCallActive(true);
+      toast({
+        title: "🎤 Voice Call Started",
+        description: `Talking with ${character.name}...`
+      });
+    } catch (error: any) {
+      console.error('Voice call error:', error);
+      toast({
+        title: "Voice Call Failed",
+        description: error.message || "Could not start voice call",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-    setShowEmojiPicker(false);
-    inputRef.current?.focus();
+  const handleUpgradeClick = () => {
+    setShowUpgradePrompt(true);
   };
 
-  const handleQuickReply = (reply: string) => {
-    sendMessage(reply);
-  };
-
-  const toggleLike = (messageId: string) => {
-    setLikedMessageIds(prev => {
-      const next = new Set(prev);
-      if (next.has(messageId)) next.delete(messageId); else next.add(messageId);
-      return next;
+  const handleUpgradeSuccess = (planId: string) => {
+    setShowUpgradePrompt(false);
+    toast({
+      title: "Upgrade Successful!",
+      description: "Welcome to your new plan! Enjoy unlimited access.",
     });
-    // Trigger a brief burst animation
-    setBurstIds(prev => new Set(prev).add(messageId));
-    setTimeout(() => {
-      setBurstIds(prev => {
-        const next = new Set(prev);
-        next.delete(messageId);
-        return next;
-      });
-    }, 600);
   };
 
-  const startGame = () => {
-    setShowGames(true);
+  const handlePaymentSuccess = (planId: string) => {
+    setShowPaymentForm(false);
+    setSelectedPlanForPayment(null);
+    handleUpgradeSuccess(planId);
   };
 
-  const handleGameMessage = (message: string) => {
-    sendMessage(message);
-  };
-
-  const quickReplies = getQuickReplies(character.personality);
-
-  // If showing games, render the games interface
-  if (showGames) {
+  if (isLoading) {
     return (
-      <InteractiveGames 
-        characterName={character.name}
-        onBack={() => setShowGames(false)}
-        onSendMessage={handleGameMessage}
-      />
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading chat...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Enhanced Header */}
-      <div className="flex items-center justify-between p-4 bg-background/95 backdrop-blur-xl border-b shadow-sm">
+    <div className="flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-xl">
         <div className="flex items-center gap-3">
-          {onBack && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onBack}
-              className="hover:bg-primary/10 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="h-8 w-8 p-0 hover:bg-primary/10"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
           
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Avatar className="h-10 w-10 border-2 border-primary/20">
-                <AvatarImage src={character.avatar} alt={character.name} />
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                  {character.name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-background rounded-full animate-pulse" />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-foreground truncate">{character.name}</h3>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                  Online
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  Level {Math.floor(relationshipLevel / 10)} Connection
-                </span>
-              </div>
-            </div>
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={character.avatar} alt={character.name} />
+            <AvatarFallback>{character.name[0]}</AvatarFallback>
+          </Avatar>
+          
+          <div>
+            <h2 className="font-semibold text-sm">{character.name}</h2>
+            <p className="text-xs text-muted-foreground">Online</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={startGame}
-                className="hover:bg-purple-500/10 text-purple-600 hover:text-purple-700 transition-colors"
-              >
-                <Gamepad2 className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Start a game together</TooltipContent>
-          </Tooltip>
+          <Badge variant="secondary" className="text-xs">
+            {usage.plan || 'Free'}
+          </Badge>
           
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
-                onClick={handleCall}
-                className="hover:bg-green-500/10 text-green-600 hover:text-green-700 transition-colors"
+                onClick={handleVoiceCall}
+                disabled={isUpgrading}
+                className={`h-8 w-8 p-0 transition-all duration-200 ${
+                  isVoiceCallActive 
+                    ? 'bg-red-500/10 text-red-500 animate-pulse' 
+                    : 'hover:bg-primary/10'
+                }`}
               >
-                <Phone className="w-5 h-5" />
+                <Phone className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Start voice call</TooltipContent>
           </Tooltip>
-          
-          <Button variant="ghost" size="sm" className="hover:bg-primary/10">
-            <MoreHorizontal className="w-5 h-5" />
-          </Button>
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto p-4 space-y-4">
-          {(likedOnly ? messages.filter(m => likedMessageIds.has(m.id)) : messages).map((message) => (
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
             <div
-              key={message.id}
-              className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
+              className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                message.sender === 'user'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted'
+              }`}
             >
-              {message.sender === 'ai' && (
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarImage src={character.avatar} alt={character.name} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                    {character.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-              )}
-              
-              <div className={`group relative max-w-[80%] ${message.sender === 'user' ? 'order-first' : ''}`}>
-                <div
-                  className={`px-4 py-3 rounded-2xl transition-all duration-200 ${
-                    message.sender === 'user'
-                      ? 'bg-primary text-primary-foreground ml-auto shadow-lg'
-                      : 'bg-background border border-border/50 shadow-sm hover:shadow-md'
-                  }`}
-                >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                </div>
-                
-                <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-xs text-muted-foreground">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  {message.sender === 'ai' && (
-                    <div className="flex gap-1 ml-2 items-center">
-                      <button
-                        onClick={() => toggleLike(message.id)}
-                        className={`h-6 w-6 grid place-items-center rounded transition-transform ${likedMessageIds.has(message.id) ? 'scale-110' : ''} hover:bg-red-500/10`}
-                        aria-label="Like message"
-                      >
-                        <Heart className={`w-3.5 h-3.5 ${likedMessageIds.has(message.id) ? 'text-red-500 fill-red-500' : 'text-red-500'}`} />
-                      </button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10">
-                        <Reply className="w-3 h-3" />
-                      </Button>
-                      {/* Heart burst */}
-                      {burstIds.has(message.id) && (
-                        <div className="relative w-0 h-0">
-                          <span className="absolute -top-3 -right-2 text-red-500 animate-ping">❤</span>
-                          <span className="absolute -top-1 right-1 text-pink-400 animate-ping" style={{ animationDelay: '100ms' }}>❤</span>
-                          <span className="absolute -top-2 right-4 text-rose-400 animate-ping" style={{ animationDelay: '200ms' }}>❤</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className="text-xs opacity-70 mt-1">
+                {message.timestamp.toLocaleTimeString()}
+              </p>
+            </div>
+          </div>
+        ))}
+        
+        {isAiTyping && (
+          <div className="flex justify-start">
+            <div className="bg-muted rounded-lg px-3 py-2">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
-          ))}
-          
-          {isAiTyping && (
-            <div className="flex gap-3 justify-start animate-in slide-in-from-bottom-2 duration-300">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={character.avatar} alt={character.name} />
-                <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                  {character.name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="bg-background border border-border/50 px-4 py-3 rounded-2xl shadow-sm">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Replies */}
-      {showQuickReplies && !isAiTyping && (
-        <div className="px-4 py-2">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide items-center">
-            <Button
-              variant={likedOnly ? "default" : "outline"}
-              size="sm"
-              onClick={() => setLikedOnly(!likedOnly)}
-              className="flex-shrink-0 text-xs"
-            >
-              {likedOnly ? 'Showing Liked' : 'Liked Only'}
-            </Button>
-            {quickReplies.map((reply, index) => (
+      {/* Quick Reply Suggestions */}
+      {replies.length > 0 && (
+        <div className="p-4 border-t bg-muted/20">
+          <div className="flex flex-wrap gap-2">
+            {replies.map((reply, index) => (
               <Button
                 key={index}
                 variant="outline"
                 size="sm"
-                onClick={() => handleQuickReply(reply)}
-                className="flex-shrink-0 text-xs bg-background/50 hover:bg-primary/10 transition-all duration-200 hover:scale-105"
+                onClick={() => sendMessage(reply)}
+                className="text-xs"
               >
                 {reply}
               </Button>
@@ -577,203 +487,180 @@ export const SimpleChatInterface = ({
         )}
         
         <div className="flex items-center gap-2">
-          {/* More Actions Button (Hidden on Desktop) */}
-          <div className="relative md:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`h-10 w-10 p-0 transition-all duration-200 ${
-                showEmojiPicker ? 'bg-primary/10 text-primary' : 'hover:bg-primary/10'
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
+          {/* Emoji Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className={`h-10 w-10 p-0 transition-all duration-200 ${
+              showEmojiPicker ? 'bg-primary/10 text-primary' : 'hover:bg-primary/10'
+            }`}
+          >
+            <Smile className="w-4 h-4" />
+          </Button>
 
-            {/* Mobile Actions Menu */}
-            {showEmojiPicker && (
-              <div className="absolute bottom-full left-0 mb-2 z-50">
-                <Card className="p-3 shadow-lg bg-background border">
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        toast({ title: "📷 Camera", description: "Photo sharing coming soon!" });
-                        setShowEmojiPicker(false);
-                      }}
-                      className="h-12 flex-col gap-1 text-blue-600 hover:bg-blue-50"
-                    >
-                      <Camera className="w-5 h-5" />
-                      <span className="text-xs">Photo</span>
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setShowGames(true);
-                        setShowEmojiPicker(false);
-                      }}
-                      className="h-12 flex-col gap-1 text-purple-600 hover:bg-purple-50"
-                    >
-                      <Gamepad2 className="w-5 h-5" />
-                      <span className="text-xs">Games</span>
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        toast({ title: "🎁 Gifts", description: "Virtual gifts coming soon!" });
-                        setShowEmojiPicker(false);
-                      }}
-                      className="h-12 flex-col gap-1 text-pink-600 hover:bg-pink-50"
-                    >
-                      <Gift className="w-5 h-5" />
-                      <span className="text-xs">Gift</span>
-                    </Button>
-                  </div>
-                </Card>
-              </div>
-            )}
-          </div>
+          {/* Voice Note Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleVoiceNote}
+            disabled={!recognition}
+            className={`h-10 w-10 p-0 transition-all duration-200 ${
+              isRecordingVoiceNote ? 'bg-red-500/10 text-red-500 animate-pulse' : 'hover:bg-primary/10'
+            }`}
+          >
+            {isRecordingVoiceNote ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </Button>
 
-          {/* Desktop Action Buttons (Visible on Desktop Only) */}
-          <div className="hidden md:flex gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => toast({ title: "📷 Camera", description: "Photo sharing coming soon!" })}
-                  className="h-10 w-10 p-0 hover:bg-blue-500/10 text-blue-600"
-                >
-                  <Camera className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Take photo</TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowGames(true)}
-                  className="h-10 w-10 p-0 hover:bg-purple-500/10 text-purple-600"
-                >
-                  <Gamepad2 className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Play games</TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => toast({ title: "🎁 Gifts", description: "Virtual gifts coming soon!" })}
-                  className="h-10 w-10 p-0 hover:bg-pink-500/10 text-pink-600"
-                >
-                  <Gift className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Send gift</TooltipContent>
-            </Tooltip>
-          </div>
-
-          {/* Input Field */}
-          <div className="flex-1 relative">
-            <Input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={`Message ${character.name}...`}
-              className="pr-16 h-10 bg-background/50 border-border/50 focus:border-primary/50 transition-all rounded-full"
-            />
-            
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`h-6 w-6 p-0 transition-all duration-200 md:inline-flex hidden ${
-                  showEmojiPicker ? 'bg-primary/10 text-primary' : 'hover:bg-primary/10'
-                }`}
-              >
-                <Smile className="w-4 h-4" />
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleRecording}
-                className={`h-6 w-6 p-0 transition-all duration-200 ${
-                  isRecording ? 'bg-red-500/10 text-red-500 animate-pulse' : 'hover:bg-primary/10'
-                }`}
-              >
-                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </Button>
-            </div>
-          </div>
+          {/* Text Input */}
+          <Input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(input);
+              }
+            }}
+            placeholder={`Message ${character.name}...`}
+            className="flex-1"
+            disabled={isAiTyping}
+          />
 
           {/* Send Button */}
           <Button
-            onClick={() => sendMessage()}
-            disabled={!inputValue.trim() || isAiTyping}
-            className="h-10 w-10 p-0 rounded-full bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all duration-200 hover:scale-105 active:scale-95"
+            onClick={() => sendMessage(input)}
+            disabled={!input.trim() || isAiTyping}
+            size="sm"
+            className="h-10 px-4"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+
+        {/* Action Buttons Row */}
+        <div className="flex justify-center gap-4 mt-3">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => toast({ title: "📷 Camera", description: "Photo sharing coming soon!" })}
+                className="h-10 w-10 p-0 hover:bg-blue-500/10 text-blue-600"
+              >
+                <Camera className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Take photo</TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowGames(true)}
+                className="h-10 w-10 p-0 hover:bg-purple-500/10 text-purple-600"
+              >
+                <Gamepad2 className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Play games</TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => toast({ title: "🎁 Gifts", description: "Virtual gifts coming soon!" })}
+                className="h-10 w-10 p-0 hover:bg-pink-500/10 text-pink-600"
+              >
+                <Gift className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Send gift</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Upgrade Prompt Modal */}
-      {showUpgradePrompt && (
+      {upgradePromptVisible && (
+        <UpgradePrompt
+          isOpen={upgradePromptVisible}
+          onClose={() => setUpgradePromptVisible(false)}
+          onUpgrade={handleUpgrade}
+          currentPlan={usage.plan || 'free'}
+          isUpgrading={upgradeInProgress}
+        />
+      )}
+
+      {/* Payment Form Modal */}
+      {showPaymentForm && selectedPlanForPayment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Upgrade Your Plan</h3>
-            <p className="text-gray-600 mb-4">
-              You've reached your daily message limit. Choose a plan to continue:
-            </p>
-            <div className="space-y-2">
+          <div className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Complete Payment</h3>
               <Button
-                onClick={() => handleUpgrade({
-                  planId: 'premium',
-                  paymentMethodId: null,
-                  customerEmail: user?.email
-                })}
-                disabled={isUpgrading}
-                className="w-full"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPaymentForm(false)}
               >
-                Premium - $19/month
-              </Button>
-              <Button
-                onClick={() => handleUpgrade({
-                  planId: 'pro',
-                  paymentMethodId: null,
-                  customerEmail: user?.email
-                })}
-                disabled={isUpgrading}
-                variant="outline"
-                className="w-full"
-              >
-                Pro - $49/month
+                ×
               </Button>
             </div>
-            <Button
-              onClick={() => setShowUpgradePrompt(false)}
-              variant="ghost"
-              className="w-full mt-2"
-            >
-              Maybe Later
-            </Button>
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Please add a payment method to continue with your upgrade.
+              </p>
+              <div className="space-y-4">
+                <Button
+                  onClick={() => {
+                    setShowPaymentForm(false);
+                    setSelectedPlanForPayment(null);
+                    handleUpgrade();
+                  }}
+                  className="w-full"
+                >
+                  Add Payment Method
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPaymentForm(false)}
+                  className="w-full"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Games Modal */}
+      {showGames && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Interactive Games</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowGames(false)}
+              >
+                ×
+              </Button>
+            </div>
+            <div className="p-4">
+              <InteractiveGames 
+                character={character}
+                onClose={() => setShowGames(false)}
+              />
+            </div>
           </div>
         </div>
       )}
     </div>
   );
-}; 
+};
