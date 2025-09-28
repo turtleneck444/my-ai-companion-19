@@ -237,3 +237,4 @@ export default CompanionLibrary = () => {
     </div>
   );
 };
+// Export removed - already exported above
