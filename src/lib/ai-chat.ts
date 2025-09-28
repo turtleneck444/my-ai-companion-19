@@ -54,7 +54,7 @@ export class PersonalityAI {
 
   constructor() {
     // Use correct API endpoint based on environment
-    this.apiEndpoint = import.meta.env.DEV 
+    this.apiEndpoint = process.env.NODE_ENV === 'development' 
       ? '/api/openai-chat' 
       : '/.netlify/functions/openai-chat';
     
