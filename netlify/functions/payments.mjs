@@ -311,7 +311,7 @@ async function handleCreateSubscription(data, headers) {
         customer: customer.id,
         items: [{ price: plan.priceId }],
         default_payment_method: paymentMethodId,
-        payment_behavior: 'default_incomplete',
+        payment_behavior: 'allow_incomplete',
         payment_settings: { 
           save_default_payment_method: 'on_subscription' 
         },
@@ -333,18 +333,26 @@ async function handleCreateSubscription(data, headers) {
       // Check if subscription needs payment confirmation
       if (subscription.status === 'incomplete') {
         console.log('💳 Subscription requires payment confirmation');
-        console.log('💳 Latest invoice:', subscription.latest_invoice);
         
-        // Finalize the invoice to create payment intent
-        const finalizedInvoice = await stripe.invoices.finalizeInvoice(subscription.latest_invoice.id);
-        console.log('💳 Invoice finalized:', {
-          id: finalizedInvoice.id,
-          status: finalizedInvoice.status,
-          hasPaymentIntent: !!finalizedInvoice.payment_intent
-        });
+        // Try to get payment intent from expanded data first
+        let paymentIntent = subscription.latest_invoice?.payment_intent;
         
-        // Get the payment intent from the finalized invoice
-        const paymentIntent = finalizedInvoice.payment_intent;
+        // If no payment intent, try to pay the invoice
+        if (!paymentIntent) {
+          console.log('💳 No payment intent found, attempting to pay invoice...');
+          try {
+            const paidInvoice = await stripe.invoices.pay(subscription.latest_invoice.id);
+            paymentIntent = paidInvoice.payment_intent;
+            console.log('💳 Invoice payment attempted:', {
+              id: paidInvoice.id,
+              status: paidInvoice.status,
+              hasPaymentIntent: !!paymentIntent
+            });
+          } catch (payError) {
+            console.log('💳 Invoice payment failed:', payError.message);
+            // If payment fails, the subscription will remain incomplete
+          }
+        }
         
         if (paymentIntent) {
           console.log('💳 Payment intent found:', paymentIntent.id);
@@ -366,7 +374,7 @@ async function handleCreateSubscription(data, headers) {
             }),
           };
         } else {
-          console.log('❌ No payment intent found after finalizing invoice');
+          console.log('❌ No payment intent available for confirmation');
           return {
             statusCode: 200,
             headers,
@@ -379,7 +387,7 @@ async function handleCreateSubscription(data, headers) {
                 planId: planId,
               },
               paymentStatus: 'incomplete',
-              error: 'No payment intent available after finalizing invoice'
+              error: 'No payment intent available for confirmation'
             }),
           };
         }
