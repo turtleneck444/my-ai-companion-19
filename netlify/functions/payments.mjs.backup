@@ -1,272 +1,457 @@
-// Netlify function for payment processing with multiple providers
 import Stripe from 'stripe';
 
-// Check if payments are enabled
-const PAYMENT_PROVIDER = process.env.VITE_PAYMENT_PROVIDER || 'none';
-const PAYMENTS_ENABLED = PAYMENT_PROVIDER !== 'none' && PAYMENT_PROVIDER !== 'disabled';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Initialize payment processor only if enabled
-let stripe = null;
-if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'stripe' && process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-}
+const headers = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+};
 
 // Subscription plans configuration
 const SUBSCRIPTION_PLANS = {
+  free: {
+    name: 'Free',
+    price: 0,
+    amount: 0,
+    currency: 'usd',
+    interval: 'forever',
+    priceId: null
+  },
   premium: {
-    priceId: process.env.STRIPE_PREMIUM_PRICE_ID || 'price_premium_monthly',
+    name: 'Premium',
+    price: 19.00,
     amount: 1900, // $19.00 in cents
     currency: 'usd',
-    interval: 'month'
+    interval: 'month',
+    priceId: process.env.STRIPE_PREMIUM_PRICE_ID
   },
   pro: {
-    priceId: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_monthly', 
+    name: 'Pro',
+    price: 49.00,
     amount: 4900, // $49.00 in cents
     currency: 'usd',
-    interval: 'month'
+    interval: 'month',
+    priceId: process.env.STRIPE_PRO_PRICE_ID
   }
 };
 
-export async function handler(event) {
-  // Set CORS headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  };
+// Security: Validate payment success
+function isPaymentSuccessful(paymentIntent) {
+  if (!paymentIntent) return false;
+  
+  // Only these statuses indicate successful payment
+  const successStatuses = ['succeeded'];
+  return successStatuses.includes(paymentIntent.status);
+}
 
-  // Handle preflight requests
+// Security: Validate subscription status
+function isSubscriptionActive(subscription) {
+  if (!subscription) return false;
+  
+  // Only these statuses indicate active subscription
+  const activeStatuses = ['active', 'trialing'];
+  return activeStatuses.includes(subscription.status);
+}
+
+// Activate user in Supabase
+async function activateSupabaseUser(customerId, planId, paymentMethod = null) {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ Supabase not configured');
+    return;
+  }
+
+  const paymentData = paymentMethod ? {
+    payment_method_id: paymentMethod.id,
+    card_brand: paymentMethod.card?.brand,
+    card_last4: paymentMethod.card?.last4,
+    card_exp_month: paymentMethod.card?.exp_month,
+    card_exp_year: paymentMethod.card?.exp_year,
+    payment_method_created: new Date(paymentMethod.created * 1000).toISOString(),
+  } : {};
+
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+        'apikey': supabaseKey,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        subscription_plan: planId,
+        subscription_status: 'active',
+        subscription_customer_id: customerId,
+        ...paymentData,
+        updated_at: new Date().toISOString()
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ Supabase activation failed:', error);
+    } else {
+      console.log('✅ User activated in Supabase:', customerId, planId);
+    }
+  } catch (error) {
+    console.error('❌ Supabase activation error:', error);
+  }
+}
+
+export async function handler(event, context) {
+  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
-  // Check if payments are disabled
-  if (!PAYMENTS_ENABLED) {
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Payments are currently disabled',
-        provider: PAYMENT_PROVIDER,
-        message: 'Payment processing is not configured' 
-      })
-    };
-  }
-
-  // Initialize Square client if needed
-  let square = null;
-  if (PAYMENTS_ENABLED && PAYMENT_PROVIDER === 'square' && process.env.SQUARE_ACCESS_TOKEN) {
-    try {
-      const { Client: SquareClient, Environment: SquareEnv } = await import('square');
-      const env = (process.env.SQUARE_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
-        ? SquareEnv.Production
-        : SquareEnv.Sandbox;
-      square = new SquareClient({
-        accessToken: process.env.SQUARE_ACCESS_TOKEN,
-        environment: env,
-      });
-      console.log('✅ Square client initialized successfully');
-    } catch (error) {
-      console.error('Square SDK load failed, continuing without Square:', error.message);
-    }
-  }
+  const { httpMethod, body } = event;
+  let data;
 
   try {
-    const { httpMethod, path, body } = event;
-    const data = body ? JSON.parse(body) : {};
-
-    // Route handling
-    if (path.endsWith('/create-intent')) {
-      return await handleCreateIntent(data, headers, square);
-    } else if (path.endsWith('/confirm')) {
-      return await handleConfirmPayment(data, headers);
-    } else if (path.endsWith('/create-subscription')) {
-      return await handleCreateSubscription(data, headers);
-    } else if (path.endsWith('/cancel-subscription')) {
-      return await handleCancelSubscription(data, headers);
-    } else if (path.endsWith('/webhook')) {
-      return await handleWebhook(event, headers);
-    } else if (path.includes('/subscription/')) {
-      return await handleGetSubscription(path, headers);
-    } else if (path.includes('/customer/') && path.includes('/subscriptions')) {
-      return await handleGetCustomerSubscriptions(path, headers);
-    }
-
-    return {
-      statusCode: 404,
-      headers,
-      body: JSON.stringify({ error: 'Endpoint not found' })
-    };
-
+    data = JSON.parse(body || '{}');
   } catch (error) {
-    console.error('Payment function error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Internal server error', details: error.message })
+    return { 
+      statusCode: 400, 
+      headers, 
+      body: JSON.stringify({ error: 'Invalid JSON' }) 
     };
   }
-}
 
-async function handleCreateIntent(data, headers, square) {
-  const { planId, userId, amount, currency = 'usd', provider = PAYMENT_PROVIDER, sourceId } = data;
-
-  console.log('💳 Payment request:', {
-    planId,
-    amount,
-    currency,
-    provider,
-    hasSourceId: !!sourceId
+  console.log(`💳 ${httpMethod} ${event.path}`, { 
+    hasBody: !!body, 
+    provider: data.provider 
   });
 
   try {
-    if (provider === 'stripe') {
-      if (!stripe || !process.env.STRIPE_SECRET_KEY) {
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Stripe not configured' }) };
-      }
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100),
-        currency: currency.toLowerCase(),
-        metadata: { planId, userId: userId || 'anonymous' },
-        automatic_payment_methods: { enabled: true },
-      });
-      return { statusCode: 200, headers, body: JSON.stringify({ id: paymentIntent.id, clientSecret: paymentIntent.client_secret, status: paymentIntent.status }) };
+    switch (httpMethod) {
+      case 'POST':
+        if (event.path.includes('/create-intent')) {
+          return await handleCreatePaymentIntent(data, headers);
+        } else if (event.path.includes('/create-subscription')) {
+          return await handleCreateSubscription(data, headers);
+        } else if (event.path.includes('/confirm')) {
+          return await handleConfirmPayment(data, headers);
+        } else if (event.path.includes('/cancel-subscription')) {
+          return await handleCancelSubscription(data, headers);
+        }
+        break;
+      
+      case 'GET':
+        if (event.path.includes('/subscription/')) {
+          const subscriptionId = event.path.split('/subscription/')[1];
+          return await handleGetSubscription(subscriptionId, headers);
+        } else if (event.path.includes('/customer/') && event.path.includes('/subscriptions')) {
+          const customerId = event.path.split('/customer/')[1].split('/subscriptions')[0];
+          return await handleGetCustomerSubscriptions(customerId, headers);
+        }
+        break;
     }
 
-    if (provider === 'square') {
-      if (!square || !process.env.SQUARE_LOCATION_ID) {
-        console.log('❌ Square not properly configured');
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Square not configured' }) };
-      }
-      if (!sourceId) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing sourceId (card token)' }) };
-      }
-      const idempotencyKey = `${userId || 'anonymous'}-${planId}-${Date.now()}`;
-      const { paymentsApi } = square;
-      const payment = await paymentsApi.createPayment({
-        sourceId,
-        idempotencyKey,
-        amountMoney: { amount: Math.round(amount * 100), currency: currency.toUpperCase() },
-        locationId: process.env.SQUARE_LOCATION_ID,
-        note: `LoveAI ${planId} plan`,
-        referenceId: `${planId}-${userId || 'anonymous'}`,
-      });
+    return { 
+      statusCode: 404, 
+      headers, 
+      body: JSON.stringify({ error: 'Not found' }) 
+    };
 
-      const sq = payment?.result?.payment;
-      if (!sq) throw new Error('Square payment failed');
-
-      // Mark user active in Supabase on success
-      if (['COMPLETED', 'APPROVED'].includes((sq.status || '').toUpperCase())) {
-        await activateSupabaseUser(userId, planId);
-      }
-
-      return { statusCode: 200, headers, body: JSON.stringify({ id: sq.id, status: sq.status }) };
-    }
-
-    return { statusCode: 400, headers, body: JSON.stringify({ error: `Unsupported provider: ${provider}` }) };
   } catch (error) {
-    console.error('Payment processing error:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create payment', details: String(error?.message || error) }) };
+    console.error('Handler error:', error);
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Internal server error', details: error.message }) 
+    };
   }
 }
 
-async function handleConfirmPayment(data, headers) {
-  const { paymentIntentId } = data;
+async function handleCreatePaymentIntent(data, headers) {
+  const { planId, userId, amount, currency, provider } = data;
+  
+  console.log('💳 Payment intent creation request:', {
+    planId,
+    userId,
+    amount,
+    currency,
+    provider
+  });
+
+  if (provider !== 'stripe') {
+    return { 
+      statusCode: 400, 
+      headers, 
+      body: JSON.stringify({ error: 'Unsupported provider' }) 
+    };
+  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
+    };
+  }
 
   try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        id: paymentIntent.id,
-        status: paymentIntent.status,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency
-      })
+    const plan = SUBSCRIPTION_PLANS[planId];
+    if (!plan) {
+      return { 
+        statusCode: 400, 
+        headers, 
+        body: JSON.stringify({ error: 'Invalid plan ID' }) 
+      };
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: plan.amount,
+      currency: currency.toLowerCase(),
+      metadata: { 
+        planId, 
+        userId: userId || 'anonymous',
+        timestamp: Date.now().toString()
+      },
+      automatic_payment_methods: { enabled: true },
+      capture_method: 'automatic'
+    });
+
+    return { 
+      statusCode: 200, 
+      headers, 
+      body: JSON.stringify({ 
+        id: paymentIntent.id, 
+        clientSecret: paymentIntent.client_secret, 
+        status: paymentIntent.status 
+      }) 
     };
+
   } catch (error) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Failed to confirm payment', details: error.message })
+    console.error('Payment intent creation error:', error);
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Failed to create payment intent', details: error.message }) 
     };
   }
 }
 
 async function handleCreateSubscription(data, headers) {
-  const { planId, userId, paymentMethodId, customerId } = data;
+  const { planId, paymentMethodId, customerEmail, customerName, customerAge } = data;
+  
+  console.log('💳 Subscription creation request:', {
+    planId,
+    customerEmail,
+    hasPaymentMethod: !!paymentMethodId
+  });
 
   const plan = SUBSCRIPTION_PLANS[planId];
   if (!plan) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: 'Invalid plan ID' })
+    return { 
+      statusCode: 400, 
+      headers, 
+      body: JSON.stringify({ error: 'Invalid plan ID' }) 
+    };
+  }
+
+  if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: 'Stripe not configured' }) 
     };
   }
 
   try {
-    let customer;
-    
     // Create or retrieve customer
-    if (customerId) {
-      customer = await stripe.customers.retrieve(customerId);
+    let customer;
+    const customers = await stripe.customers.list({ email: customerEmail, limit: 1 });
+    if (customers.data.length > 0) {
+      customer = customers.data[0];
     } else {
       customer = await stripe.customers.create({
-        metadata: {
-          userId: userId || 'anonymous'
-        }
+        payment_method: paymentMethodId,
+        email: customerEmail,
+        name: customerName,
+        metadata: { age: customerAge, planId: planId },
+        invoice_settings: { default_payment_method: paymentMethodId },
       });
     }
 
-    // Attach payment method to customer
-    await stripe.paymentMethods.attach(paymentMethodId, {
-      customer: customer.id,
-    });
+    // Attach payment method to customer if not already attached
+    if (paymentMethodId && !customer.invoice_settings.default_payment_method) {
+      await stripe.paymentMethods.attach(paymentMethodId, { customer: customer.id });
+      await stripe.customers.update(customer.id, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+    }
 
-    // Set as default payment method
-    await stripe.customers.update(customer.id, {
-      invoice_settings: {
-        default_payment_method: paymentMethodId,
-      },
-    });
-
-    // Create subscription
+    // Create subscription with immediate payment
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
-      items: [
-        {
-          price: plan.priceId,
-        },
-      ],
+      items: [{ price: plan.priceId }],
+      expand: ['latest_invoice.payment_intent'],
       payment_behavior: 'default_incomplete',
       payment_settings: { save_default_payment_method: 'on_subscription' },
-      expand: ['latest_invoice.payment_intent'],
-      metadata: {
-        planId,
-        userId: userId || 'anonymous'
+      collection_method: 'charge_automatically'
+    });
+
+    const latestInvoice = subscription.latest_invoice;
+    const paymentIntent = latestInvoice?.payment_intent;
+
+    console.log('🔍 Payment Intent Details:', {
+      paymentIntentId: paymentIntent?.id,
+      paymentIntentStatus: paymentIntent?.status,
+      subscriptionStatus: subscription.status,
+      hasPaymentMethod: !!paymentMethodId,
+      hasPaymentIntent: !!paymentIntent,
+      latestInvoiceId: latestInvoice?.id
+      paymentIntentId: paymentIntent?.id,
+      paymentIntentStatus: paymentIntent?.status,
+      subscriptionStatus: subscription.status,
+      hasPaymentMethod: !!paymentMethodId,
+      hasPaymentIntent: !!paymentIntent,
+      latestInvoiceId: latestInvoice?.id
+      paymentIntentId: paymentIntent?.id,
+      paymentIntentStatus: paymentIntent?.status,
+      subscriptionStatus: subscription.status,
+      hasPaymentMethod: !!paymentMethodId
+    });
+
+    // Confirm the payment intent immediately
+    if (paymentIntent && paymentIntent.status === 'requires_confirmation') {
+      try {
+        console.log('🔄 Confirming payment intent:', paymentIntent.id);
+        const confirmedPaymentIntent = await stripe.paymentIntents.confirm(paymentIntent.id, {
+          payment_method: paymentMethodId
+        });
+        
+        console.log('💳 Payment intent confirmation result:', {
+          id: confirmedPaymentIntent.id,
+          status: confirmedPaymentIntent.status,
+          last_payment_error: confirmedPaymentIntent.last_payment_error
+        });
+        
+        if (isPaymentSuccessful(confirmedPaymentIntent)) {
+          console.log('✅ Payment confirmed and successful, activating user:', customer.id, planId);
+          
+          // Get the payment method details for storage
+          const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+          
+          await activateSupabaseUser(customer.id, planId, paymentMethod);
+        } else {
+          console.log('❌ Payment confirmation failed:', {
+            paymentIntentStatus: confirmedPaymentIntent.status,
+            subscriptionStatus: subscription.status,
+            lastPaymentError: confirmedPaymentIntent.last_payment_error
+          });
+        }
+      } catch (confirmError) {
+        console.error('💥 Payment confirmation error:', {
+          error: confirmError.message,
+          type: confirmError.type,
+          code: confirmError.code,
+          decline_code: confirmError.decline_code
+        });
       }
+    } else if (paymentIntent && isPaymentSuccessful(paymentIntent)) {
+      console.log('✅ Payment already successful, activating user:', customer.id, planId);
+      
+      // Get the payment method details for storage
+      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+      
+      await activateSupabaseUser(customer.id, planId, paymentMethod);
+    } else {
+      console.log('❌ Payment not successful, not activating user:', {
+        paymentIntentStatus: paymentIntent?.status,
+        subscriptionStatus: subscription.status,
+        hasPaymentIntent: !!paymentIntent
+      });
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: isPaymentSuccessful(paymentIntent),
+        subscription: {
+          id: subscription.id,
+          status: subscription.status,
+          customerId: customer.id,
+          clientSecret: paymentIntent?.client_secret,
+          currentPeriodStart: subscription.current_period_start,
+          currentPeriodEnd: subscription.current_period_end,
+          planId: planId,
+        },
+        paymentStatus: paymentIntent?.status || 'unknown'
+      }),
+    };
+
+  } catch (error) {
+    console.error('Stripe subscription creation error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to create subscription', 
+        details: error.message 
+      }),
+    };
+  }
+}
+
+async function handleConfirmPayment(data, headers) {
+  const { paymentIntentId, paymentMethodId } = data;
+
+  console.log('💳 Payment confirmation request:', {
+    paymentIntentId,
+    hasPaymentMethod: !!paymentMethodId
+  });
+
+  try {
+    if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+      return { 
+        statusCode: 500, 
+        headers, 
+        body: JSON.stringify({ error: 'Stripe not configured' }) 
+      };
+    }
+
+    const paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
+      payment_method: paymentMethodId
+    });
+
+    // SECURITY: Only return success if payment is actually successful
+    const isSuccessful = isPaymentSuccessful(paymentIntent);
+    
+    console.log('💳 Payment confirmation result:', {
+      id: paymentIntent.id,
+      status: paymentIntent.status,
+      isSuccessful
     });
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        id: subscription.id,
-        status: subscription.status,
-        customerId: customer.id,
-        clientSecret: subscription.latest_invoice.payment_intent.client_secret,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
-      })
+        success: isSuccessful,
+        paymentIntent: {
+          id: paymentIntent.id,
+          status: paymentIntent.status,
+          clientSecret: paymentIntent.client_secret
+        }
+      }),
     };
+
   } catch (error) {
+    console.error('Payment confirmation error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Failed to create subscription', details: error.message })
+      body: JSON.stringify({ 
+        error: 'Failed to confirm payment', 
+        details: error.message 
+      }),
     };
   }
 }
@@ -274,241 +459,129 @@ async function handleCreateSubscription(data, headers) {
 async function handleCancelSubscription(data, headers) {
   const { subscriptionId } = data;
 
+  console.log('💳 Subscription cancellation request:', { subscriptionId });
+
   try {
+    if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+      return { 
+        statusCode: 500, 
+        headers, 
+        body: JSON.stringify({ error: 'Stripe not configured' }) 
+      };
+    }
+
     const subscription = await stripe.subscriptions.cancel(subscriptionId);
-    
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        id: subscription.id,
-        status: subscription.status,
-        canceledAt: new Date(subscription.canceled_at * 1000).toISOString()
-      })
+        success: true,
+        subscription: {
+          id: subscription.id,
+          status: subscription.status,
+          currentPeriodEnd: subscription.current_period_end
+        }
+      }),
     };
+
   } catch (error) {
+    console.error('Subscription cancellation error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Failed to cancel subscription', details: error.message })
+      body: JSON.stringify({ 
+        error: 'Failed to cancel subscription', 
+        details: error.message 
+      }),
     };
   }
 }
 
-async function handleGetSubscription(path, headers) {
-  const subscriptionId = path.split('/').pop();
+async function handleGetSubscription(subscriptionId, headers) {
+  console.log('💳 Get subscription request:', { subscriptionId });
 
   try {
+    if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+      return { 
+        statusCode: 500, 
+        headers, 
+        body: JSON.stringify({ error: 'Stripe not configured' }) 
+      };
+    }
+
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         id: subscription.id,
         status: subscription.status,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        planId: subscription.metadata.planId
-      })
+        customerId: subscription.customer,
+        currentPeriodStart: subscription.current_period_start,
+        currentPeriodEnd: subscription.current_period_end,
+        planId: subscription.items.data[0]?.price.id
+      }),
     };
+
   } catch (error) {
+    console.error('Get subscription error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Failed to retrieve subscription', details: error.message })
+      body: JSON.stringify({ 
+        error: 'Failed to get subscription', 
+        details: error.message 
+      }),
     };
   }
 }
 
-async function handleGetCustomerSubscriptions(path, headers) {
-  const customerId = path.split('/')[2];
+async function handleGetCustomerSubscriptions(customerId, headers) {
+  console.log('💳 Get customer subscriptions request:', { customerId });
 
   try {
+    if (!stripe || !process.env.STRIPE_SECRET_KEY) {
+      return { 
+        statusCode: 500, 
+        headers, 
+        body: JSON.stringify({ error: 'Stripe not configured' }) 
+      };
+    }
+
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: 'all'
     });
-    
+
+    const formattedSubscriptions = subscriptions.data.map(sub => ({
+      id: sub.id,
+      status: sub.status,
+      customerId: sub.customer,
+      currentPeriodStart: sub.current_period_start,
+      currentPeriodEnd: sub.current_period_end,
+      planId: sub.items.data[0]?.price.id
+    }));
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(subscriptions.data.map(sub => ({
-        id: sub.id,
-        status: sub.status,
-        currentPeriodStart: new Date(sub.current_period_start * 1000).toISOString(),
-        currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
-        planId: sub.metadata.planId
-      })))
+      body: JSON.stringify(formattedSubscriptions),
     };
+
   } catch (error) {
+    console.error('Get customer subscriptions error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Failed to retrieve subscriptions', details: error.message })
-    };
-  }
-}
-
-async function handleWebhook(event, headers) {
-  // Check if payment processor is available
-  if (!PAYMENTS_ENABLED) {
-    return {
-      statusCode: 200,
-      headers,
       body: JSON.stringify({ 
-        message: 'Webhook received but payments are disabled',
-        provider: PAYMENT_PROVIDER,
-        received: true 
-      })
-    };
-  }
-
-  // Handle Square webhooks
-  if (PAYMENT_PROVIDER === 'square') {
-    return await handleSquareWebhook(event, headers);
-  }
-
-  // Handle Stripe webhooks
-  if (PAYMENT_PROVIDER === 'stripe') {
-    const sig = event.headers['stripe-signature'];
-    let stripeEvent;
-
-    try {
-      stripeEvent = stripe.webhooks.constructEvent(event.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    } catch (err) {
-      console.error('Webhook signature verification failed:', err.message);
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: `Webhook Error: ${err.message}` })
-      };
-    }
-
-    return await handleStripeWebhookEvents(stripeEvent, headers);
-  }
-
-  return {
-    statusCode: 400,
-    headers,
-    body: JSON.stringify({ error: `Unsupported payment provider: ${PAYMENT_PROVIDER}` })
-  };
-}
-
-// Handle Square webhook events
-async function handleSquareWebhook(event, headers) {
-  try {
-    const webhookBody = event.body;
-    const webhookSignature = event.headers['x-square-signature'];
-    
-    // For now, just log the webhook and return success
-    // TODO: Add Square webhook signature verification when Square credentials are configured
-    console.log('Square webhook received:', {
-      signature: webhookSignature ? 'present' : 'missing',
-      bodyLength: webhookBody ? webhookBody.length : 0
-    });
-
-    const data = webhookBody ? JSON.parse(webhookBody) : {};
-    console.log('Square webhook event type:', data.type);
-
-    // Handle different Square webhook events
-    switch (data.type) {
-      case 'payment.created':
-      case 'payment.updated':
-        console.log('Payment event received:', data.data?.id);
-        break;
-      case 'invoice.payment_made':
-        console.log('Invoice payment made:', data.data?.id);
-        break;
-      default:
-        console.log('Unhandled webhook event type:', data.type);
-    }
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ 
-        message: 'Square webhook processed successfully',
-        eventType: data.type,
-        received: true 
-      })
-    };
-  } catch (error) {
-    console.error('Square webhook error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Webhook processing failed', details: error.message })
+        error: 'Failed to get customer subscriptions', 
+        details: error.message 
+      }),
     };
   }
 }
 
-// Handle Stripe webhook events
-async function handleStripeWebhookEvents(stripeEvent, headers) {
-  try {
-    console.log('Stripe webhook received:', stripeEvent.type);
-
-    switch (stripeEvent.type) {
-      case 'payment_intent.succeeded':
-        const paymentIntent = stripeEvent.data.object;
-        console.log('Payment succeeded:', paymentIntent.id);
-        // Handle successful payment
-        break;
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-        const subscription = stripeEvent.data.object;
-        console.log('Subscription event:', subscription.id);
-        // Handle subscription events
-        break;
-      default:
-        console.log('Unhandled Stripe event type:', stripeEvent.type);
-    }
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ 
-        message: 'Stripe webhook processed successfully',
-        eventType: stripeEvent.type,
-        received: true 
-      })
-    };
-  } catch (error) {
-    console.error('Stripe webhook error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Webhook processing failed', details: error.message })
-    };
-  }
-}
-
-// Activate Supabase user after successful payment
-async function activateSupabaseUser(userId, planId) {
-  try {
-    if (!userId) return;
-    const url = `${process.env.VITE_SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: {
-        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({
-        subscription_status: 'active',
-        plan: planId,
-        subscription_plan_id: planId,
-        updated_at: new Date().toISOString()
-      })
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      console.warn('Supabase profile activation failed:', t);
-    }
-  } catch (e) {
-    console.warn('activateSupabaseUser error:', e);
-  }
-}
+// Add this at the end of the file for debugging
+console.log('🔧 Payments function loaded successfully');

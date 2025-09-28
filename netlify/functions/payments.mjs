@@ -306,10 +306,6 @@ async function handleCreateSubscription(data, headers) {
       hasPaymentMethod: !!paymentMethodId,
       hasPaymentIntent: !!paymentIntent,
       latestInvoiceId: latestInvoice?.id
-      paymentIntentId: paymentIntent?.id,
-      paymentIntentStatus: paymentIntent?.status,
-      subscriptionStatus: subscription.status,
-      hasPaymentMethod: !!paymentMethodId
     });
 
     // Confirm the payment intent immediately
@@ -576,6 +572,3 @@ async function handleGetCustomerSubscriptions(customerId, headers) {
     };
   }
 }
-
-// Add this at the end of the file for debugging
-console.log('🔧 Payments function loaded successfully');
