@@ -451,7 +451,7 @@ async function handleCreateSubscription(data, headers) {
                 currency: plan.currency.toLowerCase(),
                 customer: customer.id,
                 payment_method: paymentMethodId,
-                confirm: true,
+                confirm: false, // Don't confirm immediately
                 metadata: {
                   planId: planId,
                   customerId: customer.id,
