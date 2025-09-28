@@ -88,20 +88,12 @@ export const useUpgrade = () => {
       }
 
       // Update user profile with new plan and billing info
-      const billingStartDate = new Date();
-      const nextBillingDate = new Date();
-      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({
-          subscription_plan_id: plan.id,
-          subscription_status: 'active',
           subscription_plan: plan.id,
-          customer_id: subscriptionResult.customerId,
-          subscription_id: subscriptionResult.subscriptionId,
-          billing_cycle_start: billingStartDate.toISOString(),
-          next_billing_date: nextBillingDate.toISOString(),
+          subscription_customer_id: subscriptionResult.customerId,
+          payment_method_id: subscriptionResult.subscriptionId,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -177,7 +169,7 @@ export const useUpgrade = () => {
         .from('user_profiles')
         .update({
           subscription_plan_id: newPlan,
-          subscription_status: 'active',
+          
           subscription_plan: newPlan,
           updated_at: new Date().toISOString()
         })
