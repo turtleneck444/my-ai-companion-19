@@ -332,9 +332,8 @@ async function handleCreateSubscription(data, headers) {
       if (subscription.status === 'incomplete') {
         console.log('💳 Subscription requires payment confirmation');
         
-        // Get the latest invoice to access payment intent
-        const latestInvoice = await stripe.invoices.retrieve(subscription.latest_invoice);
-        const paymentIntent = latestInvoice.payment_intent;
+        // Get the payment intent from the expanded invoice
+        const paymentIntent = subscription.latest_invoice.payment_intent;
         
         if (paymentIntent) {
           return {
