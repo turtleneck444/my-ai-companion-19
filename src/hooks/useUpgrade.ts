@@ -62,7 +62,7 @@ export const useUpgrade = () => {
     }
   }, [user?.id, toast]);
 
-  // Create subscription with proper billing setup
+  // Create subscription with proper billing setup (simplified)
   const createSubscriptionWithBilling = async (upgradeData: UpgradeData) => {
     if (!user) {
       throw new Error('User not authenticated');
@@ -74,54 +74,31 @@ export const useUpgrade = () => {
     }
 
     try {
-      // Step 1: Process initial payment
-      const paymentResult = await subscriptionService.processPayment({
-        amount: plan.price,
-        currency: plan.currency,
-        planId: plan.id,
-        customerEmail: upgradeData.customerEmail || user.email || '',
-        sourceId: upgradeData.paymentMethodId
-      });
-
-      if (!paymentResult.success) {
-        throw new Error(paymentResult.error || 'Payment failed');
-      }
-
-      // Step 2: Create customer for future billing
-      const customerResult = await subscriptionService.createCustomer(
-        upgradeData.customerEmail || user.email || '',
-        upgradeData.paymentMethodId,
-        plan.id
-      );
-
-      if (!customerResult.success) {
-        throw new Error(customerResult.error || 'Customer creation failed');
-      }
-
-      // Step 3: Create subscription record with billing date
-      const billingStartDate = new Date();
-      const nextBillingDate = new Date();
-      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-
-      const subscriptionResult = await subscriptionService.createSubscription({
+      // Use the new simplified subscription creation
+      const subscriptionResult = await subscriptionService.createSubscriptionWithPayment({
         userId: user.id,
         planId: plan.id,
-        stripeCustomerId: customerResult.customerId!,
-        stripeCardId: customerResult.cardId!
+        customerEmail: upgradeData.customerEmail || user.email || '',
+        customerName: upgradeData.customerName,
+        paymentMethodId: upgradeData.paymentMethodId
       });
 
       if (!subscriptionResult.success) {
         throw new Error(subscriptionResult.error || 'Subscription creation failed');
       }
 
-      // Step 4: Update user profile with new plan and billing info
+      // Update user profile with new plan and billing info
+      const billingStartDate = new Date();
+      const nextBillingDate = new Date();
+      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({
           subscription_plan_id: plan.id,
           subscription_status: 'active',
           subscription_plan: plan.id,
-          customer_id: customerResult.customerId,
+          customer_id: subscriptionResult.customerId,
           subscription_id: subscriptionResult.subscriptionId,
           billing_cycle_start: billingStartDate.toISOString(),
           next_billing_date: nextBillingDate.toISOString(),

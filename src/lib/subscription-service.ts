@@ -21,70 +21,56 @@ class SubscriptionService {
     ? 'http://localhost:3000/api' 
     : 'https://loveaicompanion.com/.netlify/functions';
 
-  // Process real payment with Stripe
-  async processPayment(paymentData: PaymentData): Promise<{ success: boolean; error?: string; paymentId?: string }> {
+  // Create subscription with payment processing (handles customer creation internally)
+  async createSubscriptionWithPayment(subscriptionData: {
+    userId: string;
+    planId: string;
+    customerEmail: string;
+    customerName?: string;
+    customerAge?: string;
+    paymentMethodId: string;
+  }): Promise<{ success: boolean; error?: string; subscriptionId?: string; customerId?: string; cardId?: string }> {
     try {
-      const response = await fetch(`${this.apiBase}/payments/create-intent`, {
+      const response = await fetch(`${this.apiBase}/payments/create-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...paymentData,
+          planId: subscriptionData.planId,
+          userId: subscriptionData.userId,
+          customerEmail: subscriptionData.customerEmail,
+          customerName: subscriptionData.customerName,
+          customerAge: subscriptionData.customerAge,
+          paymentMethodId: subscriptionData.paymentMethodId,
           provider: 'stripe'
         })
       });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        return { success: false, error: error.error || 'Payment failed' };
-      }
-
-      const result = await response.json();
-      return { success: true, paymentId: result.id };
-    } catch (error: any) {
-      console.error('Payment processing error:', error);
-      return { success: false, error: error.message || 'Payment processing failed' };
-    }
-  }
-
-  // Create customer and save card for future billing
-  async createCustomer(email: string, sourceId: string, planId: string): Promise<{ success: boolean; error?: string; customerId?: string; cardId?: string }> {
-    try {
-      const response = await fetch(`${this.apiBase}/payments/create-customer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          sourceId,
-          planId,
-          provider: 'stripe'
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        return { success: false, error: error.error || 'Customer creation failed' };
+        return { success: false, error: error.error || 'Subscription creation failed' };
       }
 
       const result = await response.json();
       return { 
         success: true, 
-        customerId: result.customerId, 
-        cardId: result.cardId 
+        subscriptionId: result.subscriptionId,
+        customerId: result.customerId,
+        cardId: result.paymentMethodId
       };
     } catch (error: any) {
-      console.error('Customer creation error:', error);
-      return { success: false, error: error.message || 'Customer creation failed' };
+      console.error('Subscription creation error:', error);
+      return { success: false, error: error.message || 'Subscription creation failed' };
     }
   }
 
-  // Create subscription in database
+  // Create subscription in database (legacy method - kept for compatibility)
   async createSubscription(subscriptionData: SubscriptionData): Promise<{ success: boolean; error?: string; subscriptionId?: string }> {
     try {
       const { data, error } = await supabase.rpc('create_subscription', {
         p_user_id: subscriptionData.userId,
         p_plan_id: subscriptionData.planId,
-        p_square_customer_id: subscriptionData.stripeCustomerId,
-        p_square_card_id: subscriptionData.stripeCardId
+        p_stripe_customer_id: subscriptionData.stripeCustomerId,
+        p_stripe_card_id: subscriptionData.stripeCardId
       });
 
       if (error) {
