@@ -86,8 +86,8 @@ const CheckoutForm = ({ selectedPlan, onSuccess, onClose }: {
         paymentMethod.id
       );
 
-      // Confirm payment
-      if (subscription.clientSecret) {
+      // Handle subscription confirmation
+      if (subscription.paymentStatus === 'requires_confirmation' && subscription.clientSecret) {
         const { error: confirmError } = await stripe.confirmCardPayment(
           subscription.clientSecret
         );
@@ -95,15 +95,22 @@ const CheckoutForm = ({ selectedPlan, onSuccess, onClose }: {
         if (confirmError) {
           throw new Error(confirmError.message);
         }
+      } else if (subscription.paymentStatus === 'failed') {
+        throw new Error(subscription.error || 'Payment failed');
       }
 
-      toast({
-        title: "Payment Successful!",
-        description: `Welcome to ${plan.name} plan! Your subscription is now active.`,
-      });
+      // Only show success if payment actually succeeded
+      if (subscription.success || subscription.paymentStatus === 'succeeded') {
+        toast({
+          title: "Payment Successful!",
+          description: `Welcome to ${plan.name} plan! Your subscription is now active.`,
+        });
 
-      onSuccess(subscription);
-      onClose();
+        onSuccess(subscription);
+        onClose();
+      } else {
+        throw new Error('Payment was not successful');
+      }
 
     } catch (error: any) {
       console.error('Payment failed:', error);
