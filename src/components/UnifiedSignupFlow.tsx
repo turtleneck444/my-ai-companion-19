@@ -42,8 +42,6 @@ const PaymentForm = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardElementError, setCardElementError] = useState<string | null>(null);
   const [cardDataComplete, setCardDataComplete] = useState(false);
-  const cardElementRef = useRef<any>(null);
-  const [retryCount, setRetryCount] = useState(0);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +81,7 @@ const PaymentForm = ({
       console.log('Card element ready:', cardElementReady);
       console.log('Card data complete:', cardDataComplete);
 
-      // Get the card element
+      // Get the card element - use the stable reference
       const cardElement = elements.getElement(CardElement);
       
       if (!cardElement) {
@@ -92,74 +90,25 @@ const PaymentForm = ({
 
       console.log('Card element found, creating payment method...');
 
-      // Wait longer to ensure the element is fully ready
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create payment method directly - no complex retry logic
+      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          email: formData.email,
+          name: formData.preferredName,
+        },
+      });
 
-      // Try to create payment method with a different approach
-      let paymentMethod = null;
-      let createPaymentMethodError = null;
-      let attempts = 0;
-      const maxAttempts = 5;
-
-      while (attempts < maxAttempts && !paymentMethod) {
-        attempts++;
-        console.log(`Payment method creation attempt ${attempts}/${maxAttempts}`);
-        
-        try {
-          // Try to get a fresh element reference
-          const freshCardElement = elements.getElement(CardElement);
-          if (!freshCardElement) {
-            throw new Error('Card element lost during processing');
-          }
-
-          // Create payment method with explicit options
-          const result = await stripe.createPaymentMethod({
-            type: 'card',
-            card: freshCardElement,
-            billing_details: {
-              email: formData.email,
-              name: formData.preferredName,
-            },
-          });
-          
-          paymentMethod = result.paymentMethod;
-          createPaymentMethodError = result.error;
-          
-          if (paymentMethod) {
-            console.log('Payment method created successfully:', paymentMethod.id);
-            break;
-          }
-        } catch (error) {
-          console.log(`Attempt ${attempts} failed:`, error);
-          if (attempts < maxAttempts) {
-            // Wait progressively longer between attempts
-            const waitTime = Math.min(1000 * Math.pow(2, attempts - 1), 5000);
-            console.log(`Waiting ${waitTime}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-          }
-        }
-      }
-
-      if (createPaymentMethodError) {
-        throw new Error(createPaymentMethodError.message);
+      if (pmError) {
+        throw new Error(pmError.message);
       }
 
       if (!paymentMethod) {
-        // If all attempts failed, try one more time with a completely fresh approach
-        console.log('All attempts failed, trying fresh approach...');
-        setRetryCount(prev => prev + 1);
-        
-        if (retryCount < 2) {
-          toast({
-            title: "Payment Form Issue",
-            description: "Please refresh the page and try again. The payment form needs to be reset.",
-            variant: "destructive"
-          });
-          return;
-        } else {
-          throw new Error('Payment method could not be created after multiple attempts. Please refresh the page and try again.');
-        }
+        throw new Error('Payment method could not be created. Please try again.');
       }
+
+      console.log('Payment method created successfully:', paymentMethod.id);
 
       // Process payment with backend (create subscription)
       const paymentProcessor = new PaymentProcessor();
@@ -242,10 +191,9 @@ const PaymentForm = ({
         </CardContent>
       </Card>
 
-      {/* Stripe Card Element */}
+      {/* Stripe Card Element - FIXED: Removed dynamic key prop */}
       <div className="p-4 border rounded-lg" data-testid="card-element">
         <CardElement 
-          key={`card-element-${retryCount}`}
           options={{ 
             style: { 
               base: { 
@@ -262,7 +210,6 @@ const PaymentForm = ({
             console.log('Card element is ready');
             setCardElementReady(true);
             setCardElementError(null);
-            cardElementRef.current = element;
           }}
           onChange={(event) => {
             if (event.error) {
