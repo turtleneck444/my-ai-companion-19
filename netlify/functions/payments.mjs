@@ -302,22 +302,18 @@ async function handleCreateSubscription(data, headers) {
       }
     }
 
-    // Create subscription with immediate payment
+    // Create subscription with immediate payment - CHANGED APPROACH
     console.log('🔄 Creating subscription...');
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: plan.priceId }],
       expand: ['latest_invoice.payment_intent'],
-      payment_behavior: 'default_incomplete',
+      payment_behavior: 'allow_incomplete',
       payment_settings: { 
-        save_default_payment_method: 'on_subscription',
-        payment_method_options: {
-          card: {
-            request_three_d_secure: 'automatic'
-          }
-        }
+        save_default_payment_method: 'on_subscription'
       },
-      collection_method: 'charge_automatically'
+      collection_method: 'charge_automatically',
+      proration_behavior: 'create_prorations'
     });
 
     console.log('📋 Subscription created:', {
@@ -337,62 +333,65 @@ async function handleCreateSubscription(data, headers) {
       latestInvoiceId: latestInvoice?.id
     });
 
-    // Try to confirm the payment intent if it exists and requires confirmation
-    if (paymentIntent && paymentIntent.status === 'requires_confirmation') {
-      try {
-        console.log('🔄 Confirming payment intent:', paymentIntent.id);
-        const confirmedPaymentIntent = await stripe.paymentIntents.confirm(paymentIntent.id, {
-          payment_method: paymentMethodId
-        });
-        
-        console.log('💳 Payment intent confirmation result:', {
-          id: confirmedPaymentIntent.id,
-          status: confirmedPaymentIntent.status,
-          last_payment_error: confirmedPaymentIntent.last_payment_error
-        });
-        
-        if (isPaymentSuccessful(confirmedPaymentIntent)) {
-          console.log('✅ Payment confirmed and successful, activating user:', customer.id, planId);
+    // If we have a payment intent, try to confirm it
+    if (paymentIntent) {
+      if (paymentIntent.status === 'requires_confirmation') {
+        try {
+          console.log('🔄 Confirming payment intent:', paymentIntent.id);
+          const confirmedPaymentIntent = await stripe.paymentIntents.confirm(paymentIntent.id, {
+            payment_method: paymentMethodId
+          });
           
-          // Get the payment method details for storage
-          const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+          console.log('💳 Payment intent confirmation result:', {
+            id: confirmedPaymentIntent.id,
+            status: confirmedPaymentIntent.status,
+            last_payment_error: confirmedPaymentIntent.last_payment_error
+          });
           
-          await activateSupabaseUser(customer.id, planId, paymentMethod);
-        } else {
-          console.log('❌ Payment confirmation failed:', {
-            paymentIntentStatus: confirmedPaymentIntent.status,
-            subscriptionStatus: subscription.status,
-            lastPaymentError: confirmedPaymentIntent.last_payment_error
+          if (isPaymentSuccessful(confirmedPaymentIntent)) {
+            console.log('✅ Payment confirmed and successful, activating user:', customer.id, planId);
+            
+            // Get the payment method details for storage
+            const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+            
+            await activateSupabaseUser(customer.id, planId, paymentMethod);
+          } else {
+            console.log('❌ Payment confirmation failed:', {
+              paymentIntentStatus: confirmedPaymentIntent.status,
+              subscriptionStatus: subscription.status,
+              lastPaymentError: confirmedPaymentIntent.last_payment_error
+            });
+          }
+        } catch (confirmError) {
+          console.error('💥 Payment confirmation error:', {
+            error: confirmError.message,
+            type: confirmError.type,
+            code: confirmError.code,
+            decline_code: confirmError.decline_code
           });
         }
-      } catch (confirmError) {
-        console.error('💥 Payment confirmation error:', {
-          error: confirmError.message,
-          type: confirmError.type,
-          code: confirmError.code,
-          decline_code: confirmError.decline_code
+      } else if (isPaymentSuccessful(paymentIntent)) {
+        console.log('✅ Payment already successful, activating user:', customer.id, planId);
+        
+        // Get the payment method details for storage
+        const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+        
+        await activateSupabaseUser(customer.id, planId, paymentMethod);
+      } else {
+        console.log('❌ Payment not successful:', {
+          paymentIntentStatus: paymentIntent.status,
+          subscriptionStatus: subscription.status
         });
       }
-    } else if (paymentIntent && isPaymentSuccessful(paymentIntent)) {
-      console.log('✅ Payment already successful, activating user:', customer.id, planId);
-      
-      // Get the payment method details for storage
-      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-      
-      await activateSupabaseUser(customer.id, planId, paymentMethod);
     } else {
-      console.log('❌ Payment not successful, not activating user:', {
-        paymentIntentStatus: paymentIntent?.status,
-        subscriptionStatus: subscription.status,
-        hasPaymentIntent: !!paymentIntent
-      });
+      console.log('❌ No payment intent created for subscription');
     }
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        success: isPaymentSuccessful(paymentIntent),
+        success: paymentIntent ? isPaymentSuccessful(paymentIntent) : false,
         subscription: {
           id: subscription.id,
           status: subscription.status,
