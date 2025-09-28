@@ -30,7 +30,9 @@ import { EmojiPicker } from "@/components/EmojiPicker";
 import { InteractiveGames } from "@/components/InteractiveGames";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { PaymentModal } from "@/components/PaymentModal";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
+import { getPlanById, getRemainingMessages } from '@/lib/payments';
+import { useUpgrade } from '@/hooks/useUpgrade';
 
 // Using ChatMessage from ai-chat.ts instead of local Message interface
 
@@ -140,6 +142,7 @@ export const SimpleChatInterface = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { handleUpgrade, isUpgrading } = useUpgrade();
 
   // Plan is now loaded automatically from Supabase by useSupabaseUsageTracking
 
@@ -217,13 +220,19 @@ export const SimpleChatInterface = ({
     const currentInput = messageContent || inputValue.trim();
     if (!currentInput || isAiTyping) return;
 
-    // Enforce per-plan message limit
+    // Check if user has hit their message limit
     if (!canSendMessage) {
+      const plan = getPlanById(currentPlan);
+      const limit = plan?.limits.messagesPerDay || 0;
+      const remaining = getRemainingMessages(currentPlan, usage.messagesUsed);
+      
       toast({
         title: "Daily message limit reached",
-        description: `You've used all ${currentPlan} messages for today. Upgrade to continue chatting instantly.`,
+        description: `You've used all ${limit} messages for today. Upgrade to continue chatting!`,
         variant: "destructive"
       });
+      
+      // Show upgrade prompt
       setUpgradePlan('premium');
       setShowUpgradePayment(true);
       return;
@@ -735,11 +744,13 @@ export const SimpleChatInterface = ({
       </div>
 
       {upgradePlan && (
-        <PaymentModal
+        <UpgradePrompt
           isOpen={showUpgradePayment}
           onClose={() => { setShowUpgradePayment(false); setUpgradePlan(null); }}
-          selectedPlan={upgradePlan}
-          onSuccess={() => {
+          limitType="messages"
+          currentPlan={currentPlan}
+          remaining={getRemainingMessages(currentPlan, usage.messagesUsed)}
+          onUpgradeSuccess={() => {
             setShowUpgradePayment(false);
             setUpgradePlan(null);
             toast({ title: 'Upgraded!', description: 'You can now continue chatting.' });

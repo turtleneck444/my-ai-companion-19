@@ -1,0 +1,18 @@
+    // Enforce per-plan message limit
+    if (!canSendMessage) {
+      const plan = getPlanById(currentPlan);
+      const limit = plan?.limits.messagesPerDay || 0;
+      const remaining = getRemainingMessages(currentPlan, usage.messagesUsed);
+      
+      toast({
+        title: "Daily message limit reached",
+        description: `You've used all ${limit} messages for today. ${remaining === 0 ? 'Upgrade to continue chatting instantly.' : `You have ${remaining} messages remaining.`}`,
+        variant: "destructive"
+      });
+      
+      if (remaining === 0) {
+        setUpgradePlan('premium');
+        setShowUpgradePayment(true);
+      }
+      return;
+    }

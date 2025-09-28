@@ -1,0 +1,9 @@
+      }
+      return {
+        ...prev,
+        personality: has
+          ? prev.personality.filter(p => p !== trait)
+          : [...prev.personality, trait]
+      };
+    };
+  };

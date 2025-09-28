@@ -17,7 +17,8 @@ import { generateAvatarImage, validateImagePrompt, examplePrompts } from "@/lib/
 import { useNavigate } from "react-router-dom";
 import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
-import { PaymentModal } from "@/components/PaymentModal";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
+import { getPlanById, getRemainingCompanions, checkCompanionLimit } from "@/lib/payments";
 import { 
   Upload, 
   X, 
@@ -83,9 +84,9 @@ const Create = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { currentPlan } = useSupabaseUsageTracking();
+  const { currentPlan, usage, refreshLimits } = useSupabaseUsageTracking();
   const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
-  const [showPayment, setShowPayment] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
@@ -117,10 +118,7 @@ const Create = () => {
   const [avatarMethod, setAvatarMethod] = useState('upload'); // 'upload' or 'generate'
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const plan = (user as any)?.user_metadata?.plan || 'free';
-    setCurrentPlan(plan);
-  }, [user, setCurrentPlan]);
+  // Remove the problematic useEffect that was causing the white screen
 
   const [character, setCharacter] = useState<NewCharacter>({
     name: "",
@@ -138,6 +136,15 @@ const Create = () => {
 
   const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
   const prev = () => setStepIdx((i) => Math.max(i - 1, 0));
+
+  // Check companion limit before saving
+  const canCreateCompanion = () => {
+    return checkCompanionLimit(currentPlan, usage.companionsCreated);
+  };
+
+  const getRemainingCompanionsCount = () => {
+    return getRemainingCompanions(currentPlan, usage.companionsCreated);
+  };
 
   // AI Image generation handler
   const generateAvatar = async () => {
@@ -225,10 +232,29 @@ const Create = () => {
   };
 
   const save = async () => {
+    // Check companion limit before saving
+    if (!canCreateCompanion()) {
+      const plan = getPlanById(currentPlan);
+      const limit = plan?.limits.companions || 0;
+      const remaining = getRemainingCompanionsCount();
+      
+      toast({
+        title: "Companion limit reached",
+        description: `You've reached your limit of ${limit} companions. ${remaining === 0 ? 'Upgrade to create more companions.' : `You have ${remaining} companions remaining.`}`,
+        variant: "destructive"
+      });
+      
+      if (remaining === 0) {
+        setUpgradePlan('premium');
+        setShowUpgradePrompt(true);
+      }
+      return;
+    }
+
     try {
       setSaving(true);
       const uploaded = await handleUpload();
-      const payload = { 
+      const payload = {
         ...character, 
         avatarUrl: uploaded || character.avatarUrl,
         voice: character.voice?.name || "Default",
@@ -269,10 +295,15 @@ const Create = () => {
         description: `${payload.name} is ready to meet you!` 
       });
 
+      // Refresh usage data to update companion count
+      if (refreshLimits) {
+        refreshLimits();
+      }
+
       // Navigate to success page with character data
       navigate('/app', { 
         state: { startChatWith: characterForSuccess } 
-      });
+      };
     } catch (e: any) {
       toast({ title: "Error", description: String(e?.message || e) });
     } finally {
@@ -287,13 +318,13 @@ const Create = () => {
         toast({ title: 'Upgrade for more traits', description: 'Free plan allows up to 3 personality traits. Upgrade to add more.', variant: 'destructive' });
         return prev;
       }
-      return ({
+      return {
         ...prev,
         personality: has
           ? prev.personality.filter(p => p !== trait)
           : [...prev.personality, trait]
-      });
-    });
+      };
+    };
   };
 
   const updatePersonalityTrait = (key: string, value: number[]) => {
@@ -366,13 +397,13 @@ const Create = () => {
       toast({
         title: "Voice preview played! 🎉",
         description: `You just heard ${character.voice.name}'s voice`,
-      });
+      };
     } catch (error) {
       console.error('Voice preview error:', error);
       toast({
         title: "Voice preview",
         description: "Using browser voice. Premium ElevenLabs voices available when connected.",
-      });
+      };
     } finally {
       setIsPlayingVoice(false);
     }
@@ -457,8 +488,20 @@ const Create = () => {
     </Card>
   );
 
+  // Add upgrade success handler
+  const handleUpgradeSuccess = (newPlan: string) => {
+    toast({
+      title: "Upgrade Successful!",
+      description: `Welcome to ${newPlan} plan! Your limits have been updated.`,
+    });
+    // Refresh usage data
+    if (refreshLimits) {
+      refreshLimits();
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
       {/* Header with Stepper */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b">
         <div className="max-w-6xl mx-auto p-4">
@@ -566,7 +609,7 @@ const Create = () => {
                                 Personality fine-tuning is available on Premium and Pro plans.
                                 <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span>
                                 <div className="mt-2">
-                                  <Button size="sm" onClick={() => { setUpgradePlan('premium'); setShowPayment(true); }}>Upgrade to Unlock</Button>
+                                  <Button size="sm" onClick={() => { setUpgradePlan('premium'); setShowUpgradePrompt(true); }}>Upgrade to Unlock</Button>
                                 </div>
                               </div>
                             ) : (
@@ -659,7 +702,7 @@ const Create = () => {
                             {currentPlan === 'free' ? (
                               <div className="space-y-2">
                                 <p className="text-sm text-muted-foreground">Custom avatar upload is a Premium feature. <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span></p>
-                                <Button onClick={() => { setUpgradePlan('premium'); setShowPayment(true); }}>Upgrade to Unlock</Button>
+                                <Button onClick={() => { setUpgradePlan('premium'); setShowUpgradePrompt(true); }}>Upgrade to Unlock</Button>
                               </div>
                             ) : character.avatarUrl ? (
                               <div className="space-y-4">
@@ -807,16 +850,13 @@ const Create = () => {
 
       {/* Inline Payment Modal for Upgrades */}
       {upgradePlan && (
-        <PaymentModal
-          isOpen={showPayment}
-          onClose={() => { setShowPayment(false); setUpgradePlan(null); }}
-          selectedPlan={upgradePlan}
-          onSuccess={() => {
-            setShowPayment(false);
-            setUpgradePlan(null);
-            setCurrentPlan(upgradePlan);
-            toast({ title: 'Upgraded!', description: 'Premium features unlocked. Enjoy!' });
-          }}
+        <UpgradePrompt
+          isOpen={showUpgradePrompt}
+          onClose={() => { setShowUpgradePrompt(false); setUpgradePlan(null); }}
+          limitType="companions"
+          currentPlan={currentPlan}
+          remaining={getRemainingCompanionsCount()}
+          onUpgradeSuccess={handleUpgradeSuccess}
         />
       )}
     </div>
