@@ -1,365 +1,249 @@
-let playbackQueue: Promise<void> = Promise.resolve();
-let currentAudio: HTMLAudioElement | null = null;
-let isPlaying = false;
+// Voice utilities for ElevenLabs TTS integration
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ElevenLabsSettings {
-  stability?: number;
-  similarity_boost?: number;
+  stability: number;
+  similarity_boost: number;
   style?: number;
   use_speaker_boost?: boolean;
 }
 
-// Enhanced voice presets for much more natural, human-like speech
+export interface VoiceCallSettings {
+  voiceId: string;
+  settings: ElevenLabsSettings;
+  modelId?: string;
+}
+
+// Voice presets for different personalities - ALL SEDUCTIVE FEMALE VOICES
 const VOICE_PRESETS: Record<string, ElevenLabsSettings> = {
-  // Custom voices with optimal settings for natural conversation
-  'NAW2WDhAioeiIYFXitBQ': { stability: 0.1, similarity_boost: 0.95, style: 0.8, use_speaker_boost: true }, // Your custom Luna voice - ultra natural
-  'Qz1ptFvQEBIyY87QB6oV': { stability: 0.12, similarity_boost: 0.93, style: 0.85, use_speaker_boost: true }, // Bonquisha - bold & vibrant
-  // Premium ElevenLabs Public Library Voices → ultra-realistic settings
-  '21m00Tcm4TlvDq8ikWAM': { stability: 0.12, similarity_boost: 0.98, style: 0.88, use_speaker_boost: true }, // Rachel - warm & intimate
-  'AZnzlk1XvdvUeBnXmlld': { stability: 0.15, similarity_boost: 0.97, style: 0.92, use_speaker_boost: true }, // Bella - energetic & playful
-  'EXAVITQu4vr4xnSDxMaL': { stability: 0.18, similarity_boost: 0.96, style: 0.78, use_speaker_boost: true }, // Sarah - professional yet warm
-  'ErXwobaYiN019PkySvjV': { stability: 0.08, similarity_boost: 0.99, style: 0.95, use_speaker_boost: true }, // Elli - ultra gentle & caring
-  'pNInz6obpgDQGcFmaJgB': { stability: 0.13, similarity_boost: 0.98, style: 0.90, use_speaker_boost: true }, // Olivia - cheerful & uplifting
-  'MF3mGyEYCl7XYWbV9V6O': { stability: 0.20, similarity_boost: 0.95, style: 0.82, use_speaker_boost: true }, // Cora - mature & wise
-  'onwK4e9ZLuTAKqWW03F9': { stability: 0.16, similarity_boost: 0.97, style: 0.91, use_speaker_boost: true }, // Domi - confident & bold
-  'kdmDKE6EkgrWrrykO9Qt': { stability: 0.14, similarity_boost: 0.98, style: 0.89, use_speaker_boost: true }, // Emily - sophisticated British
-  'XrExE9yKIg1WjnnlVkGX': { stability: 0.11, similarity_boost: 0.99, style: 0.93, use_speaker_boost: true }, // Matilda - sweet & romantic
-  'CYw3kZ02Hs0563khs1Fj': { stability: 0.17, similarity_boost: 0.96, style: 0.85, use_speaker_boost: true }, // Nova - modern & dynamic
-  'XB0fDUnXU5powFXDhCwa': { stability: 0.19, similarity_boost: 0.97, style: 0.80, use_speaker_boost: true }, // Charlotte - calm & professional
+  'EXAVITQu4vr4xnSDxMaL': { stability: 0.75, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true }, // Luna (Sarah) - professional
+  '21m00Tcm4TlvDq8ikWAM': { stability: 0.50, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true }, // Bonquisha (Rachel) - bold
+  'AZnzlk1XvdvUeBnXmlld': { stability: 0.60, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Bella - seductive and playful
+  'ErXwobaYiN019PkySvjV': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Elli - soft and seductive
+  'pNInz6obpgDQGcFmaJgB': { stability: 0.70, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true }, // Olivia - cheerful and seductive
+  'onwK4e9ZLuTAKqWW03F9': { stability: 0.55, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Domi - bold and seductive
+  'kdmDKE6EkgrWrrykO9Qt': { stability: 0.70, similarity_boost: 0.85, style: 0.20, use_speaker_boost: true }, // Emily - sophisticated and seductive
+  'XrExE9yKIg1WjnnlVkGX': { stability: 0.75, similarity_boost: 0.90, style: 0.15, use_speaker_boost: true }, // Matilda - sweet and seductive
+  'CYw3kZ02Hs0563khs1Fj': { stability: 0.65, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Nova - modern and seductive
+  'XB0fDUnXU5powFXDhCwa': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Charlotte - calm and seductive
+  'VR6AewLTigWG4xSOukaG': { stability: 0.75, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true }, // Lily - sweet and seductive
+  'pqHfZKP75CvOlQylNhV4': { stability: 0.70, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Bella - seductive and mysterious
 };
 
-function getPersistedTuning(voiceId?: string): ElevenLabsSettings | undefined {
-  try {
-    const raw = localStorage.getItem('loveai-voice-tuning');
-    if (!raw) return undefined;
-    const all = JSON.parse(raw) as Record<string, ElevenLabsSettings>;
-    return voiceId && all[voiceId] ? all[voiceId] : all['__default'];
-  } catch {
-    return undefined;
-  }
+// Default voice settings
+const DEFAULT_VOICE_SETTINGS: ElevenLabsSettings = {
+  stability: 0.75,
+  similarity_boost: 0.75,
+  style: 0.0,
+  use_speaker_boost: true
+};
+
+// Get voice settings for a specific voice ID
+export function getVoiceSettings(voiceId: string): ElevenLabsSettings {
+  return VOICE_PRESETS[voiceId] || DEFAULT_VOICE_SETTINGS;
 }
 
-function mergeSettings(voiceId?: string, override?: ElevenLabsSettings): ElevenLabsSettings {
-  const preset = (voiceId && VOICE_PRESETS[voiceId]) ? VOICE_PRESETS[voiceId] : undefined;
-  const persisted = getPersistedTuning(voiceId);
-  return {
-    stability: override?.stability ?? persisted?.stability ?? preset?.stability ?? 0.15, // Much lower for natural variation
-    similarity_boost: override?.similarity_boost ?? persisted?.similarity_boost ?? preset?.similarity_boost ?? 0.98, // Higher for consistency
-    style: override?.style ?? persisted?.style ?? preset?.style ?? 0.85, // Much higher for expressiveness
-    use_speaker_boost: override?.use_speaker_boost ?? persisted?.use_speaker_boost ?? preset?.use_speaker_boost ?? true,
-  };
-}
-
-// Enhanced text processing for more natural speech
-function processTextForSpeech(text: string): string {
-  // For voice previews, use minimal processing to save credits
-  if (text.length < 100) {
-    return text; // Skip processing for short previews
+// Process text for better speech synthesis
+export function processTextForSpeech(text: string): string {
+  // Skip complex processing for short texts to save credits
+  if (text.length < 50) {
+    return text;
   }
   
-  // Add natural pauses and emphasis
+  // Remove excessive punctuation and normalize spacing
   let processed = text
-    // Add pauses after sentences
-    .replace(/([.!?])\s+/g, '$1... ')
-    // Add emphasis to important words
-    .replace(/\b(amazing|incredible|wonderful|beautiful|love|adore|excited|happy|thrilled)\b/gi, '*$1*')
-    // Add natural hesitations
-    .replace(/\b(well|um|hmm|oh|wow|oh my)\b/gi, '$1...')
-    // Add emotional expressions
-    .replace(/\b(that's|that is)\b/gi, "that's")
-    .replace(/\b(I'm|I am)\b/gi, "I'm")
-    .replace(/\b(you're|you are)\b/gi, "you're")
-    .replace(/\b(we're|we are)\b/gi, "we're")
-    .replace(/\b(they're|they are)\b/gi, "they're");
-  
+    .replace(/[.]{2,}/g, '.') // Replace multiple periods with single
+    .replace(/[!]{2,}/g, '!') // Replace multiple exclamations with single
+    .replace(/[?]{2,}/g, '?') // Replace multiple questions with single
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+
+  // Add natural pauses for better speech flow
+  processed = processed
+    .replace(/\.\s+/g, '. ') // Ensure space after periods
+    .replace(/,\s+/g, ', ') // Ensure space after commas
+    .replace(/!\s+/g, '! ') // Ensure space after exclamations
+    .replace(/\?\s+/g, '? '); // Ensure space after questions
+
   return processed;
 }
 
+// Main function to speak text using ElevenLabs
 export async function speakText(
-  text: string,
-  voiceId?: string,
-  options?: { modelId?: string; voiceSettings?: ElevenLabsSettings }
+  text: string, 
+  voiceId: string = 'EXAVITQu4vr4xnSDxMaL', // Default to Luna
+  settings?: ElevenLabsSettings
 ): Promise<void> {
-  console.log('🎤 Speaking text:', text.slice(0, 50) + '...', 'Voice ID:', voiceId);
+  console.log('🎤 Speaking text:', text.substring(0, 50) + '...', 'Voice ID:', voiceId);
   
-  const task = async () => {
-    try {
-      // Stop any current audio
-      stopAllTTS();
-      
-      // Process text for more natural speech
-      const processedText = processTextForSpeech(text);
-      
-      // Resolve best-available settings for natural speech
-      const settings = mergeSettings(voiceId, options?.voiceSettings);
-      console.log('�� Voice settings:', settings);
+  // Stop any current speech
+  stopAllSpeech();
+  
+  const processedText = processTextForSpeech(text);
+  const voiceSettings = settings || getVoiceSettings(voiceId);
+  
+  console.log(' Voice settings:', voiceSettings);
 
-      // Try multiple API endpoints for reliability
-      const endpoints = [
-        '/api/elevenlabs-tts',
-        '/.netlify/functions/elevenlabs-tts'
-      ];
+  try {
+    // Try local API first, then Netlify function
+    const endpoints = [
+      '/api/elevenlabs-tts',
+      '/.netlify/functions/elevenlabs-tts'
+    ];
 
-      let response: Response | null = null;
-      let lastError: Error | null = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          console.log('🌐 Trying endpoint:', endpoint);
-          
-          response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              text: processedText, // Use processed text
-              voice_id: voiceId || '21m00Tcm4TlvDq8ikWAM',
-              model_id: options?.modelId || 'eleven_multilingual_v2',
-              voice_settings: settings
-            }),
-            signal: AbortSignal.timeout(25000) // Increased timeout for better quality
-          });
-
-          if (response.ok) {
-            console.log('✅ Success with endpoint:', endpoint);
-            break;
-          } else {
-            const errorText = await response.text();
-            console.warn('⚠️ Endpoint failed:', endpoint, response.status, errorText);
-            lastError = new Error(`Endpoint ${endpoint} failed: ${response.status} - ${errorText}`);
-          }
-        } catch (error) {
-          console.warn('⚠️ Endpoint error:', endpoint, error);
-          lastError = error as Error;
-        }
-      }
-
-      if (!response || !response.ok) {
-        throw lastError || new Error('All TTS endpoints failed');
-      }
-
-      const blob = await response.blob();
-      console.log('📦 Received audio blob:', blob.size, 'bytes');
-      
-      if (blob.size === 0) {
-        throw new Error('Empty audio response');
-      }
-
-      const url = URL.createObjectURL(blob);
+    for (const endpoint of endpoints) {
       try {
-        await playAudio(url);
-        console.log('🔊 Audio playback completed');
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('❌ TTS Error:', error);
-      
-      // Enhanced fallback to browser TTS with better settings
-      console.log('🔄 Falling back to browser TTS');
-      await fallbackTTS(text);
-    }
-  };
+        console.log(`🌐 Trying endpoint: ${endpoint}`);
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: processedText,
+            voice_id: voiceId,
+            voice_settings: voiceSettings,
+            model_id: 'eleven_multilingual_v2'
+          })
+        });
 
-  playbackQueue = playbackQueue.then(task).catch(async (e) => { 
-    console.error('❌ Playback queue error:', e);
-    throw e; 
-  });
-  return playbackQueue;
-}
-
-// Enhanced fallback to browser TTS with much better settings
-async function fallbackTTS(text: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
-      const utterance = new SpeechSynthesisUtterance(text);
-      
-      // Much more natural settings
-      utterance.rate = 0.85; // Slightly slower for natural speech
-      utterance.pitch = 1.1; // Slightly higher pitch for female voices
-      utterance.volume = 1.0;
-      
-      // Try to find the best female voice
-      const voices = speechSynthesis.getVoices();
-      const femaleVoices = voices.filter(voice => 
-        voice.name.toLowerCase().includes('female') || 
-        voice.name.toLowerCase().includes('woman') ||
-        voice.name.toLowerCase().includes('zira') ||
-        voice.name.toLowerCase().includes('susan') ||
-        voice.name.toLowerCase().includes('hazel') ||
-        voice.name.toLowerCase().includes('samantha') ||
-        voice.name.toLowerCase().includes('karen') ||
-        voice.name.toLowerCase().includes('victoria')
-      );
-      
-      if (femaleVoices.length > 0) {
-        // Choose the best female voice
-        const bestVoice = femaleVoices.find(v => v.name.toLowerCase().includes('samantha')) ||
-                         femaleVoices.find(v => v.name.toLowerCase().includes('zira')) ||
-                         femaleVoices[0];
-        utterance.voice = bestVoice;
-        console.log('🎤 Using voice:', bestVoice?.name);
-      }
-      
-      utterance.onend = () => {
-        console.log('🔊 Fallback TTS completed');
-        resolve();
-      };
-      
-      utterance.onerror = (event) => {
-        console.error('❌ Fallback TTS error:', event.error);
-        reject(new Error(`Fallback TTS failed: ${event.error}`));
-      };
-      
-      speechSynthesis.speak(utterance);
-    } catch (error) {
-      console.error('❌ Fallback TTS setup error:', error);
-      reject(error);
-    }
-  });
-}
-
-export function stopAllTTS(): void {
-  console.log('🛑 Stopping all TTS');
-  isPlaying = false;
-  
-  try { 
-    speechSynthesis.cancel(); 
-  } catch (error) {
-    console.warn('⚠️ Error canceling speech synthesis:', error);
-  }
-  
-  try {
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-      currentAudio = null;
-    }
-  } catch (error) {
-    console.warn('⚠️ Error stopping audio:', error);
-  }
-}
-
-function playAudio(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
-      // Stop any previous audio
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-      
-      const audio = new Audio(url);
-      currentAudio = audio;
-      isPlaying = true;
-      
-      const onEnded = () => {
-        console.log('🔊 Audio playback ended');
-        cleanup();
-        isPlaying = false;
-        resolve();
-      };
-      
-      const onError = (event: any) => {
-        console.error('❌ Audio playback error:', event);
-        cleanup();
-        isPlaying = false;
-        reject(new Error('Audio playback failed'));
-      };
-      
-      const onLoadStart = () => {
-        console.log('🔄 Audio loading started');
-      };
-      
-      const onCanPlay = () => {
-        console.log('✅ Audio ready to play');
-      };
-      
-      const cleanup = () => {
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-        audio.removeEventListener('loadstart', onLoadStart);
-        audio.removeEventListener('canplay', onCanPlay);
-        if (currentAudio === audio) {
-          currentAudio = null;
-          isPlaying = false;
+        if (response.ok) {
+          console.log(`✅ Success with endpoint: ${endpoint}`);
+          const audioBlob = await response.blob();
+          console.log('📦 Received audio blob:', audioBlob.size, 'bytes');
+          
+          // Create audio element and play
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          
+          // Set up audio event handlers
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            console.log('🔊 Audio playback completed');
+          };
+          
+          audio.onerror = (error) => {
+            console.error('❌ Audio playback error:', error);
+            URL.revokeObjectURL(audioUrl);
+          };
+          
+          // Play the audio
+          await audio.play();
+          console.log('🎵 Audio playback started');
+          return;
+        } else {
+          console.warn(`⚠️ Endpoint failed: ${endpoint} ${response.status}`);
+          const errorText = await response.text();
+          console.warn('Error details:', errorText);
         }
-      };
-      
-      audio.addEventListener('ended', onEnded);
-      audio.addEventListener('error', onError);
-      audio.addEventListener('loadstart', onLoadStart);
-      audio.addEventListener('canplay', onCanPlay);
-      
-      // Enhanced audio properties for better quality
-      audio.volume = 1.0;
-      audio.preload = 'auto';
-      
-      console.log('🎵 Starting audio playback');
-      audio.play().catch((error) => {
-        console.error('❌ Audio play failed:', error);
-        cleanup();
-        isPlaying = false;
-        reject(error);
-      });
-    } catch (error) {
-      console.error('❌ Audio setup error:', error);
-      isPlaying = false;
-      reject(error);
+      } catch (error) {
+        console.warn(`⚠️ Endpoint failed: ${endpoint}`, error);
+      }
+    }
+
+    // If all endpoints fail, fall back to browser TTS
+    console.log('🔄 Falling back to browser TTS');
+    await fallbackTTS(processedText, voiceId);
+    
+  } catch (error) {
+    console.error('❌ TTS Error:', error);
+    console.log('🔄 Falling back to browser TTS');
+    await fallbackTTS(processedText, voiceId);
+  }
+}
+
+// Fallback to browser TTS
+async function fallbackTTS(text: string, voiceId: string): Promise<void> {
+  if (!('speechSynthesis' in window)) {
+    console.error('❌ Speech synthesis not supported');
+    return;
+  }
+
+  // Map voice IDs to browser voices
+  const voiceMap: Record<string, string> = {
+    'EXAVITQu4vr4xnSDxMaL': 'Samantha',
+    '21m00Tcm4TlvDq8ikWAM': 'Samantha',
+    'AZnzlk1XvdvUeBnXmlld': 'Samantha',
+    'ErXwobaYiN019PkySvjV': 'Samantha',
+    'pNInz6obpgDQGcFmaJgB': 'Samantha',
+    'onwK4e9ZLuTAKqWW03F9': 'Samantha',
+    'kdmDKE6EkgrWrrykO9Qt': 'Samantha',
+    'XrExE9yKIg1WjnnlVkGX': 'Samantha',
+    'CYw3kZ02Hs0563khs1Fj': 'Samantha',
+    'XB0fDUnXU5powFXDhCwa': 'Samantha',
+    'VR6AewLTigWG4xSOukaG': 'Samantha',
+    'pqHfZKP75CvOlQylNhV4': 'Samantha'
+  };
+
+  const browserVoice = voiceMap[voiceId] || 'Samantha';
+  console.log('🎤 Using voice:', browserVoice);
+
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = speechSynthesis.getVoices().find(voice => voice.name === browserVoice) || null;
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.8;
+
+    utterance.onend = () => {
+      console.log('🔊 Fallback TTS completed');
+      resolve();
+    };
+
+    utterance.onerror = (error) => {
+      console.error('❌ Fallback TTS error:', error);
+      resolve();
+    };
+
+    speechSynthesis.speak(utterance);
+  });
+}
+
+// Stop all current speech
+export function stopAllSpeech(): void {
+  console.log('🛑 Stopping all TTS');
+  
+  // Stop browser TTS
+  if ('speechSynthesis' in window) {
+    speechSynthesis.cancel();
+  }
+  
+  // Stop any playing audio elements
+  const audioElements = document.querySelectorAll('audio');
+  audioElements.forEach(audio => {
+    if (!audio.paused) {
+      audio.pause();
+      audio.currentTime = 0;
     }
   });
 }
 
-// Check if TTS is currently playing
-export function isTTSPlaying(): boolean {
-  return isPlaying;
+// Test voice function for previews
+export async function testVoice(voiceId: string, text: string): Promise<void> {
+  console.log('🧪 Testing voice:', voiceId, 'with text:', text);
+  await speakText(text, voiceId);
 }
 
-// Get available voices
-export function getAvailableVoices(): SpeechSynthesisVoice[] {
-  return speechSynthesis.getVoices();
-}
-
-// Test voice functionality with natural settings
-export async function testVoice(voiceId?: string): Promise<boolean> {
+// Voice call utilities
+export async function startVoiceCall(characterId: string, voiceSettings: VoiceCallSettings): Promise<void> {
   try {
-    const testText = "Hello! I'm so excited to meet you! How are you doing today?";
-    await speakText(testText, voiceId, {
-      modelId: 'eleven_multilingual_v2',
-      voiceSettings: {
-        stability: 0.15,
-        similarity_boost: 0.98,
-        style: 0.85,
-        use_speaker_boost: true
-      }
-    });
-    return true;
+    // Track voice call usage
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('usage_tracking').upsert({
+        user_id: user.id,
+        date: new Date().toISOString().split('T')[0],
+        voice_calls_made: 1
+      }, {
+        onConflict: 'user_id,date'
+      });
+    }
   } catch (error) {
-    console.error('Voice test failed:', error);
-    return false;
+    console.error('Error tracking voice call usage:', error);
   }
 }
 
-// Get natural voice settings based on conversation context
-export function getNaturalVoiceSettings(context: 'excited' | 'calm' | 'intimate' | 'playful' | 'professional'): ElevenLabsSettings {
-  const baseSettings = {
-    stability: 0.15,
-    similarity_boost: 0.98,
-    style: 0.85,
-    use_speaker_boost: true
-  };
-
-  switch (context) {
-    case 'excited':
-      return { ...baseSettings, stability: 0.12, style: 0.92 };
-    case 'calm':
-      return { ...baseSettings, stability: 0.18, style: 0.75 };
-    case 'intimate':
-      return { ...baseSettings, stability: 0.10, style: 0.95 };
-    case 'playful':
-      return { ...baseSettings, stability: 0.13, style: 0.90 };
-    case 'professional':
-      return { ...baseSettings, stability: 0.20, style: 0.70 };
-    default:
-      return baseSettings;
-  }
+export async function endVoiceCall(): Promise<void> {
+  stopAllSpeech();
 }
