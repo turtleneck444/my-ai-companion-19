@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { VoiceSelector } from "@/components/VoiceSelector";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { speakText } from "@/lib/voice";
+import { speakText, testVoice } from "@/lib/voice";
 import { generateAvatarImage, validateImagePrompt, examplePrompts } from "@/lib/image-generation";
 import { useNavigate } from "react-router-dom";
 import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
@@ -35,7 +35,10 @@ import {
   Wand2,
   Loader2,
   RefreshCw,
-  ImageIcon
+  ImageIcon,
+  Camera,
+  Palette,
+  Zap
 } from "lucide-react";
 
 interface Voice {
@@ -92,45 +95,15 @@ const Create = () => {
   // Use the enhanced upgrade system
   const { 
     showUpgradePrompt, 
-    setShowUpgradePrompt, 
+    showUpgrade,
+    hideUpgrade,
     handleUpgrade,
     isUpgrading 
   } = useUpgrade();
   
   const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
-  const [stepIdx, setStepIdx] = useState(0);
+  const [currentStep, setCurrentStep] = useState<Step>("Basics");
   const [saving, setSaving] = useState(false);
-  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
-  const [voiceTuning, setVoiceTuning] = useState<{ stability: number; similarity: number; style: number; boost: boolean }>(() => {
-    try {
-      const raw = localStorage.getItem('loveai-voice-tuning');
-      if (raw) {
-        const all = JSON.parse(raw);
-        const def = all['__default'];
-        if (def) return { stability: def.stability ?? 0.3, similarity: def.similarity_boost ?? 0.95, style: def.style ?? 0.55, boost: def.use_speaker_boost ?? true };
-      }
-    } catch {}
-    return { stability: 0.3, similarity: 0.95, style: 0.55, boost: true };
-  });
-
-  const persistTuning = (id: string | undefined, values: { stability: number; similarity: number; style: number; boost: boolean }) => {
-    try {
-      const raw = localStorage.getItem('loveai-voice-tuning');
-      const all = raw ? JSON.parse(raw) : {};
-      const key = id || '__default';
-      all[key] = { stability: values.stability, similarity_boost: values.similarity, style: values.style, use_speaker_boost: values.boost };
-      localStorage.setItem('loveai-voice-tuning', JSON.stringify(all));
-    } catch {}
-  };
-  const [dragActive, setDragActive] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [imagePrompt, setImagePrompt] = useState('');
-  const [imageStyle, setImageStyle] = useState('realistic');
-  const [avatarMethod, setAvatarMethod] = useState('upload'); // 'upload' or 'generate'
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Remove the problematic useEffect that was causing the white screen
-
   const [character, setCharacter] = useState<NewCharacter>({
     name: "",
     bio: "",
@@ -143,75 +116,137 @@ const Create = () => {
       intelligence: 50
     },
     voice: null,
+    avatarFile: null,
+    avatarUrl: ""
   });
 
-  const next = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
-  const prev = () => setStepIdx((i) => Math.max(i - 1, 0));
+  // Voice preview state
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const [voicePreviewError, setVoicePreviewError] = useState<string | null>(null);
 
-  // Check companion limit before saving
-  const canCreateCompanion = () => {
-    return checkCompanionLimit(usage.plan, usage.companionsCreated || 0);
-  };
+  // AI Image generation state
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [imageGenerationError, setImageGenerationError] = useState<string | null>(null);
+  const [showImagePrompt, setShowImagePrompt] = useState(false);
 
-  const getRemainingCompanionsCount = () => {
-    return getRemainingCompanions(usage.plan, usage.companionsCreated || 0);
-  };
+  // Check companion limit
+  useEffect(() => {
+    const checkLimit = async () => {
+      if (user && !usageLoading) {
+        const canCreate = await checkCompanionLimit(user.id, usage?.plan || 'free');
+        if (!canCreate) {
+          showUpgrade('message');
+          setUpgradePlan('premium');
+        }
+      }
+    };
+    checkLimit();
+  }, [user, usage, usageLoading]);
 
-  // AI Image generation handler
-  const generateAvatar = async () => {
-    if (usage.plan === 'free') {
-      toast({ title: 'Upgrade required', description: 'AI avatar generation is included with Premium and Pro plans.', variant: 'destructive' });
-      navigate('/pricing?plan=premium');
-      return;
+  const currentStepIndex = steps.indexOf(currentStep);
+  const progress = ((currentStepIndex + 1) / steps.length) * 100;
+
+  const nextStep = () => {
+    const nextIndex = currentStepIndex + 1;
+    if (nextIndex < steps.length) {
+      setCurrentStep(steps[nextIndex]);
     }
-    const validation = validateImagePrompt(imagePrompt);
-    if (!validation.isValid) {
+  };
+
+  const prevStep = () => {
+    const prevIndex = currentStepIndex - 1;
+    if (prevIndex >= 0) {
+      setCurrentStep(steps[prevIndex]);
+    }
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case "Basics":
+        return character.name.trim() !== "" && character.bio.trim() !== "";
+      case "Personality":
+        return character.personality.length > 0;
+      case "Voice":
+        return character.voice !== null;
+      case "Avatar":
+        return character.avatarUrl !== "" || character.avatarFile !== null;
+      case "Review":
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  // Enhanced voice preview function
+  const previewVoice = async (voice: Voice) => {
+    try {
+      setPreviewingVoice(voice.voice_id);
+      setVoicePreviewError(null);
+      
+      // Test the voice with a sample text
+      const sampleText = `Hello! I'm ${character.name || 'your AI companion'}. I'm so excited to meet you!`;
+      
+      await testVoice(voice.voice_id);
+      await speakText(sampleText, voice.voice_id, {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: {
+          stability: 0.35,
+          similarity_boost: 0.9,
+          style: 0.4,
+          use_speaker_boost: true
+        }
+      });
+      
       toast({
-        title: "Invalid prompt",
-        description: validation.message,
+        title: "Voice Preview",
+        description: `Playing ${voice.name} voice preview`
+      });
+    } catch (error) {
+      console.error('Voice preview error:', error);
+      setVoicePreviewError('Failed to preview voice. Please try again.');
+      toast({
+        title: "Preview Error",
+        description: "Could not preview voice. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setPreviewingVoice(null);
+    }
+  };
+
+  // AI Image generation function
+  const generateAIImage = async () => {
+    if (!imagePrompt.trim()) {
+      toast({
+        title: "Prompt Required",
+        description: "Please enter a description for your AI companion's image",
         variant: "destructive"
       });
       return;
     }
 
-    setIsGeneratingImage(true);
-    
     try {
+      setIsGeneratingImage(true);
+      setImageGenerationError(null);
+      
+      const validatedPrompt = validateImagePrompt(imagePrompt);
+      const imageUrl = await generateAvatarImage(validatedPrompt);
+      
+      setGeneratedImageUrl(imageUrl);
+      setCharacter(prev => ({ ...prev, avatarUrl: imageUrl }));
+      
       toast({
-        title: "Generating avatar...",
-        description: "Creating your AI companion's image. This may take 30-60 seconds.",
+        title: "Image Generated!",
+        description: "Your AI companion's avatar has been created"
       });
-
-      const result = await generateAvatarImage({
-        prompt: imagePrompt,
-        style: imageStyle as any,
-        quality: 'standard',
-        size: '1024x1024'
-      });
-
-      if (result) {
-        setCharacter(prev => ({
-          ...prev,
-          avatarUrl: result.url,
-          avatarFile: null // Clear file since we're using generated image
-        }));
-
-        toast({
-          title: "Avatar generated!",
-          description: `Created by ${result.provider}. You can regenerate if you want to try again.`,
-        });
-      } else {
-        toast({
-          title: "Generation failed",
-          description: "Could not generate avatar. Please try a different description or upload an image instead.",
-          variant: "destructive"
-        });
-      }
     } catch (error) {
-      console.error('Avatar generation error:', error);
+      console.error('Image generation error:', error);
+      setImageGenerationError('Failed to generate image. Please try again.');
       toast({
-        title: "Generation error",
-        description: "Something went wrong. Please try again or upload an image instead.",
+        title: "Generation Failed",
+        description: "Could not generate image. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -219,54 +254,43 @@ const Create = () => {
     }
   };
 
-  // Get a random example prompt
-  const useExamplePrompt = () => {
-    const randomPrompt = examplePrompts[Math.floor(Math.random() * examplePrompts.length)];
-    setImagePrompt(randomPrompt);
-  };
-
-  const handleUpload = async (): Promise<string | undefined> => {
-    if (!character.avatarFile) return character.avatarUrl;
-    if (!isSupabaseConfigured) return undefined;
-    const file = character.avatarFile;
-    const path = `avatars/${Date.now()}-${file.name}`;
-    const bucket = (import.meta.env.VITE_SUPABASE_STORAGE_BUCKET as string) || 'public';
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(path, file, { upsert: false });
-    if (error) {
-      toast({ title: "Upload failed", description: error.message });
-      return undefined;
-    }
-    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(data.path);
-    return pub?.publicUrl;
-  };
-
-  const save = async () => {
-    // Check companion limit before saving
-    if (!canCreateCompanion()) {
-      const plan = getPlanById(usage.plan);
-      const limit = plan?.limits.companions || 0;
-      const remaining = getRemainingCompanionsCount();
-      
+  // Enhanced character creation with proper user_id
+  const createCharacter = async () => {
+    if (!user) {
       toast({
-        title: "Companion limit reached",
-        description: `You've reached your limit of ${limit} companions. ${remaining === 0 ? 'Upgrade to create more companions.' : `You have ${remaining} companions remaining.`}`,
+        title: "Authentication Required",
+        description: "Please sign in to create a character",
         variant: "destructive"
       });
-      
-      if (remaining === 0) {
-        setUpgradePlan('premium');
-        setShowUpgradePrompt(true);
-      }
       return;
     }
 
+    setSaving(true);
     try {
-      setSaving(true);
-      const uploaded = await handleUpload();
+      // Upload avatar if file exists
+      let uploaded = null;
+      if (character.avatarFile) {
+        const formData = new FormData();
+        formData.append('file', character.avatarFile);
+        
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(`${user.id}/${Date.now()}-${character.avatarFile.name}`, character.avatarFile);
+        
+        if (error) throw error;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(data.path);
+        
+        uploaded = publicUrl;
+      }
+
       const payload = {
-        ...character, 
+        name: character.name,
+        bio: character.bio,
+        personality: character.personality,
+        personalityTraits: character.personalityTraits,
         avatarUrl: uploaded || character.avatarUrl,
         voice: character.voice?.name || "Default",
         voiceId: character.voice?.voice_id
@@ -275,16 +299,23 @@ const Create = () => {
       let savedCharacter = null;
       
       if (isSupabaseConfigured) {
+        // FIXED: Include user_id for RLS policy compliance
         const { data, error } = await supabase.from("characters").insert({
+          user_id: user.id, // This was missing!
           name: payload.name,
-          bio: payload.bio,
-          personality: payload.personality,
+          description: payload.bio,
+          personality: JSON.stringify(payload.personality),
+          personality_traits: JSON.stringify(payload.personalityTraits),
           voice: payload.voice,
           voice_id: payload.voiceId,
           avatar_url: payload.avatarUrl,
+          is_public: false
         }).select().single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Character creation error:', error);
+          throw new Error(`Failed to create character: ${error.message}`);
+        }
         savedCharacter = data;
       }
 
@@ -295,8 +326,11 @@ const Create = () => {
         avatar: payload.avatarUrl || '/placeholder.svg',
         bio: payload.bio,
         personality: payload.personality,
-        voice: payload.voice,
-        voice_id: payload.voiceId,
+        personalityTraits: payload.personalityTraits,
+        voice: { 
+          voice_id: payload.voiceId, 
+          name: payload.voice 
+        },
         isOnline: true,
         relationshipLevel: 1.0
       };
@@ -311,552 +345,474 @@ const Create = () => {
         state: { startChatWith: characterForSuccess } 
       });
     } catch (e: any) {
-      toast({ title: "Error", description: String(e?.message || e) });
+      console.error('Character creation error:', e);
+      toast({ 
+        title: "Error", 
+        description: String(e?.message || e),
+        variant: "destructive"
+      });
     } finally {
       setSaving(false);
     }
   };
 
   const togglePersonality = (trait: string) => {
-    setCharacter(prev => {
-      const has = prev.personality.includes(trait);
-      if (!has && usage.plan === 'free' && prev.personality.length >= 3) {
-        toast({ title: 'Upgrade for more traits', description: 'Free plan allows up to 3 personality traits. Upgrade to add more.', variant: 'destructive' });
-        return prev;
-      }
-      return {
-        ...prev,
-        personality: has
-          ? prev.personality.filter(p => p !== trait)
-          : [...prev.personality, trait]
-      };
-    });
+    setCharacter(prev => ({
+      ...prev,
+      personality: prev.personality.includes(trait)
+        ? prev.personality.filter(t => t !== trait)
+        : [...prev.personality, trait]
+    }));
   };
 
   const updatePersonalityTrait = (key: string, value: number[]) => {
     setCharacter(prev => ({
       ...prev,
-      personalityTraits: { ...prev.personalityTraits, [key]: value[0] }
+      personalityTraits: {
+        ...prev.personalityTraits,
+        [key]: value[0]
+      }
     }));
   };
 
-  const handleFileUpload = (file: File) => {
-    if (file && file.type.startsWith('image/')) {
-      setCharacter(prev => ({ ...prev, avatarFile: file }));
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setCharacter(prev => ({ ...prev, avatarUrl: e.target?.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleVoiceSelect = (voice: Voice) => {
-    setCharacter(prev => ({ ...prev, voice }));
-    // Load tuning for this specific voice if present
-    try {
-      const raw = localStorage.getItem('loveai-voice-tuning');
-      if (raw) {
-        const all = JSON.parse(raw);
-        const sel = all[voice.voice_id];
-        if (sel) setVoiceTuning({ stability: sel.stability ?? 0.3, similarity: sel.similarity_boost ?? 0.95, style: sel.style ?? 0.55, boost: sel.use_speaker_boost ?? true });
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please choose an image smaller than 5MB",
+          variant: "destructive"
+        });
+        return;
       }
-    } catch {}
+      
+      const url = URL.createObjectURL(file);
+      setCharacter(prev => ({
+        ...prev,
+        avatarFile: file,
+        avatarUrl: url
+      }));
+    }
   };
 
-  const handlePersonalitySuggest = (traits: string[]) => {
+  const removeAvatar = () => {
     setCharacter(prev => ({
       ...prev,
-      personality: [...new Set([...prev.personality, ...traits])]
+      avatarFile: null,
+      avatarUrl: ""
     }));
   };
 
-  const previewSelectedVoice = async () => {
-    if (!character.voice) {
-      toast({ title: "No voice selected", description: "Please select a voice first." });
-      return;
-    }
-    try {
-      setIsPlayingVoice(true);
-      const previewText = `Hi! I'm ${character.name || 'your AI companion'}. Can't wait to talk with you.`;
-      console.log('Playing voice preview:', { voiceId: character.voice.voice_id, text: previewText, tuning: voiceTuning });
-      await speakText(previewText, character.voice.voice_id, { voiceSettings: { stability: voiceTuning.stability, similarity_boost: voiceTuning.similarity, style: voiceTuning.style, use_speaker_boost: voiceTuning.boost } });
-      toast({
-        title: "Voice preview played! 🎉",
-        description: `You just heard ${character.voice.name}'s voice`,
-      });
-    } catch (error) {
-      console.error('Voice preview error:', error);
-      toast({
-        title: "Voice preview",
-        description: "Using browser voice. Premium ElevenLabs voices available when connected.",
-      });
-    } finally {
-      setIsPlayingVoice(false);
-    }
-  };
-
-  const step = steps[stepIdx];
-  const progress = ((stepIdx + 1) / steps.length) * 100;
-
-  const LivePreviewCard = () => (
-    <Card className="overflow-hidden shadow-romance transition-all duration-300 hover:shadow-glow border-0 bg-card/80 backdrop-blur-sm">
-      <div className="relative">
-        <div className="w-full h-48 bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
-          {character.avatarUrl ? (
-            <div className="w-32 h-32 rounded-full overflow-hidden ring-4 ring-white/50 shadow-lg">
-              <img
-                src={character.avatarUrl}
-                alt={character.name || "Preview"}
-                className="w-full h-full object-cover"
+  const renderStep = () => {
+    switch (currentStep) {
+      case "Basics":
+        return (
+          <div className="space-y-6">
+            <div>
+              <Label htmlFor="name">Character Name</Label>
+              <Input
+                id="name"
+                value={character.name}
+                onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter your AI companion's name"
+                className="mt-2"
               />
             </div>
-          ) : (
-            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-              <Heart className="w-12 h-12 text-pink-400" />
-            </div>
-          )}
-        </div>
-        <div className="absolute top-3 right-3">
-          <div className="w-3 h-3 rounded-full bg-green-400 shadow-sm" />
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-          <h3 className="text-white font-semibold text-lg">
-            {character.name || "Your AI Companion"}
-          </h3>
-          <p className="text-white/80 text-sm">
-            {character.voice?.name || "Select a voice"} voice
-          </p>
-        </div>
-      </div>
-      
-      <div className="p-4 space-y-3">
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          {character.bio || "Tell me about yourself..."}
-        </p>
-        
-        <div className="flex flex-wrap gap-1">
-          {character.personality.slice(0, 3).map((trait) => (
-            <Badge key={trait} variant="secondary" className="text-xs">
-              {trait}
-            </Badge>
-          ))}
-          {character.personality.length === 0 && (
-            <Badge variant="outline" className="text-xs text-muted-foreground">
-              Add personality traits
-            </Badge>
-          )}
-        </div>
-
-        {character.voice && (
-          <div className="pt-2 border-t">
-            <Button
-              onClick={previewSelectedVoice}
-              disabled={isPlayingVoice}
-              size="sm"
-              variant="outline"
-              className="w-full"
-            >
-              {isPlayingVoice ? (
-                <>
-                  <Pause className="w-3 h-3 mr-2" />
-                  Playing...
-                </>
-              ) : (
-                <>
-                  <Mic className="w-3 h-3 mr-2" />
-                  Preview Voice
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-
-  // Add upgrade success handler
-  const handleUpgradeSuccess = (newPlan: string) => {
-    toast({
-      title: "Upgrade Successful!",
-      description: `Welcome to ${newPlan} plan! Your limits have been updated.`,
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
-      {/* Header with Stepper */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b">
-        <div className="max-w-6xl mx-auto p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => {
-                  if (window.history.length > 1) {
-                    navigate(-1);
-                  } else {
-                    navigate('/app');
-                  }
-                }}
-                className="p-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <h1 className="text-2xl font-semibold flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-primary" />
-                Create Your AI Companion
-              </h1>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Step {stepIdx + 1} of {steps.length}
+            
+            <div>
+              <Label htmlFor="bio">Character Description</Label>
+              <Textarea
+                id="bio"
+                value={character.bio}
+                onChange={(e) => setCharacter(prev => ({ ...prev, bio: e.target.value }))}
+                placeholder="Describe your AI companion's background, interests, and what makes them special..."
+                className="mt-2"
+                rows={4}
+              />
             </div>
           </div>
-          <Stepper steps={steps} currentStep={stepIdx} />
-          <Progress value={progress} className="mt-4 h-2" />
-        </div>
-      </div>
+        );
 
-      <div className="max-w-6xl mx-auto p-4 pb-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Mobile Live Preview - Shows at top on mobile */}
-          <div className="lg:hidden order-first">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <Volume2 className="w-5 h-5 text-primary" />
-                Live Preview
-              </h3>
-              <LivePreviewCard />
+      case "Personality":
+        return (
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Personality Traits</h3>
+              <div className="flex flex-wrap gap-2">
+                {personalityOptions.map((trait) => (
+                  <Badge
+                    key={trait}
+                    variant={character.personality.includes(trait) ? "default" : "outline"}
+                    className="cursor-pointer hover:bg-primary/10 transition-colors"
+                    onClick={() => togglePersonality(trait)}
+                  >
+                    {trait}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Main Content */}
-          <div className="space-y-6">
-            {/* Step Content with Animations */}
-            <div className="relative overflow-hidden">
-              <div 
-                className="transition-all duration-500 ease-in-out"
-                style={{ transform: `translateX(-${stepIdx * 100}%)` }}
-              >
-                <div className="w-full flex">
-                  {steps.map((stepName, index) => (
-                    <div key={stepName} className="w-full flex-shrink-0 px-2">
-                      {stepName === "Basics" && (
-                        <Card className="p-6 space-y-4">
-                          <div>
-                            <Label htmlFor="name" className="text-base font-medium">Name</Label>
-                            <Input 
-                              id="name" 
-                              value={character.name} 
-                              onChange={(e) => setCharacter({ ...character, name: e.target.value })} 
-                              placeholder="e.g., Luna, Aria, Sophie..." 
-                              className="mt-2"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="bio" className="text-base font-medium">Bio</Label>
-                            <Textarea 
-                              id="bio" 
-                              value={character.bio} 
-                              onChange={(e) => setCharacter({ ...character, bio: e.target.value })} 
-                              placeholder="Tell me about her personality, interests, and what makes her special..." 
-                              className="mt-2 min-h-[100px]"
-                            />
-                          </div>
-                        </Card>
-                      )}
-
-                      {stepName === "Personality" && (
-                        <Card className="p-6 space-y-6 relative">
-                          <div>
-                            <Label className="text-base font-medium mb-4 block">Personality Traits</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {personalityOptions.map((trait) => (
-                                <Badge
-                                  key={trait}
-                                  variant={character.personality.includes(trait) ? "default" : "outline"}
-                                  className="cursor-pointer transition-all duration-200 hover:scale-105"
-                                  onClick={() => togglePersonality(trait)}
-                                >
-                                  {trait}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-4">
-                            <Label className="text-base font-medium">Fine-tune Personality</Label>
-                            {usage.plan === 'free' ? (
-                              <div className="text-sm text-muted-foreground p-3 border rounded-md">
-                                Personality fine-tuning is available on Premium and Pro plans.
-                                <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span>
-                                <div className="mt-2">
-                                  <Button size="sm" onClick={() => { setUpgradePlan('premium'); setShowUpgradePrompt(true); }}>Upgrade to Unlock</Button>
-                                </div>
-                              </div>
-                            ) : (
-                              personalityTraitSliders.map((trait) => (
-                                <div key={trait.key} className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span>{trait.label}</span>
-                                    <span>{character.personalityTraits[trait.key]}%</span>
-                                  </div>
-                                  <Slider
-                                    value={[character.personalityTraits[trait.key]]}
-                                    onValueChange={(value) => updatePersonalityTrait(trait.key, value)}
-                                    min={trait.min}
-                                    max={trait.max}
-                                    step={1}
-                                    className="w-full"
-                                  />
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </Card>
-                      )}
-
-                      {stepName === "Voice" && (
-                        usage.plan === 'free' ? (
-                          <Card className="p-6 text-center">
-                            <h3 className="font-semibold mb-2">Premium Feature</h3>
-                            <p className="text-sm text-muted-foreground mb-4">Select from premium voices with a Premium or Pro plan.</p>
-                            <Button onClick={() => { setUpgradePlan('premium'); setShowUpgradePrompt(true); }}>Upgrade to Unlock</Button>
-                          </Card>
-                        ) : (
-                          <div className="space-y-6">
-                            <VoiceSelector
-                              selectedVoice={character.voice}
-                              onVoiceSelect={handleVoiceSelect}
-                              onPersonalitySuggest={handlePersonalitySuggest}
-                            />
-                            <Card className="p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div>
-                                  <h4 className="font-semibold">Voice Tuning</h4>
-                                  <p className="text-xs text-muted-foreground">Fine-tune naturalness for ElevenLabs voices</p>
-                                </div>
-                                <Button variant="outline" size="sm" onClick={() => { persistTuning(character.voice?.voice_id, voiceTuning); toast({ title: 'Saved', description: 'Your voice tuning preferences were saved.' }); }}>Save</Button>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label>Stability ({voiceTuning.stability.toFixed(2)})</Label>
-                                  <input type="range" min={0} max={1} step={0.01} value={voiceTuning.stability} onChange={(e) => setVoiceTuning(v => ({ ...v, stability: parseFloat(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Similarity Boost ({voiceTuning.similarity.toFixed(2)})</Label>
-                                  <input type="range" min={0} max={1} step={0.01} value={voiceTuning.similarity} onChange={(e) => setVoiceTuning(v => ({ ...v, similarity: parseFloat(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Style ({voiceTuning.style.toFixed(2)})</Label>
-                                  <input type="range" min={0} max={1} step={0.01} value={voiceTuning.style} onChange={(e) => setVoiceTuning(v => ({ ...v, style: parseFloat(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Speaker Boost</Label>
-                                  <div className="flex items-center gap-3">
-                                    <input id="boost" type="checkbox" checked={voiceTuning.boost} onChange={(e) => setVoiceTuning(v => ({ ...v, boost: e.target.checked }))} />
-                                    <Label htmlFor="boost">Enable</Label>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex justify-end mt-3">
-                                <Button variant="default" size="sm" onClick={previewSelectedVoice} disabled={isPlayingVoice || !character.voice}>Preview with Tuning</Button>
-                              </div>
-                            </Card>
-                          </div>
-                        )
-                      )}
-
-                      {stepName === "Avatar" && (
-                        <Card className="p-6">
-                          <Label className="text-base font-medium mb-4 block">Avatar Image</Label>
-                          <div
-                            className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
-                              dragActive 
-                                ? "border-primary bg-primary/5" 
-                                : "border-muted-foreground/25 hover:border-primary/50"
-                            }`}
-                            onDragEnter={handleDrag}
-                            onDragLeave={handleDrag}
-                            onDragOver={handleDrag}
-                            onDrop={handleDrop}
-                          >
-                            {usage.plan === 'free' ? (
-                              <div className="space-y-2">
-                                <p className="text-sm text-muted-foreground">Custom avatar upload is a Premium feature. <span className="ml-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">Upgrade</span></p>
-                                <Button onClick={() => { setUpgradePlan('premium'); setShowUpgradePrompt(true); }}>Upgrade to Unlock</Button>
-                              </div>
-                            ) : character.avatarUrl ? (
-                              <div className="space-y-4">
-                                <div className="w-24 h-24 rounded-full overflow-hidden mx-auto ring-4 ring-primary/20">
-                                  <img
-                                    src={character.avatarUrl}
-                                    alt="Preview"
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <p className="text-sm font-medium">{character.avatarFile?.name}</p>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => fileInputRef.current?.click()}
-                                  >
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    Change Image
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-4">
-                                <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
-                                <div>
-                                  <p className="text-sm font-medium">Drop your image here</p>
-                                  <p className="text-xs text-muted-foreground">or click to browse</p>
-                                </div>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => fileInputRef.current?.click()}
-                                >
-                                  <Upload className="w-4 h-4 mr-2" />
-                                  Choose File
-                                </Button>
-                              </div>
-                            )}
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleFileUpload(file);
-                              }}
-                            />
-                          </div>
-                        </Card>
-                      )}
-
-                      {stepName === "Review" && (
-                        <Card className="p-6 space-y-4">
-                          <div className="text-center space-y-2">
-                            <Check className="w-12 h-12 text-green-500 mx-auto" />
-                            <h3 className="text-lg font-semibold">Ready to Create!</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Review your AI companion and click Create when ready
-                            </p>
-                          </div>
-                          <div className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Name:</span>
-                              <span className="font-medium">{character.name || "Not set"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Personality:</span>
-                              <span className="font-medium">{character.personality.length} traits</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Voice:</span>
-                              <span className="font-medium">{character.voice?.name || "Not selected"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Avatar:</span>
-                              <span className="font-medium">{character.avatarUrl ? "Uploaded" : "Not set"}</span>
-                            </div>
-                          </div>
-                        </Card>
-                      )}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Fine-tune Personality</h3>
+              <div className="space-y-6">
+                {personalityTraitSliders.map((trait) => (
+                  <div key={trait.key}>
+                    <div className="flex justify-between items-center mb-2">
+                      <Label>{trait.label}</Label>
+                      <span className="text-sm text-muted-foreground">
+                        {character.personalityTraits[trait.key]}%
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <Slider
+                      value={[character.personalityTraits[trait.key]]}
+                      onValueChange={(value) => updatePersonalityTrait(trait.key, value)}
+                      min={trait.min}
+                      max={trait.max}
+                      step={1}
+                      className="w-full"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
+        );
 
-          {/* Live Preview Sidebar - Desktop only */}
-          <div className="hidden lg:block lg:sticky lg:top-24">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Volume2 className="w-5 h-5 text-primary" />
-                Live Preview
-              </h3>
-              <LivePreviewCard />
+      case "Voice":
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold mb-2">Choose a Voice</h3>
+              <p className="text-muted-foreground">
+                Select the perfect voice for your AI companion
+              </p>
             </div>
+            
+            <VoiceSelector
+              selectedVoice={character.voice}
+              onVoiceSelect={(voice) => setCharacter(prev => ({ ...prev, voice }))}
+              onPreviewVoice={previewVoice}
+              previewingVoice={previewingVoice}
+              previewError={voicePreviewError}
+            />
+            
+            {character.voice && (
+              <div className="mt-6 p-4 bg-muted rounded-lg">
+                <h4 className="font-semibold mb-2">Selected Voice: {character.voice.name}</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {character.voice.description}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => previewVoice(character.voice!)}
+                    disabled={previewingVoice === character.voice.voice_id}
+                  >
+                    {previewingVoice === character.voice.voice_id ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 mr-2" />
+                    )}
+                    Preview Voice
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
+        );
+
+      case "Avatar":
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold mb-2">Choose an Avatar</h3>
+              <p className="text-muted-foreground">
+                Upload an image or generate one with AI
+              </p>
+            </div>
+
+            {/* AI Image Generation */}
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Wand2 className="w-5 h-5 text-purple-500" />
+                  <h4 className="font-semibold">Generate with AI</h4>
+                </div>
+                
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="imagePrompt">Describe your AI companion</Label>
+                    <Textarea
+                      id="imagePrompt"
+                      value={imagePrompt}
+                      onChange={(e) => setImagePrompt(e.target.value)}
+                      placeholder="e.g., A beautiful young woman with long brown hair, warm smile, wearing a cozy sweater, professional headshot style"
+                      className="mt-2"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={generateAIImage}
+                      disabled={isGeneratingImage || !imagePrompt.trim()}
+                      className="flex-1"
+                    >
+                      {isGeneratingImage ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4 mr-2" />
+                      )}
+                      {isGeneratingImage ? 'Generating...' : 'Generate Image'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowImagePrompt(!showImagePrompt)}
+                    >
+                      <Palette className="w-4 h-4 mr-2" />
+                      Examples
+                    </Button>
+                  </div>
+                  
+                  {showImagePrompt && (
+                    <div className="mt-4 p-4 bg-muted rounded-lg">
+                      <h5 className="font-medium mb-2">Example prompts:</h5>
+                      <div className="space-y-2">
+                        {examplePrompts.map((prompt, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setImagePrompt(prompt)}
+                            className="block w-full text-left text-sm text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {imageGenerationError && (
+                    <div className="text-sm text-red-500">
+                      {imageGenerationError}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* Upload Image */}
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-blue-500" />
+                  <h4 className="font-semibold">Upload Your Own</h4>
+                </div>
+                
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                    id="avatar-upload"
+                  />
+                  <Label htmlFor="avatar-upload" className="cursor-pointer">
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors">
+                      <Camera className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Click to upload an image
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        PNG, JPG up to 5MB
+                      </p>
+                    </div>
+                  </Label>
+                </div>
+              </div>
+            </Card>
+
+            {/* Current Avatar Preview */}
+            {(character.avatarUrl || generatedImageUrl) && (
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <h4 className="font-semibold">Current Avatar</h4>
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={character.avatarUrl || generatedImageUrl}
+                      alt="Character avatar"
+                      className="w-20 h-20 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground">
+                        {character.avatarFile ? 'Uploaded image' : 'Generated image'}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={removeAvatar}
+                        className="mt-2"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+        );
+
+      case "Review":
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold mb-2">Review Your Character</h3>
+              <p className="text-muted-foreground">
+                Make sure everything looks perfect before creating
+              </p>
+            </div>
+
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  {character.avatarUrl && (
+                    <img
+                      src={character.avatarUrl}
+                      alt={character.name}
+                      className="w-16 h-16 rounded-full object-cover"
+                    />
+                  )}
+                  <div>
+                    <h4 className="font-semibold text-lg">{character.name}</h4>
+                    <p className="text-muted-foreground">{character.bio}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h5 className="font-medium mb-2">Personality Traits</h5>
+                  <div className="flex flex-wrap gap-1">
+                    {character.personality.map((trait) => (
+                      <Badge key={trait} variant="secondary">
+                        {trait}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h5 className="font-medium mb-2">Personality Settings</h5>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {Object.entries(character.personalityTraits).map(([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="capitalize">{key}:</span>
+                        <span>{value}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {character.voice && (
+                  <div>
+                    <h5 className="font-medium mb-2">Voice</h5>
+                    <p className="text-sm text-muted-foreground">
+                      {character.voice.name} - {character.voice.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  if (usageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p>Loading...</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Sticky Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-        <div className="max-w-6xl mx-auto flex justify-between">
-          <Button 
-            variant="ghost" 
-            onClick={prev} 
-            disabled={stepIdx === 0}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-          
-          {stepIdx < steps.length - 1 ? (
-            <Button 
-              onClick={next} 
-              disabled={step === "Basics" && !character.name}
-              className="flex items-center gap-2"
-            >
-              Next
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          ) : (
-            <Button 
-              onClick={save} 
-              disabled={saving || !character.name}
-              className="flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Creating...
-                </>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-2">Create Your AI Companion</h1>
+            <p className="text-muted-foreground">
+              Design the perfect AI companion just for you
+            </p>
+          </div>
+
+          <Card className="p-6">
+            <div className="mb-6">
+              <Stepper
+                steps={steps}
+                currentStep={currentStepIndex}
+                onStepClick={(step) => setCurrentStep(step)}
+              />
+              <Progress value={progress} className="mt-4" />
+            </div>
+
+            <div className="mb-8">
+              {renderStep()}
+            </div>
+
+            <div className="flex justify-between">
+              <Button
+                variant="outline"
+                onClick={prevStep}
+                disabled={currentStepIndex === 0}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Previous
+              </Button>
+
+              {currentStep === "Review" ? (
+                <Button
+                  onClick={createCharacter}
+                  disabled={saving || !canProceed()}
+                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+                >
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Heart className="w-4 h-4 mr-2" />
+                  )}
+                  {saving ? 'Creating...' : 'Create Companion'}
+                </Button>
               ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  Create Companion
-                </>
+                <Button
+                  onClick={nextStep}
+                  disabled={!canProceed()}
+                >
+                  Next
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
               )}
-            </Button>
-          )}
+            </div>
+          </Card>
         </div>
       </div>
 
-      {/* Upgrade Prompt Modal */}
-      {upgradePlan && (
+      {showUpgradePrompt && (
         <UpgradePrompt
           isOpen={showUpgradePrompt}
-          onClose={() => { setShowUpgradePrompt(false); setUpgradePlan(null); }}
-          limitType="companions"
-          currentPlan={usage.plan}
+          onClose={() => hideUpgrade()}
+          onUpgrade={() => handleUpgrade(upgradePlan || 'premium')}
+          isUpgrading={isUpgrading}
+          currentPlan={usage?.plan || 'free'}
+          upgradePlan={upgradePlan || 'premium'}
         />
       )}
     </div>

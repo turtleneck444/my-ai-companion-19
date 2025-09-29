@@ -86,7 +86,8 @@ app.post('/api/elevenlabs-tts', aiLimiter, async (req, res) => {
   try {
     const { text, voiceId } = req.body || {};
     const finalVoiceId = voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID || process.env.VITE_ELEVENLABS_VOICE_ID;
-    if (!process.env.ELEVENLABS_API_KEY) {
+    const apiKey = process.env.VITE_ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
       res.status(500).json({ error: 'Missing ELEVENLABS_API_KEY' });
       return;
     }
@@ -99,7 +100,7 @@ app.post('/api/elevenlabs-tts', aiLimiter, async (req, res) => {
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vid}`, {
       method: 'POST',
       headers: {
-        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'xi-api-key': apiKey,
         'Content-Type': 'application/json',
         'Accept': 'audio/mpeg'
       },
