@@ -22,7 +22,7 @@ const VOICE_PRESETS: Record<string, ElevenLabsSettings> = {
   'pNInz6obpgDQGcFmaJgB': { stability: 0.13, similarity_boost: 0.98, style: 0.90, use_speaker_boost: true }, // Olivia - cheerful & uplifting
   'MF3mGyEYCl7XYWbV9V6O': { stability: 0.20, similarity_boost: 0.95, style: 0.82, use_speaker_boost: true }, // Cora - mature & wise
   'onwK4e9ZLuTAKqWW03F9': { stability: 0.16, similarity_boost: 0.97, style: 0.91, use_speaker_boost: true }, // Domi - confident & bold
-  'TxGEqnHWrfWFTfGW9XjX': { stability: 0.14, similarity_boost: 0.98, style: 0.89, use_speaker_boost: true }, // Emily - sophisticated British
+  'kdmDKE6EkgrWrrykO9Qt': { stability: 0.14, similarity_boost: 0.98, style: 0.89, use_speaker_boost: true }, // Emily - sophisticated British
   'XrExE9yKIg1WjnnlVkGX': { stability: 0.11, similarity_boost: 0.99, style: 0.93, use_speaker_boost: true }, // Matilda - sweet & romantic
   'CYw3kZ02Hs0563khs1Fj': { stability: 0.17, similarity_boost: 0.96, style: 0.85, use_speaker_boost: true }, // Nova - modern & dynamic
   'XB0fDUnXU5powFXDhCwa': { stability: 0.19, similarity_boost: 0.97, style: 0.80, use_speaker_boost: true }, // Charlotte - calm & professional

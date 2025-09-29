@@ -150,12 +150,12 @@ export const VoiceSelector = ({
     },
     // Additional premium voices from ElevenLabs public library
     {
-      voice_id: "TxGEqnHWrfWFTfGW9XjX",
+      voice_id: "kdmDKE6EkgrWrrykO9Qt",
       name: "Emily",
       category: "female",
-      description: "Sophisticated British accent - elegant and refined",
+      description: "Super realistic young female voice that likes to chat",
       labels: { accent: "British", age: "Adult", gender: "Female" },
-      preview_url: "https://storage.googleapis.com/eleven-public-prod/premade/voices/TxGEqnHWrfWFTfGW9XjX/preview.mp3",
+      preview_url: "https://storage.googleapis.com/eleven-public-prod/premade/voices/kdmDKE6EkgrWrrykO9Qt/preview.mp3",
       suggestedPersonality: ["Sophisticated", "Elegant", "Mysterious", "Cultured"],
       characteristics: { warmth: 80, energy: 70, clarity: 95, depth: 90 },
       isPremium: true
