@@ -65,9 +65,9 @@ export const VoiceSelector = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayingVoice, setCurrentPlayingVoice] = useState<string | null>(null);
 
-  // SEDUCTIVE FEMALE VOICES ONLY - All confirmed female voices
+  // CONFIRMED FEMALE VOICES ONLY - All verified as female
   const voiceData: Voice[] = [
-    // Custom ElevenLabs Voices
+    // Custom ElevenLabs Voices (Female)
     {
       voice_id: "EXAVITQu4vr4xnSDxMaL",
       name: "Luna (Sarah Voice)",
@@ -92,7 +92,7 @@ export const VoiceSelector = ({
       isCustom: true,
       isPremium: true
     },
-    // SEDUCTIVE FEMALE VOICES - All confirmed female
+    // CONFIRMED FEMALE VOICES - All verified as female
     {
       voice_id: "AZnzlk1XvdvUeBnXmlld",
       name: "Bella",

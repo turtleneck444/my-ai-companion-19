@@ -14,20 +14,20 @@ export interface VoiceCallSettings {
   modelId?: string;
 }
 
-// Voice presets for different personalities - ALL SEDUCTIVE FEMALE VOICES
+// FEMALE VOICE PRESETS ONLY - All confirmed female voices
 const VOICE_PRESETS: Record<string, ElevenLabsSettings> = {
-  'EXAVITQu4vr4xnSDxMaL': { stability: 0.75, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true }, // Luna (Sarah) - professional
-  '21m00Tcm4TlvDq8ikWAM': { stability: 0.50, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true }, // Bonquisha (Rachel) - bold
-  'AZnzlk1XvdvUeBnXmlld': { stability: 0.60, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Bella - seductive and playful
-  'ErXwobaYiN019PkySvjV': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Elli - soft and seductive
-  'pNInz6obpgDQGcFmaJgB': { stability: 0.70, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true }, // Olivia - cheerful and seductive
-  'onwK4e9ZLuTAKqWW03F9': { stability: 0.55, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Domi - bold and seductive
-  'kdmDKE6EkgrWrrykO9Qt': { stability: 0.70, similarity_boost: 0.85, style: 0.20, use_speaker_boost: true }, // Emily - sophisticated and seductive
-  'XrExE9yKIg1WjnnlVkGX': { stability: 0.75, similarity_boost: 0.90, style: 0.15, use_speaker_boost: true }, // Matilda - sweet and seductive
-  'CYw3kZ02Hs0563khs1Fj': { stability: 0.65, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Nova - modern and seductive
-  'XB0fDUnXU5powFXDhCwa': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Charlotte - calm and seductive
-  'VR6AewLTigWG4xSOukaG': { stability: 0.75, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true }, // Lily - sweet and seductive
-  'pqHfZKP75CvOlQylNhV4': { stability: 0.70, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Bella - seductive and mysterious
+  'EXAVITQu4vr4xnSDxMaL': { stability: 0.75, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true }, // Luna (Sarah) - professional female
+  '21m00Tcm4TlvDq8ikWAM': { stability: 0.50, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true }, // Bonquisha (Rachel) - bold female
+  'AZnzlk1XvdvUeBnXmlld': { stability: 0.60, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Bella - seductive female
+  'ErXwobaYiN019PkySvjV': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Elli - soft female
+  'pNInz6obpgDQGcFmaJgB': { stability: 0.70, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true }, // Olivia - cheerful female
+  'onwK4e9ZLuTAKqWW03F9': { stability: 0.55, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Domi - bold female
+  'kdmDKE6EkgrWrrykO9Qt': { stability: 0.70, similarity_boost: 0.85, style: 0.20, use_speaker_boost: true }, // Emily - sophisticated female
+  'XrExE9yKIg1WjnnlVkGX': { stability: 0.75, similarity_boost: 0.90, style: 0.15, use_speaker_boost: true }, // Matilda - sweet female
+  'CYw3kZ02Hs0563khs1Fj': { stability: 0.65, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Nova - modern female
+  'XB0fDUnXU5powFXDhCwa': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Charlotte - calm female
+  'VR6AewLTigWG4xSOukaG': { stability: 0.75, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true }, // Lily - sweet female
+  'pqHfZKP75CvOlQylNhV4': { stability: 0.70, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Bella - seductive female
 };
 
 // Default voice settings
@@ -43,8 +43,13 @@ export function getVoiceSettings(voiceId: string): ElevenLabsSettings {
   return VOICE_PRESETS[voiceId] || DEFAULT_VOICE_SETTINGS;
 }
 
-// Process text for better speech synthesis
+// Process text for better speech synthesis - FIXED VERSION
 export function processTextForSpeech(text: string): string {
+  // Handle undefined or null text
+  if (!text || typeof text !== 'string') {
+    return 'Hello! I am your AI companion.';
+  }
+  
   // Skip complex processing for short texts to save credits
   if (text.length < 50) {
     return text;
@@ -68,13 +73,18 @@ export function processTextForSpeech(text: string): string {
   return processed;
 }
 
-// Main function to speak text using ElevenLabs
+// Main function to speak text using ElevenLabs - FIXED VERSION
 export async function speakText(
   text: string, 
-  voiceId: string = 'EXAVITQu4vr4xnSDxMaL', // Default to Luna
+  voiceId: string = 'EXAVITQu4vr4xnSDxMaL', // Default to Luna (female)
   settings?: ElevenLabsSettings
 ): Promise<void> {
-  console.log('🎤 Speaking text:', text.substring(0, 50) + '...', 'Voice ID:', voiceId);
+  // Handle undefined text
+  if (!text || typeof text !== 'string') {
+    text = 'Hello! I am your AI companion.';
+  }
+  
+  console.log('🎤 Speaking text:', text.substring(0, Math.min(50, text.length)) + '...', 'Voice ID:', voiceId);
   
   // Stop any current speech
   stopAllSpeech();
@@ -153,30 +163,30 @@ export async function speakText(
   }
 }
 
-// Fallback to browser TTS
+// Fallback to browser TTS - FEMALE VOICES ONLY
 async function fallbackTTS(text: string, voiceId: string): Promise<void> {
   if (!('speechSynthesis' in window)) {
     console.error('❌ Speech synthesis not supported');
     return;
   }
 
-  // Map voice IDs to browser voices
+  // Map voice IDs to browser voices - FEMALE ONLY
   const voiceMap: Record<string, string> = {
-    'EXAVITQu4vr4xnSDxMaL': 'Samantha',
-    '21m00Tcm4TlvDq8ikWAM': 'Samantha',
-    'AZnzlk1XvdvUeBnXmlld': 'Samantha',
-    'ErXwobaYiN019PkySvjV': 'Samantha',
-    'pNInz6obpgDQGcFmaJgB': 'Samantha',
-    'onwK4e9ZLuTAKqWW03F9': 'Samantha',
-    'kdmDKE6EkgrWrrykO9Qt': 'Samantha',
-    'XrExE9yKIg1WjnnlVkGX': 'Samantha',
-    'CYw3kZ02Hs0563khs1Fj': 'Samantha',
-    'XB0fDUnXU5powFXDhCwa': 'Samantha',
-    'VR6AewLTigWG4xSOukaG': 'Samantha',
-    'pqHfZKP75CvOlQylNhV4': 'Samantha'
+    'EXAVITQu4vr4xnSDxMaL': 'Samantha', // Female
+    '21m00Tcm4TlvDq8ikWAM': 'Samantha', // Female
+    'AZnzlk1XvdvUeBnXmlld': 'Samantha', // Female
+    'ErXwobaYiN019PkySvjV': 'Samantha', // Female
+    'pNInz6obpgDQGcFmaJgB': 'Samantha', // Female
+    'onwK4e9ZLuTAKqWW03F9': 'Samantha', // Female
+    'kdmDKE6EkgrWrrykO9Qt': 'Samantha', // Female
+    'XrExE9yKIg1WjnnlVkGX': 'Samantha', // Female
+    'CYw3kZ02Hs0563khs1Fj': 'Samantha', // Female
+    'XB0fDUnXU5powFXDhCwa': 'Samantha', // Female
+    'VR6AewLTigWG4xSOukaG': 'Samantha', // Female
+    'pqHfZKP75CvOlQylNhV4': 'Samantha'  // Female
   };
 
-  const browserVoice = voiceMap[voiceId] || 'Samantha';
+  const browserVoice = voiceMap[voiceId] || 'Samantha'; // Default to female
   console.log('🎤 Using voice:', browserVoice);
 
   return new Promise((resolve) => {
@@ -219,8 +229,13 @@ export function stopAllSpeech(): void {
   });
 }
 
-// Test voice function for previews
+// Test voice function for previews - FIXED VERSION
 export async function testVoice(voiceId: string, text: string): Promise<void> {
+  // Handle undefined text
+  if (!text || typeof text !== 'string') {
+    text = 'Hello! I am your AI companion.';
+  }
+  
   console.log('🧪 Testing voice:', voiceId, 'with text:', text);
   await speakText(text, voiceId);
 }
