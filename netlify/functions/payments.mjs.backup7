@@ -117,21 +117,6 @@ async function activateSupabaseUser(customerId, planId, paymentMethod = null) {
     return;
   }
 
-  // Calculate automatic billing dates based on signup date
-  const signupDate = new Date();
-  const nextBillingDate = new Date(signupDate);
-  
-  // Set next billing date based on plan interval
-  if (planId === 'premium' || planId === 'pro') {
-    nextBillingDate.setMonth(nextBillingDate.getMonth() + 1); // Monthly billing
-  }
-  
-  console.log('📅 Automatic billing dates calculated:', {
-    signupDate: signupDate.toISOString(),
-    nextBillingDate: planId === 'free' ? 'N/A' : nextBillingDate.toISOString(),
-    planId: planId
-  });
-
   const paymentData = paymentMethod ? {
     payment_method_id: paymentMethod.id,
     card_brand: paymentMethod.card?.brand,
@@ -140,13 +125,6 @@ async function activateSupabaseUser(customerId, planId, paymentMethod = null) {
     card_exp_year: paymentMethod.card?.exp_year,
     payment_method_created: new Date(paymentMethod.created * 1000).toISOString(),
   } : {};
-
-  // Prepare billing data with automatic dates
-  const billingData = planId === 'free' ? {} : {
-    billing_cycle_start: signupDate.toISOString(),
-    next_billing_date: nextBillingDate.toISOString(),
-    last_payment_date: signupDate.toISOString(), // First payment is on signup
-  };
 
   try {
     const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles`, {
@@ -159,11 +137,9 @@ async function activateSupabaseUser(customerId, planId, paymentMethod = null) {
       },
       body: JSON.stringify({
         subscription_plan: planId,
-        subscription_plan_id: planId, // Ensure both fields are set
         subscription_status: 'active',
         subscription_customer_id: customerId,
         ...paymentData,
-        ...billingData,
         updated_at: new Date().toISOString()
       })
     });
@@ -172,11 +148,7 @@ async function activateSupabaseUser(customerId, planId, paymentMethod = null) {
       const error = await response.text();
       console.error('❌ Supabase activation failed:', error);
     } else {
-      console.log('✅ User activated in Supabase with automatic billing dates:', {
-        customerId,
-        planId,
-        nextBilling: billingData.next_billing_date || 'N/A'
-      });
+      console.log('✅ User activated in Supabase:', customerId, planId);
     }
   } catch (error) {
     console.error('❌ Supabase activation error:', error);

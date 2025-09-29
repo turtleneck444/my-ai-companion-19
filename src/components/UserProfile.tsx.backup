@@ -102,7 +102,7 @@ export const UserProfile = () => {
     xpToNext: 1580
   });
 
-  // Current plan
+  // Current plan (launch week dynamic)
   const formatDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric' });
   const nextBillingDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   const [currentPlan, setCurrentPlan] = useState<PlanDetails>({
@@ -580,7 +580,7 @@ export const UserProfile = () => {
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">{currentPlan.name}</h3>
                   <p className="text-gray-600">
-                    {currentPlan.price === 0 ? 'Free Plan' : `$${currentPlan.price}/month`}
+                    {currentPlan.price === 0 ? 'Free during launch week' : `$${currentPlan.price}/month`}
                   </p>
                   {currentPlan.nextBilling && (
                     <p className="text-sm text-gray-500 mt-1">
@@ -638,6 +638,8 @@ export const UserProfile = () => {
               <Alert>
                 <Sparkles className="h-4 w-4" />
                 <AlertDescription>
+                  <strong>Launch Week Special!</strong> Enjoy unlimited access during our launch week. 
+                  Premium plans starting at $9.99/month will be available soon.
                 </AlertDescription>
               </Alert>
 
@@ -777,7 +779,7 @@ export const UserProfile = () => {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Payment methods are now available for managing your subscription.
+                  Payment methods will be available when billing begins after launch week.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -857,7 +859,7 @@ export const UserProfile = () => {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Subscription management is now available for all users.
+                  Subscription management will be available when billing begins after launch week.
                   Contact support if you need assistance.
                 </AlertDescription>
               </Alert>

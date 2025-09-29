@@ -57,9 +57,11 @@ interface UserPreferences {
 interface SimpleChatInterfaceProps {
   character: Character;
   onBack: () => void;
+  onStartCall?: () => void;
+  userPreferences?: UserPreferences;
 }
 
-export const SimpleChatInterface = ({ character, onBack }: SimpleChatInterfaceProps) => {
+export const SimpleChatInterface = ({ character, onBack, onStartCall, userPreferences: propUserPreferences }: SimpleChatInterfaceProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -314,27 +316,9 @@ export const SimpleChatInterface = ({ character, onBack }: SimpleChatInterfacePr
   };
 
   const handleVoiceCall = async () => {
-    if (isVoiceCallActive) {
-      await voiceCallManager.endVoiceCall();
-      setIsVoiceCallActive(false);
-      return;
-    }
-
-    try {
-      incrementVoiceCalls();
-      const sessionId = await voiceCallManager.startVoiceCall(character, userPreferences);
-      setIsVoiceCallActive(true);
-      toast({
-        title: "🎤 Voice Call Started",
-        description: `Talking with ${character.name}...`
-      });
-    } catch (error: any) {
-      console.error('Voice call error:', error);
-      toast({
-        title: "Voice Call Failed",
-        description: error.message || "Could not start voice call",
-        variant: "destructive"
-      });
+    // Use the proper onStartCall prop to navigate to VoiceCallInterface
+    if (onStartCall) {
+      onStartCall();
     }
   };
 

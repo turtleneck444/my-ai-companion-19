@@ -1,0 +1,392 @@
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { speakText, testVoice } from "@/lib/voice";
+import { 
+  Play, 
+  Pause, 
+  Volume2, 
+  Search,
+  Loader2,
+  Check,
+  Sparkles,
+  Mic,
+  MicOff
+} from "lucide-react";
+
+interface Voice {
+  voice_id: string;
+  name: string;
+  category: string;
+  description: string;
+  labels: Record<string, string>;
+  preview_url: string;
+  suggestedPersonality: string[];
+  characteristics: {
+    warmth: number;
+    energy: number;
+    clarity: number;
+    depth: number;
+  };
+}
+
+interface VoiceSelectorProps {
+  selectedVoice: Voice | null;
+  onVoiceSelect: (voice: Voice) => void;
+  onPersonalitySuggest?: (traits: string[]) => void;
+  onPreviewVoice?: (voice: Voice) => void;
+  previewingVoice?: string | null;
+  previewError?: string | null;
+  className?: string;
+}
+
+export const VoiceSelector = ({ 
+  selectedVoice, 
+  onVoiceSelect, 
+  onPersonalitySuggest,
+  onPreviewVoice,
+  previewingVoice,
+  previewError,
+  className 
+}: VoiceSelectorProps) => {
+  const { toast } = useToast();
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentPlayingVoice, setCurrentPlayingVoice] = useState<string | null>(null);
+
+  // Enhanced voice data with better characteristics
+  const voiceData: Voice[] = [
+    {
+      voice_id: "21m00Tcm4TlvDq8ikWAM",
+      name: "Rachel",
+      category: "female",
+      description: "Warm, friendly, and conversational",
+      labels: { accent: "American", age: "Young Adult", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Sweet", "Caring", "Gentle"],
+      characteristics: { warmth: 85, energy: 70, clarity: 90, depth: 75 }
+    },
+    {
+      voice_id: "AZnzlk1XvdvUeBnXmlld",
+      name: "Bella",
+      category: "female",
+      description: "Energetic, playful, and expressive",
+      labels: { accent: "American", age: "Young Adult", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Playful", "Energetic", "Funny"],
+      characteristics: { warmth: 80, energy: 95, clarity: 85, depth: 70 }
+    },
+    {
+      voice_id: "EXAVITQu4vr4xnSDxMaL",
+      name: "Sarah",
+      category: "female",
+      description: "Professional, clear, and confident",
+      labels: { accent: "American", age: "Adult", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Confident", "Intelligent", "Professional"],
+      characteristics: { warmth: 70, energy: 60, clarity: 95, depth: 85 }
+    },
+    {
+      voice_id: "TxGEqnHWrfWFTfGW9XjX",
+      name: "Emily",
+      category: "female",
+      description: "Sophisticated, elegant, and charming",
+      labels: { accent: "British", age: "Adult", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Mysterious", "Sophisticated", "Elegant"],
+      characteristics: { warmth: 75, energy: 65, clarity: 90, depth: 90 }
+    },
+    {
+      voice_id: "ErXwobaYiN019PkySvjV",
+      name: "Elli",
+      category: "female",
+      description: "Soft, gentle, and nurturing",
+      labels: { accent: "American", age: "Young Adult", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Gentle", "Caring", "Loving"],
+      characteristics: { warmth: 95, energy: 55, clarity: 80, depth: 80 }
+    },
+    {
+      voice_id: "pNInz6obpgDQGcFmaJgB",
+      name: "Olivia",
+      category: "female",
+      description: "Cheerful, bright, and optimistic",
+      labels: { accent: "American", age: "Young Adult", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Cheerful", "Optimistic", "Energetic"],
+      characteristics: { warmth: 90, energy: 85, clarity: 85, depth: 70 }
+    },
+    {
+      voice_id: "MF3mGyEYCl7XYWbV9V6O",
+      name: "Cora",
+      category: "female",
+      description: "Mature, wise, and comforting",
+      labels: { accent: "American", age: "Mature", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Wise", "Mature", "Comforting"],
+      characteristics: { warmth: 85, energy: 60, clarity: 90, depth: 95 }
+    },
+    {
+      voice_id: "onwK4e9ZLuTAKqWW03F9",
+      name: "Domi",
+      category: "female",
+      description: "Bold, confident, and assertive",
+      labels: { accent: "American", age: "Adult", gender: "Female" },
+      preview_url: "",
+      suggestedPersonality: ["Bold", "Confident", "Assertive"],
+      characteristics: { warmth: 70, energy: 90, clarity: 85, depth: 80 }
+    }
+  ];
+
+  useEffect(() => {
+    // Simulate loading
+    const timer = setTimeout(() => {
+      setVoices(voiceData);
+      setLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const filteredVoices = voices.filter(voice => {
+    const matchesSearch = voice.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         voice.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || voice.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const categories = ["all", "female", "male"];
+
+  // Enhanced voice preview function
+  const handlePreviewVoice = async (voice: Voice) => {
+    try {
+      setIsPlaying(true);
+      setCurrentPlayingVoice(voice.voice_id);
+      
+      // Call parent preview function if provided
+      if (onPreviewVoice) {
+        onPreviewVoice(voice);
+        return;
+      }
+
+      // Fallback: direct preview
+      const sampleText = `Hello! I'm ${voice.name}. I'm so excited to meet you! How are you doing today?`;
+      
+      // Test voice first
+      const voiceWorks = await testVoice(voice.voice_id);
+      if (!voiceWorks) {
+        throw new Error('Voice test failed');
+      }
+
+      // Play preview
+      await speakText(sampleText, voice.voice_id, {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings: {
+          stability: 0.35,
+          similarity_boost: 0.9,
+          style: 0.4,
+          use_speaker_boost: true
+        }
+      });
+
+      toast({
+        title: "Voice Preview",
+        description: `Playing ${voice.name} voice preview`
+      });
+    } catch (error) {
+      console.error('Voice preview error:', error);
+      toast({
+        title: "Preview Error",
+        description: "Could not preview voice. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPlaying(false);
+      setCurrentPlayingVoice(null);
+    }
+  };
+
+  const handleVoiceSelect = (voice: Voice) => {
+    onVoiceSelect(voice);
+    if (onPersonalitySuggest) {
+      onPersonalitySuggest(voice.suggestedPersonality);
+    }
+    toast({
+      title: "Voice Selected",
+      description: `${voice.name} has been selected`
+    });
+  };
+
+  const getCharacteristicColor = (value: number) => {
+    if (value >= 80) return "text-green-500";
+    if (value >= 60) return "text-yellow-500";
+    return "text-red-500";
+  };
+
+  const getCharacteristicLabel = (value: number) => {
+    if (value >= 80) return "High";
+    if (value >= 60) return "Medium";
+    return "Low";
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading voices...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`space-y-6 ${className}`}>
+      {/* Search and Filter */}
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search voices..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          {categories.map((category) => (
+            <Button
+              key={category}
+              variant={selectedCategory === category ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory(category)}
+              className="capitalize"
+            >
+              {category}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Voice Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredVoices.map((voice) => (
+          <Card
+            key={voice.voice_id}
+            className={`p-4 cursor-pointer transition-all duration-200 hover:shadow-lg ${
+              selectedVoice?.voice_id === voice.voice_id
+                ? 'ring-2 ring-primary bg-primary/5'
+                : 'hover:bg-muted/50'
+            }`}
+            onClick={() => handleVoiceSelect(voice)}
+          >
+            <div className="space-y-3">
+              {/* Voice Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">{voice.name}</h3>
+                  <p className="text-sm text-muted-foreground">{voice.description}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedVoice?.voice_id === voice.voice_id && (
+                    <Check className="w-5 h-5 text-primary" />
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePreviewVoice(voice);
+                    }}
+                    disabled={isPlaying && currentPlayingVoice === voice.voice_id}
+                  >
+                    {isPlaying && currentPlayingVoice === voice.voice_id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Voice Characteristics */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between">
+                    <span>Warmth:</span>
+                    <span className={getCharacteristicColor(voice.characteristics.warmth)}>
+                      {getCharacteristicLabel(voice.characteristics.warmth)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Energy:</span>
+                    <span className={getCharacteristicColor(voice.characteristics.energy)}>
+                      {getCharacteristicLabel(voice.characteristics.energy)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Clarity:</span>
+                    <span className={getCharacteristicColor(voice.characteristics.clarity)}>
+                      {getCharacteristicLabel(voice.characteristics.clarity)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Depth:</span>
+                    <span className={getCharacteristicColor(voice.characteristics.depth)}>
+                      {getCharacteristicLabel(voice.characteristics.depth)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Suggested Personality */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Suggested traits:</p>
+                <div className="flex flex-wrap gap-1">
+                  {voice.suggestedPersonality.map((trait) => (
+                    <Badge key={trait} variant="secondary" className="text-xs">
+                      {trait}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Voice Labels */}
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(voice.labels).map(([key, value]) => (
+                  <Badge key={key} variant="outline" className="text-xs">
+                    {value}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Preview Error Display */}
+      {previewError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{previewError}</p>
+        </div>
+      )}
+
+      {/* No Voices Found */}
+      {filteredVoices.length === 0 && (
+        <div className="text-center py-8">
+          <Volume2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No voices found matching your search</p>
+        </div>
+      )}
+    </div>
+  );
+};

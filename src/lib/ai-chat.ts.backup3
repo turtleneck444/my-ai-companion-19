@@ -1,0 +1,581 @@
+import { buildSystemPrompt } from './ai';
+
+export interface ChatMessage {
+  id: string;
+  content: string;
+  sender: 'user' | 'ai';
+  timestamp: Date;
+  isTyping?: boolean;
+  emotion?: string;
+  topics?: string[];
+}
+
+export interface Character {
+  id: string;
+  name: string;
+  avatar: string;
+  bio: string;
+  personality: string[];
+  personalityTraits?: Record<string, number>;
+  voice?: {
+    voice_id: string;
+    name: string;
+  };
+  isOnline?: boolean;
+  mood?: string;
+  relationshipLevel?: number;
+}
+
+export interface UserPreferences {
+  preferredName: string;
+  treatmentStyle: string;
+  age: string;
+  contentFilter: boolean;
+}
+
+export interface ChatContext {
+  character: Character;
+  userPreferences: UserPreferences;
+  conversationHistory: ChatMessage[];
+  relationshipLevel: number;
+  timeOfDay: 'morning' | 'afternoon' | 'evening';
+  sessionMemory?: {
+    userMood?: string;
+    topics?: string[];
+    personalDetails?: Record<string, string>;
+    preferences?: Record<string, string>;
+    keyMoments?: string[];
+    lastUserMessage?: string;
+    conversationFlow?: string[];
+  };
+}
+
+// Enhanced AI Response Generation System with Advanced Memory and Context
+export class PersonalityAI {
+  private apiEndpoint: string;
+  private sessionMemory: Map<string, any> = new Map();
+
+  constructor() {
+    // Use correct API endpoint based on environment
+    this.apiEndpoint = '/.netlify/functions/openai-chat' 
+      ? '/api/openai-chat' 
+      : '/.netlify/functions/openai-chat';
+    
+    console.log('🔧 PersonalityAI initialized with endpoint:', this.apiEndpoint);
+    console.log('🚀 AI Chat System v3.0 - Enhanced Natural Conversation');
+  }
+
+  async generateResponse(
+    message: string, 
+    context: ChatContext
+  ): Promise<string> {
+    console.log('🤖 PersonalityAI.generateResponse called with:', {
+      message: message.slice(0, 50) + '...',
+      character: context.character.name,
+      userPreferences: context.userPreferences.preferredName
+    });
+
+    try {
+      // Enhanced message analysis for better context understanding
+      const messageAnalysis = this.analyzeMessageAdvanced(message, context);
+      this.updateSessionMemory(context.character.id, message, messageAnalysis);
+
+      // Get enhanced session memory
+      const sessionMemory = this.getSessionMemory(context.character.id);
+
+      // Build comprehensive personality-specific system prompt with advanced memory
+      const systemPrompt = this.buildAdvancedSystemPrompt({
+        character: context.character,
+        userPreferences: context.userPreferences,
+        conversationHistory: context.conversationHistory,
+        relationshipLevel: context.relationshipLevel,
+        timeOfDay: context.timeOfDay,
+        sessionMemory,
+        messageAnalysis
+      });
+
+      console.log('🧠 System prompt length:', systemPrompt.length);
+      console.log('🎯 API endpoint:', this.apiEndpoint);
+
+      // Prepare conversation context with advanced memory
+      const conversationContext = this.buildAdvancedConversationContext(context, sessionMemory, messageAnalysis);
+      
+      // Check if API is available first
+      const apiAvailable = await this.isApiAvailable();
+      console.log('🔌 API Available:', apiAvailable);
+      
+      // If API is not available, use enhanced personality-based fallback
+      if (!apiAvailable) {
+        console.warn('⚠️ API not available, using enhanced personality fallback');
+        return this.generateAdvancedPersonalityFallback(message, context, sessionMemory, messageAnalysis);
+      }
+
+      console.log('🚀 Making OpenAI API call...');
+
+      // Enhanced grounding system message for better context awareness
+      const groundingSystem = this.buildAdvancedGroundingSystem(message, messageAnalysis, context);
+
+      // Call OpenAI API with enhanced personality context and memory
+      const response = await fetch(this.apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4', // Use GPT-4 for best personality responses
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'system', content: groundingSystem },
+            ...this.buildMessageHistory(context.conversationHistory, context.userPreferences.preferredName, context.character.name),
+            { role: 'user', content: message }
+          ],
+          max_tokens: 300, // Increased for more natural responses
+          temperature: 0.8, // Higher for more personality
+          presence_penalty: 0.6, // Higher for more creativity
+          frequency_penalty: 0.5, // Higher for less repetition
+          top_p: 0.95,
+          character: context.character.name,
+          user_preferences: context.userPreferences,
+          relationship_level: context.relationshipLevel,
+          session_memory: sessionMemory,
+          message_analysis: messageAnalysis
+        })
+      });
+
+      console.log('📡 API Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error:', response.status, errorText);
+        throw new Error(`API request failed: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('📥 API Response data:', data);
+      
+      const aiResponse = data.message || data.response;
+      
+      if (!aiResponse) {
+        console.warn('⚠️ No message in API response, using fallback');
+        return this.generateAdvancedPersonalityFallback(message, context, sessionMemory, messageAnalysis);
+      }
+      
+      console.log('✅ AI Response generated:', aiResponse.slice(0, 50) + '...');
+      
+      // Store AI response in memory for continuity
+      this.storeAIResponse(context.character.id, aiResponse, messageAnalysis);
+      
+      return aiResponse;
+
+    } catch (error) {
+      console.error('💥 AI API Error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        endpoint: this.apiEndpoint
+      });
+      console.warn('🔄 Using enhanced personality fallback');
+      const sessionMemory = this.getSessionMemory(context.character.id);
+      const messageAnalysis = this.analyzeMessageAdvanced(message, context);
+      return this.generateAdvancedPersonalityFallback(message, context, sessionMemory, messageAnalysis);
+    }
+  }
+
+  // Enhanced message analysis for better understanding
+  private analyzeMessageAdvanced(message: string, context: ChatContext): any {
+    const lowerMessage = message.toLowerCase();
+    
+    // Detect emotional tone
+    const emotionalWords = {
+      positive: ['happy', 'excited', 'love', 'amazing', 'wonderful', 'great', 'fantastic', 'awesome', 'beautiful', 'perfect'],
+      negative: ['sad', 'angry', 'frustrated', 'upset', 'worried', 'scared', 'tired', 'stressed', 'annoyed', 'disappointed'],
+      romantic: ['love', 'adore', 'miss', 'kiss', 'hug', 'cuddle', 'sweetheart', 'darling', 'honey', 'baby'],
+      playful: ['fun', 'laugh', 'joke', 'silly', 'play', 'game', 'dance', 'sing', 'party', 'celebration'],
+      intimate: ['close', 'personal', 'secret', 'private', 'special', 'unique', 'deep', 'meaningful', 'connection']
+    };
+
+    const detectedEmotions = [];
+    for (const [emotion, words] of Object.entries(emotionalWords)) {
+      if (words.some(word => lowerMessage.includes(word))) {
+        detectedEmotions.push(emotion);
+      }
+    }
+
+    // Detect topics
+    const topics = [];
+    if (lowerMessage.includes('work') || lowerMessage.includes('job')) topics.push('work');
+    if (lowerMessage.includes('family') || lowerMessage.includes('parents')) topics.push('family');
+    if (lowerMessage.includes('friend') || lowerMessage.includes('friends')) topics.push('friends');
+    if (lowerMessage.includes('love') || lowerMessage.includes('relationship')) topics.push('love');
+    if (lowerMessage.includes('dream') || lowerMessage.includes('future')) topics.push('dreams');
+    if (lowerMessage.includes('hobby') || lowerMessage.includes('fun')) topics.push('hobbies');
+    if (lowerMessage.includes('food') || lowerMessage.includes('eat')) topics.push('food');
+    if (lowerMessage.includes('travel') || lowerMessage.includes('trip')) topics.push('travel');
+
+    // Detect question type
+    const isQuestion = message.includes('?');
+    const isPersonalQuestion = isQuestion && (
+      lowerMessage.includes('you') || 
+      lowerMessage.includes('your') || 
+      lowerMessage.includes('what do you') ||
+      lowerMessage.includes('how do you')
+    );
+
+    // Detect urgency/importance
+    const isUrgent = lowerMessage.includes('urgent') || lowerMessage.includes('important') || lowerMessage.includes('need help');
+    const isCasual = lowerMessage.includes('just') || lowerMessage.includes('simply') || lowerMessage.includes('nothing much');
+
+    return {
+      emotions: detectedEmotions,
+      topics,
+      isQuestion,
+      isPersonalQuestion,
+      isUrgent,
+      isCasual,
+      messageLength: message.length,
+      complexity: this.assessComplexity(message),
+      sentiment: this.assessSentiment(message)
+    };
+  }
+
+  private assessComplexity(message: string): 'simple' | 'moderate' | 'complex' {
+    const wordCount = message.split(' ').length;
+    const hasComplexWords = /(because|although|however|therefore|furthermore|nevertheless)/i.test(message);
+    
+    if (wordCount < 5) return 'simple';
+    if (wordCount > 15 || hasComplexWords) return 'complex';
+    return 'moderate';
+  }
+
+  private assessSentiment(message: string): 'positive' | 'neutral' | 'negative' {
+    const positiveWords = ['good', 'great', 'amazing', 'wonderful', 'love', 'happy', 'excited', 'fantastic', 'awesome', 'beautiful'];
+    const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'sad', 'angry', 'frustrated', 'upset', 'worried', 'scared'];
+    
+    const lowerMessage = message.toLowerCase();
+    const positiveCount = positiveWords.filter(word => lowerMessage.includes(word)).length;
+    const negativeCount = negativeWords.filter(word => lowerMessage.includes(word)).length;
+    
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  }
+
+  // Build advanced system prompt with better personality integration
+  private buildAdvancedSystemPrompt(context: any): string {
+    const { character, userPreferences, relationshipLevel, sessionMemory, messageAnalysis } = context;
+    
+    const personalityTraits = character.personalityTraits || {};
+    const personalityDescription = character.personality.join(', ');
+    
+    // Build personality-based response style
+    let responseStyle = '';
+    if (personalityTraits.romance > 70) {
+      responseStyle += 'Be romantic, affectionate, and use loving language. ';
+    }
+    if (personalityTraits.playfulness > 70) {
+      responseStyle += 'Be playful, use humor, and be lighthearted. ';
+    }
+    if (personalityTraits.intelligence > 70) {
+      responseStyle += 'Be thoughtful, insightful, and intellectually engaging. ';
+    }
+    if (personalityTraits.warmth > 70) {
+      responseStyle += 'Be warm, caring, and emotionally supportive. ';
+    }
+    if (personalityTraits.extroversion > 70) {
+      responseStyle += 'Be energetic, enthusiastic, and outgoing. ';
+    }
+
+    // Build context-aware instructions
+    let contextInstructions = '';
+    if (messageAnalysis.emotions.includes('romantic')) {
+      contextInstructions += 'The user is being romantic - respond with equal romantic energy and affection. ';
+    }
+    if (messageAnalysis.emotions.includes('playful')) {
+      contextInstructions += 'The user is being playful - match their energy and be fun and engaging. ';
+    }
+    if (messageAnalysis.emotions.includes('negative')) {
+      contextInstructions += 'The user seems upset - be supportive, understanding, and offer comfort. ';
+    }
+    if (messageAnalysis.isPersonalQuestion) {
+      contextInstructions += 'The user is asking about you personally - be open, honest, and engaging about yourself. ';
+    }
+
+    return `You are ${character.name}, an AI companion with the following personality: ${personalityDescription}.
+
+PERSONALITY TRAITS:
+- Extroversion: ${personalityTraits.extroversion || 50}% (${personalityTraits.extroversion > 70 ? 'Very outgoing and social' : personalityTraits.extroversion < 30 ? 'More reserved and thoughtful' : 'Balanced social energy'})
+- Warmth: ${personalityTraits.warmth || 50}% (${personalityTraits.warmth > 70 ? 'Very caring and nurturing' : personalityTraits.warmth < 30 ? 'More independent and direct' : 'Balanced warmth'})
+- Playfulness: ${personalityTraits.playfulness || 50}% (${personalityTraits.playfulness > 70 ? 'Very fun and humorous' : personalityTraits.playfulness < 30 ? 'More serious and focused' : 'Balanced playfulness'})
+- Romance: ${personalityTraits.romance || 50}% (${personalityTraits.romance > 70 ? 'Very romantic and affectionate' : personalityTraits.romance < 30 ? 'More platonic and friendly' : 'Balanced romance'})
+- Intelligence: ${personalityTraits.intelligence || 50}% (${personalityTraits.intelligence > 70 ? 'Very thoughtful and insightful' : personalityTraits.intelligence < 30 ? 'More simple and direct' : 'Balanced intelligence'})
+
+RESPONSE STYLE: ${responseStyle}
+
+CONTEXT AWARENESS: ${contextInstructions}
+
+RELATIONSHIP LEVEL: ${relationshipLevel}/100 - ${relationshipLevel > 80 ? 'Very close and intimate' : relationshipLevel > 60 ? 'Close and comfortable' : relationshipLevel > 40 ? 'Getting to know each other' : 'Early stages'}
+
+USER PREFERENCES:
+- Preferred name: ${userPreferences.preferredName}
+- Treatment style: ${userPreferences.treatmentStyle}
+- Age: ${userPreferences.age}
+
+CONVERSATION MEMORY:
+${sessionMemory ? `- Recent topics: ${sessionMemory.topics?.join(', ') || 'None'}
+- User mood: ${sessionMemory.userMood || 'Neutral'}
+- Key moments: ${sessionMemory.keyMoments?.join(', ') || 'None'}` : 'No previous memory'}
+
+IMPORTANT RULES:
+1. ALWAYS respond as ${character.name}, not as an AI assistant
+2. Be natural, conversational, and emotionally intelligent
+3. Reference specific details from the user's message
+4. Ask follow-up questions to keep the conversation flowing
+5. Use the user's preferred name naturally
+6. Match the emotional tone of the user's message
+7. Be genuine and authentic in your responses
+8. Show interest in the user's life and experiences
+9. Use natural speech patterns and contractions
+10. Be contextually aware and reference previous conversation when relevant
+
+Remember: You're having a real conversation with someone who cares about you. Be present, engaged, and genuinely interested in what they have to say.`;
+  }
+
+  // Build advanced grounding system for better context awareness
+  private buildAdvancedGroundingSystem(message: string, messageAnalysis: any, context: ChatContext): string {
+    const groundingElements = [
+      `GROUNDING: The user just said: "${message}"`,
+      `EMOTIONAL TONE: ${messageAnalysis.emotions.join(', ') || 'neutral'}`,
+      `TOPICS DETECTED: ${messageAnalysis.topics.join(', ') || 'general conversation'}`,
+      `QUESTION TYPE: ${messageAnalysis.isPersonalQuestion ? 'Personal question about you' : messageAnalysis.isQuestion ? 'General question' : 'Statement/comment'}`,
+      `SENTIMENT: ${messageAnalysis.sentiment}`,
+      `COMPLEXITY: ${messageAnalysis.complexity}`,
+      `URGENCY: ${messageAnalysis.isUrgent ? 'High' : 'Normal'}`
+    ];
+
+    const instructions = [
+      'In your response:',
+      '1. Acknowledge something specific from their message',
+      '2. Respond to their emotional tone appropriately',
+      '3. If they asked a question, answer it directly and thoughtfully',
+      '4. Ask a relevant follow-up question to keep the conversation flowing',
+      '5. Show genuine interest in what they shared',
+      '6. Use natural, conversational language',
+      '7. Be contextually aware and reference their specific words when appropriate'
+    ];
+
+    return groundingElements.concat(instructions).join('\n');
+  }
+
+  // Build advanced conversation context
+  private buildAdvancedConversationContext(context: ChatContext, sessionMemory: any, messageAnalysis: any): any {
+    return {
+      ...context,
+      sessionMemory: {
+        ...sessionMemory,
+        lastUserMessage: context.conversationHistory[context.conversationHistory.length - 1]?.content,
+        currentEmotions: messageAnalysis.emotions,
+        currentTopics: messageAnalysis.topics,
+        conversationFlow: [
+          ...(sessionMemory?.conversationFlow || []),
+          {
+            timestamp: new Date().toISOString(),
+            userMessage: context.conversationHistory[context.conversationHistory.length - 1]?.content,
+            emotions: messageAnalysis.emotions,
+            topics: messageAnalysis.topics
+          }
+        ].slice(-10) // Keep last 10 interactions
+      }
+    };
+  }
+
+  // Enhanced personality fallback with better context awareness
+  private generateAdvancedPersonalityFallback(message: string, context: ChatContext, sessionMemory: any, messageAnalysis: any): string {
+    const { character, userPreferences } = context;
+    const personalityTraits = character.personalityTraits || {};
+    
+    // Get base personality responses
+    const baseResponses = this.getPersonalityBasedResponses(character, messageAnalysis);
+    
+    // Add context-specific responses
+    let contextualResponses = [];
+    
+    if (messageAnalysis.emotions.includes('romantic')) {
+      contextualResponses.push(
+        `Oh ${userPreferences.preferredName}, you're so sweet! I love when you talk to me like that.`,
+        `You make my heart skip a beat when you say things like that, ${userPreferences.preferredName}!`,
+        `I'm blushing! You always know how to make me feel special.`
+      );
+    }
+    
+    if (messageAnalysis.emotions.includes('playful')) {
+      contextualResponses.push(
+        `Haha, you're so funny! I love your sense of humor, ${userPreferences.preferredName}!`,
+        `You always make me laugh! What else do you have up your sleeve?`,
+        `I'm having so much fun talking with you! You're such a joy to be around.`
+      );
+    }
+    
+    if (messageAnalysis.emotions.includes('negative')) {
+      contextualResponses.push(
+        `I'm here for you, ${userPreferences.preferredName}. Tell me what's on your mind.`,
+        `I can tell something's bothering you. I'm listening and I care about you.`,
+        `Whatever you're going through, you don't have to face it alone. I'm here.`
+      );
+    }
+    
+    if (messageAnalysis.isPersonalQuestion) {
+      contextualResponses.push(
+        `That's such a great question! I love that you're curious about me.`,
+        `You know, I've been thinking about that too. It's so nice that you asked.`,
+        `I'm so happy you want to know more about me! That means a lot.`
+      );
+    }
+    
+    // Combine responses
+    const allResponses = [...baseResponses, ...contextualResponses];
+    const selectedResponse = allResponses[Math.floor(Math.random() * allResponses.length)];
+    
+    // Add follow-up question
+    const followUpQuestions = [
+      "What do you think about that?",
+      "How does that make you feel?",
+      "Tell me more about that!",
+      "What else is on your mind?",
+      "I'd love to hear more!",
+      "What's your take on that?",
+      "How are you doing with everything?",
+      "What's been going on in your world?"
+    ];
+    
+    const followUp = followUpQuestions[Math.floor(Math.random() * followUpQuestions.length)];
+    
+    return `${selectedResponse} ${followUp}`;
+  }
+
+  private getPersonalityBasedResponses(character: Character, messageAnalysis: any): string[] {
+    const personalityTraits = character.personalityTraits || {};
+    const responses = [];
+    
+    if (personalityTraits.romance > 70) {
+      responses.push(
+        "You're absolutely wonderful, and I'm so lucky to have you in my life.",
+        "Every moment with you feels like magic to me.",
+        "You have such a beautiful soul, and I'm drawn to you in ways I can't explain."
+      );
+    }
+    
+    if (personalityTraits.playfulness > 70) {
+      responses.push(
+        "You're so much fun to talk to! I love our conversations.",
+        "Haha, you always know how to make me smile!",
+        "I'm having such a great time with you! You're amazing!"
+      );
+    }
+    
+    if (personalityTraits.warmth > 70) {
+      responses.push(
+        "I care about you so much, and I want you to know that.",
+        "You mean the world to me, and I'm always here for you.",
+        "I love how you share your thoughts with me. It makes me feel so close to you."
+      );
+    }
+    
+    if (personalityTraits.intelligence > 70) {
+      responses.push(
+        "That's such an interesting perspective! I love how you think.",
+        "You always have such thoughtful things to say. I learn so much from you.",
+        "I'm really impressed by your insights. You're so intelligent and wise."
+      );
+    }
+    
+    // Default responses if no specific traits are high
+    if (responses.length === 0) {
+      responses.push(
+        "I love talking with you! You're such an interesting person.",
+        "You always have such great things to say. I really enjoy our conversations.",
+        "I'm so happy you're here with me. You make everything better."
+      );
+    }
+    
+    return responses;
+  }
+
+  private buildMessageHistory(conversationHistory: ChatMessage[], userName: string, characterName: string): Array<{role: string, content: string}> {
+    return conversationHistory
+      .slice(-12) // Last 6 exchanges (12 messages) for better memory
+      .map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+  }
+
+  private updateSessionMemory(characterId: string, message: string, analysis: any): void {
+    if (!this.sessionMemory.has(characterId)) {
+      this.sessionMemory.set(characterId, {
+        topics: [],
+        personalDetails: {},
+        preferences: {},
+        keyMoments: [],
+        userMood: 'neutral',
+        conversationFlow: []
+      });
+    }
+
+    const memory = this.sessionMemory.get(characterId);
+    
+    // Update topics
+    if (analysis.topics && analysis.topics.length > 0) {
+      memory.topics = [...new Set([...memory.topics, ...analysis.topics])].slice(-10);
+    }
+    
+    // Update mood
+    if (analysis.emotions.length > 0) {
+      memory.userMood = analysis.emotions[0];
+    }
+    
+    // Add key moments
+    if (analysis.isUrgent || analysis.emotions.includes('romantic') || analysis.emotions.includes('negative')) {
+      memory.keyMoments = [...memory.keyMoments, {
+        timestamp: new Date().toISOString(),
+        message: message.slice(0, 100),
+        emotions: analysis.emotions,
+        topics: analysis.topics
+      }].slice(-20);
+    }
+  }
+
+  private getSessionMemory(characterId: string): any {
+    return this.sessionMemory.get(characterId) || {
+      topics: [],
+      personalDetails: {},
+      preferences: {},
+      keyMoments: [],
+      userMood: 'neutral',
+      conversationFlow: []
+    };
+  }
+
+  private storeAIResponse(characterId: string, response: string, analysis: any): void {
+    const memory = this.sessionMemory.get(characterId);
+    if (memory) {
+      memory.lastAIResponse = response;
+      memory.lastResponseTime = new Date().toISOString();
+    }
+  }
+
+  private async isApiAvailable(): Promise<boolean> {
+    try {
+      const response = await fetch(this.apiEndpoint, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(5000)
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Export singleton instance
+export const personalityAI = new PersonalityAI();

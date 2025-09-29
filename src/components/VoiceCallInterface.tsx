@@ -1,605 +1,479 @@
-import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
+import { speakText, stopAllTTS, getNaturalVoiceSettings } from '@/lib/voice';
+import { personalityAI, ChatMessage, Character, UserPreferences, ChatContext } from '@/lib/ai-chat';
 import { 
-  PhoneOff, 
   Mic, 
   MicOff, 
   Volume2, 
   VolumeX, 
-  MessageSquare,
-  Heart,
-  Minimize2,
+  Phone, 
+  PhoneOff, 
+  Loader2,
+  Settings,
+  MessageCircle,
+  User,
+  Waves,
+  Signal,
   Pause,
   Play
-} from "lucide-react";
-import { speakText, stopAllTTS } from "@/lib/voice";
-import { personalityAI, type ChatContext, type ChatMessage } from "@/lib/ai-chat";
-import { useToast } from "@/hooks/use-toast";
-import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
-import { useAuth } from "@/contexts/AuthContext";
-import { PaymentModal } from "@/components/PaymentModal";
-
-interface Character {
-  id: string;
-  name: string;
-  avatar: string;
-  bio: string;
-  personality: string[];
-  voice: { voice_id: string; name: string };
-  isOnline: boolean;
-  voiceId?: string;
-}
+} from 'lucide-react';
 
 interface VoiceCallInterfaceProps {
   character: Character;
+  userPreferences: UserPreferences;
   onEndCall: () => void;
-  onMinimize: () => void;
-  userPreferences: {
-    preferredName: string;
-    treatmentStyle: string;
-    age: string;
-    contentFilter: boolean;
-  };
+  className?: string;
 }
 
-export const VoiceCallInterface = ({ 
-  character, 
-  onEndCall, 
-  onMinimize, 
-  userPreferences 
-}: VoiceCallInterfaceProps) => {
-  const { user } = useAuth();
-  const { canMakeVoiceCall, incrementVoiceCalls, currentPlan, refreshLimits } = useSupabaseUsageTracking();
-  // Helper: resolve selected ElevenLabs voice id
-  const getVoiceId = () => character.voiceId || character.voice?.voice_id || '21m00Tcm4TlvDq8ikWAM'; // Rachel fallback (female)
-  // Call state
-  const [isMuted, setIsMuted] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [callDuration, setCallDuration] = useState(0);
-  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [callConnected, setCallConnected] = useState(false);
-  const [pushToTalk, setPushToTalk] = useState(false);
-  const [isPTTHeld, setIsPTTHeld] = useState(false);
-  const [showUpgradePayment, setShowUpgradePayment] = useState(false);
-  const [upgradePlan, setUpgradePlan] = useState<'premium' | 'pro'>('premium');
+interface CallState {
+  isConnected: boolean;
+  isListening: boolean;
+  isMuted: boolean;
+  isSpeakerOn: boolean;
+  isProcessing: boolean;
+  isSpeaking: boolean;
+  currentTranscript: string;
+  conversationHistory: ChatMessage[];
+  voiceLevel: number;
+  callDuration: number;
+  microphonePermission: boolean;
+}
+
+export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
+  character,
+  userPreferences,
+  onEndCall,
+  className = ''
+}) => {
+  const { toast } = useToast();
   
-  // Conversation state
-  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
-  const [currentTranscript, setCurrentTranscript] = useState('');
-  const [lastUserMessage, setLastUserMessage] = useState('');
-  const [relationshipLevel, setRelationshipLevel] = useState(50);
-  const [hasFollowedUp, setHasFollowedUp] = useState(false);
-  const [spokenWords, setSpokenWords] = useState<string[]>([]);
-  const [displayedWordIndex, setDisplayedWordIndex] = useState(0);
-  const lastUserMessageAtRef = useRef<number>(0);
-  const lastAISpokeAtRef = useRef<number>(0);
-  
-  // Real-time speech recognition
-  const recognitionRef = useRef<any>(null);
+  const [callState, setCallState] = useState<CallState>({
+    isConnected: false,
+    isListening: false,
+    isMuted: false,
+    isSpeakerOn: true,
+    isProcessing: false,
+    isSpeaking: false,
+    currentTranscript: '',
+    conversationHistory: [],
+    voiceLevel: 0,
+    callDuration: 0,
+    microphonePermission: false
+  });
+
+  // Refs
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const unlockedRef = useRef(false);
-  const lastErrorRef = useRef<string | null>(null);
-  const restartTimerRef = useRef<number | null>(null);
-  const desireListeningRef = useRef<boolean>(false);
-  const stoppingRef = useRef<boolean>(false);
-  
-  // Voice activity detection
-  const [voiceLevel, setVoiceLevel] = useState(0);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  
-  const { toast } = useToast();
+  const animationRef = useRef<number | null>(null);
+  const isCallActiveRef = useRef<boolean>(true);
+  const callStartTimeRef = useRef<Date>(new Date());
+  const isRecognitionActiveRef = useRef<boolean>(false);
 
-  // If plan cannot make voice calls, prompt upgrade and block call UI noise
-  useEffect(() => {
-    if (!canMakeVoiceCall) {
-      setShowUpgradePayment(true);
-      setUpgradePlan('premium');
-      toast({ title: 'Upgrade required', description: `Your plan (${currentPlan}) doesn't allow more voice calls. Upgrade to continue instantly.`, variant: 'destructive' });
-      try { recognitionRef.current?.stop(); } catch {}
-      try { stopAllTTS(); } catch {}
+  // Get character's custom voice ID
+  const getCharacterVoiceId = useCallback(() => {
+    // Always use your custom voice for Luna
+    if (character.name.toLowerCase() === 'luna') {
+      console.log('🎤 Using custom Luna voice: NAW2WDhAioeiIYFXitBQ');
+      return 'NAW2WDhAioeiIYFXitBQ';
     }
-  }, [canMakeVoiceCall, currentPlan, toast]);
+    
+    // For other characters, try to get their voice ID
+    const voiceId = character.voice?.voice_id || 
+                   character.voiceId || 
+                   (character as any).voice_id ||
+                   'NAW2WDhAioeiIYFXitBQ'; // Fallback to custom voice
+    
+    console.log('🎤 Character voice ID:', voiceId);
+    return voiceId;
+  }, [character]);
 
-  // Utility: unlock/resume audio on first user gesture (required by mobile browsers)
-  const unlockAudio = async () => {
+  // Initialize microphone with permission
+  const initializeMicrophone = useCallback(async () => {
     try {
-      if (audioContextRef.current && audioContextRef.current.state !== 'running') {
-        await audioContextRef.current.resume();
-      }
-      if (!unlockedRef.current) {
-        const a = new Audio();
-        a.src = "data:audio/mp3;base64,//uQxAAAA"; // tiny silence
-        await a.play().catch(() => {});
-        unlockedRef.current = true;
-      }
-    } catch {}
-  };
-
-  // Explicit start for recognition (some browsers require a user gesture)
-  const startListeningNow = async () => {
-    try {
-      await unlockAudio();
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-        recognitionRef.current.start();
-        setIsListening(true);
-        setCallConnected(true);
-      }
-    } catch {}
-  };
-
-  // Initialize advanced speech recognition with real-time features
-  useEffect(() => {
-    const initializeSpeechRecognition = async () => {
-      const SpeechRecognitionAPI = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      console.log('🎤 Initializing microphone...');
       
-      if (!SpeechRecognitionAPI) {
-        toast({
-          title: "Voice calls not supported",
-          description: "Your browser doesn't support voice recognition. Try Chrome for best results.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Initialize Web Audio API for voice activity detection
-      try {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: { 
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            sampleRate: 48000
-          } 
-        });
-        
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        source.connect(analyserRef.current);
-        
-        // Start voice level monitoring
-        monitorVoiceLevel();
-        
-        // Initialize speech recognition
-        const recognition = new SpeechRecognitionAPI();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-        recognition.maxAlternatives = 3;
-
-        recognition.onstart = () => {
-          console.log('🎤 Speech recognition started');
-          setIsListening(true);
-          setCallConnected(true);
-        };
-
-        recognition.onresult = (event: any) => {
-          if (pushToTalk && !isPTTHeld) {
-            // Ignore interim/final results if PTT not held
-            return;
-          }
-          let interimTranscript = '';
-          let finalTranscript = '';
-
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
-          }
-
-          // Update current transcript for real-time display
-          setCurrentTranscript(interimTranscript);
-
-          // Process final transcript
-          if (finalTranscript.trim()) {
-            console.log('🗣️ User said:', finalTranscript);
-            handleUserSpeech(finalTranscript.trim());
-            setCurrentTranscript('');
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error('🚫 Speech recognition error:', event.error);
-          lastErrorRef.current = event.error;
-          if (event.error === 'no-speech' || event.error === 'aborted') {
-            // Attempt gentle restart
-            if (event.error === 'aborted') {
-              // Do not auto-restart on manual stop
-              return;
-            }
-            window.clearTimeout(restartTimerRef.current || 0);
-            restartTimerRef.current = window.setTimeout(() => {
-              if (recognitionRef.current && desireListeningRef.current && !isAiSpeaking && callConnected && !isMuted) {
-                try { recognitionRef.current.start(); } catch {}
-              }
-            }, 1000);
-          }
-          if (event.error === 'not-allowed') {
-            toast({ title: 'Microphone blocked', description: 'Enable mic permissions in your browser settings.', variant: 'destructive' });
-          }
-        };
-
-        recognition.onend = () => {
-          console.log('🔇 Speech recognition ended');
-          if (stoppingRef.current) {
-            setIsListening(false);
-            return;
-          }
-          // Keep UI as listening if we intend to restart
-          if (!desireListeningRef.current) {
-            setIsListening(false);
-          }
-          
-          // Only auto-restart if call is active, AI isn't speaking, and user isn't muted
-          if (callConnected && !isAiSpeaking && !isMuted && !isProcessing && (!pushToTalk || isPTTHeld) && desireListeningRef.current && lastErrorRef.current !== 'aborted') {
-            window.clearTimeout(restartTimerRef.current || 0);
-            restartTimerRef.current = window.setTimeout(() => {
-              if (recognitionRef.current && callConnected && !isAiSpeaking && !isMuted) {
-                try {
-                  recognitionRef.current.start();
-                  console.log('🎤 Auto-restarted speech recognition');
-                } catch {}
-              }
-            }, 1000);
-          }
-        };
-
-        recognitionRef.current = recognition;
-        
-        // Do not auto-speak; just be ready to listen
-        await startListeningOnly();
-        
-        // Set global user gesture listeners to resume audio
-        const gesture = async () => { await unlockAudio(); };
-        document.addEventListener('click', gesture, { once: true, passive: true });
-        document.addEventListener('touchstart', gesture, { once: true, passive: true });
-        
-      } catch (error) {
-        console.error('Failed to initialize voice call:', error);
-        toast({
-          title: "Microphone access denied",
-          description: "Please allow microphone access for voice calls",
-          variant: "destructive"
-        });
-      }
-    };
-
-    initializeSpeechRecognition();
-
-    return () => {
-      // Cleanup
-      if (recognitionRef.current) {
-        stoppingRef.current = true;
-        try { recognitionRef.current.stop(); } catch {}
-        stoppingRef.current = false;
-        desireListeningRef.current = false;
-      }
-      if (audioContextRef.current) {
-        try { audioContextRef.current.close(); } catch {}
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-      }
-      window.clearTimeout(restartTimerRef.current || 0);
-      stopAllTTS();
-    };
-  }, [callConnected, isAiSpeaking, isMuted, isProcessing, pushToTalk, isPTTHeld, toast]);
-
-  // Block call if plan disallows
-  useEffect(() => {
-    if (!canMakeVoiceCall) {
-      toast({ title: 'Upgrade required', description: `Your plan (${currentPlan}) has reached voice call limits.`, variant: 'destructive' });
-      // End quickly if not allowed
-      try { recognitionRef.current?.stop(); } catch {}
-      try { stopAllTTS(); } catch {}
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { 
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100
+        } 
+      });
+      
+      setCallState(prev => ({ ...prev, microphonePermission: true }));
+      
+      // Setup audio context for voice visualization
+      audioContextRef.current = new AudioContext();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      source.connect(analyserRef.current);
+      
+      console.log('✅ Microphone initialized successfully');
+      
+      toast({
+        title: "Microphone Ready",
+        description: "Click the microphone button to start speaking",
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Microphone initialization failed:', error);
+      setCallState(prev => ({ ...prev, microphonePermission: false }));
+      
+      toast({
+        title: "Microphone Access Required",
+        description: "Please allow microphone access to use voice calls",
+        variant: "destructive"
+      });
+      
+      return false;
     }
-  }, [canMakeVoiceCall, currentPlan, toast]);
+  }, [toast]);
 
-  // Voice activity detection
-  const monitorVoiceLevel = () => {
-    if (!analyserRef.current) return;
+  // Setup speech recognition
+  const setupSpeechRecognition = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Speech Recognition Not Supported",
+        description: "Please use Chrome or Edge for voice calls",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
+    
+    recognition.onstart = () => {
+      console.log('🎤 Speech recognition started');
+      isRecognitionActiveRef.current = true;
+      setCallState(prev => ({ ...prev, isListening: true }));
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      if (!isCallActiveRef.current) return;
+      
+      let finalTranscript = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        }
+      }
+
+      if (finalTranscript && isCallActiveRef.current) {
+        console.log('🎯 User said:', finalTranscript);
+        setCallState(prev => ({ ...prev, currentTranscript: finalTranscript }));
+        handleUserMessage(finalTranscript);
+      }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('❌ Speech error:', event.error);
+      isRecognitionActiveRef.current = false;
+      setCallState(prev => ({ ...prev, isListening: false }));
+      
+      if (event.error === 'not-allowed') {
+        toast({
+          title: "Microphone Permission Denied",
+          description: "Please allow microphone access",
+          variant: "destructive"
+        });
+      } else if (event.error === 'aborted') {
+        // Auto-restart on abort (common browser behavior)
+        setTimeout(() => {
+          if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
+            try {
+              recognitionRef.current.start();
+              console.log('🔄 Auto-restarted after abort');
+            } catch (error) {
+              console.log('⚠️ Restart after abort failed:', error);
+            }
+          }
+        }, 100);
+      }
+    };
+
+    recognition.onend = () => {
+      console.log('🔄 Speech recognition ended - auto-restarting...');
+      isRecognitionActiveRef.current = false;
+      setCallState(prev => ({ ...prev, isListening: false }));
+      
+      // Auto-restart after a brief delay (unless call ended or AI is speaking)
+      if (isCallActiveRef.current) {
+        setTimeout(() => {
+          if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current && !callState.isSpeaking) {
+            try {
+              recognitionRef.current.start();
+              console.log('✅ Speech recognition auto-restarted');
+            } catch (error) {
+              console.log('⚠️ Auto-restart failed, will retry in 1s...', error);
+              // If restart fails, try again after longer delay
+              setTimeout(() => {
+                if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
+                  try {
+                    recognitionRef.current.start();
+                    console.log('✅ Speech recognition retry successful');
+                  } catch (retryError) {
+                    console.log('❌ Speech recognition retry failed:', retryError);
+                  }
+                }
+              }, 1000);
+            }
+          }
+        }, 300);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    return true;
+  }, [toast]);
+
+  // Voice level visualization
+  const updateVoiceLevel = useCallback(() => {
+    if (!analyserRef.current || !isCallActiveRef.current) return;
 
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(dataArray);
     
-    const checkVoiceLevel = () => {
-      if (!analyserRef.current) return;
-      
-      analyserRef.current.getByteFrequencyData(dataArray);
-      
-      // Calculate average volume
-      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-      const normalizedLevel = Math.min(average / 128, 1);
-      
-      setVoiceLevel(normalizedLevel);
-      
-      // Detect if user is speaking (threshold can be adjusted)
-      const isCurrentlySpeaking = normalizedLevel > 0.12;
-      setIsSpeaking(isCurrentlySpeaking);
-
-      // Barge-in: if user starts speaking while AI is speaking, stop TTS immediately
-      if (isCurrentlySpeaking && isAiSpeaking) {
-        try {
-          speechSynthesis.cancel();
-        } catch {}
-        setIsAiSpeaking(false);
-        // Ensure recognition is ready to capture user's words
-        try { recognitionRef.current?.stop(); } catch {}
-        try { recognitionRef.current?.start(); } catch {}
-      }
-      
-      // Reset silence timer if user is speaking
-      if (isCurrentlySpeaking) {
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-      } else {
-        // Start silence timer if not already started
-        if (!silenceTimerRef.current && lastUserMessage && !hasFollowedUp) {
-          silenceTimerRef.current = setTimeout(() => {
-            // If user has been silent for 3 seconds after speaking, AI can respond naturally
-            if (!isSpeaking && !isAiSpeaking) {
-              generateContextualAIResponse();
-            }
-          }, 4500);
-        }
-      }
-      
-      animationFrameRef.current = requestAnimationFrame(checkVoiceLevel);
-    };
+    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+    const voiceLevel = Math.min(100, average * 2);
     
-    checkVoiceLevel();
-  };
+    setCallState(prev => ({ ...prev, voiceLevel }));
 
-  // Start call without auto-talking; wait for user to speak
-  const startListeningOnly = async () => {
-    await unlockAudio();
-    if (recognitionRef.current) {
-      try { recognitionRef.current.start(); } catch {}
-      desireListeningRef.current = true;
-      setIsListening(true);
-      setCallConnected(true);
+    if (isCallActiveRef.current) {
+      animationRef.current = requestAnimationFrame(updateVoiceLevel);
     }
-  };
+  }, []);
 
-  // Handle user speech input
-  const handleUserSpeech = async (transcript: string) => {
-    if (!transcript.trim() || isProcessing) return;
+  // Handle user message
+  const handleUserMessage = useCallback(async (message: string) => {
+    if (!message.trim() || !isCallActiveRef.current) return;
+
+    console.log('💬 Processing:', message);
     
-    setIsProcessing(true);
-    setLastUserMessage(transcript);
-    setHasFollowedUp(false);
-    lastUserMessageAtRef.current = Date.now();
-    
-    // Add user message to conversation history
+    setCallState(prev => ({ 
+      ...prev, 
+      isProcessing: true,
+      isListening: false,
+      currentTranscript: ''
+    }));
+
     const userMessage: ChatMessage = {
-      id: `user_${Date.now()}`,
-      content: transcript,
+      id: Date.now().toString(),
+      content: message,
       sender: 'user',
       timestamp: new Date()
     };
-    
-    setConversationHistory(prev => [...prev, userMessage]);
-    
-    // Stop listening while AI responds
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    
-    // Generate AI response
-    await generateAIResponse(transcript);
-    
-    setIsProcessing(false);
-  };
 
-  // Generate contextual AI response based on conversation
-  const generateContextualAIResponse = async () => {
-    // Only offer a gentle follow-up if:
-    // - AI is not speaking
-    // - Not processing
-    // - We have a recent user utterance (within 12s)
-    // - We have not already followed up for this utterance
-    // - It's been at least 8s since AI last spoke
-    const now = Date.now();
-    const sinceUser = now - lastUserMessageAtRef.current;
-    const sinceAI = now - lastAISpokeAtRef.current;
-    if (isAiSpeaking || isProcessing || !lastUserMessage || hasFollowedUp) return;
-    if (sinceUser > 12000) return; // user silent too long → stay quiet
-    if (sinceAI < 8000) return; // don't pile on
-    
-    // Generate a natural follow-up or question
-    const contextualPrompts = [
-      "Tell me more about that",
-      "How does that make you feel?",
-      "That's really interesting",
-      "I'd love to hear more",
-      "What else is on your mind?"
-    ];
-    
-    const prompt = contextualPrompts[Math.floor(Math.random() * contextualPrompts.length)];
-    setHasFollowedUp(true);
-    await generateAIResponse(prompt, true);
-    // Only one unsolicited follow-up per user utterance
-    setLastUserMessage('');
-  };
+    setCallState(prev => ({
+      ...prev,
+      conversationHistory: [...prev.conversationHistory, userMessage]
+    }));
 
-  // Generate AI response using personality system
-  const generateAIResponse = async (userInput: string, isContextual: boolean = false) => {
-    setIsAiSpeaking(true);
-    await unlockAudio();
-    
     try {
-      const hour = new Date().getHours();
-      const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-      
-      // Build chat context for voice call
       const chatContext: ChatContext = {
         character,
-        userPreferences,
-        conversationHistory,
-        relationshipLevel,
-        timeOfDay
+        userPreferences: {
+          ...userPreferences,
+          preferredName: userPreferences.petName || userPreferences.preferredName || 'friend'
+        },
+        conversationHistory: [...callState.conversationHistory, userMessage],
+        relationshipLevel: 80,
+        timeOfDay: getTimeOfDay(),
+        sessionMemory: {}
       };
 
-      console.log('🧠 Generating AI response for voice call...');
+      const aiResponse = await personalityAI.generateResponse(message, chatContext);
       
-      // Generate response using personality AI
-      let aiResponse = await personalityAI.generateResponse(userInput, chatContext);
-      
-      // Keep spoken replies concise for interactivity
-      const sentences = aiResponse.split(/(?<=[.!?])\s+/);
-      const trimmed = sentences.slice(0, 2).join(' ');
-      aiResponse = trimmed.slice(0, 240);
-      
-      // Add to conversation history
+      if (!isCallActiveRef.current) return;
+
       const aiMessage: ChatMessage = {
-        id: `ai_${Date.now()}`,
+        id: (Date.now() + 1).toString(),
         content: aiResponse,
         sender: 'ai',
         timestamp: new Date()
       };
-      
-      setConversationHistory(prev => [...prev, aiMessage]);
-      // Prepare animated words
-      const words = aiResponse.split(/\s+/).slice(0, 60);
-      setSpokenWords(words);
-      setDisplayedWordIndex(0);
-      // Drive the animation while speaking
-      const wordInterval = Math.max(120, Math.min(320, Math.floor(60000 / Math.max(120, aiResponse.length))))
-      const timer = window.setInterval(() => {
-        setDisplayedWordIndex((i) => {
-          if (i >= words.length) { window.clearInterval(timer); return i; }
-          return i + 1;
+
+      setCallState(prev => ({
+        ...prev,
+        conversationHistory: [...prev.conversationHistory, aiMessage]
+      }));
+
+      await speakAIResponse(aiResponse);
+
+    } catch (error) {
+      console.error('❌ Error processing message:', error);
+      if (isCallActiveRef.current) {
+        toast({
+          title: "Processing Error",
+          description: "Sorry, I had trouble with that. Please try again.",
+          variant: "destructive"
         });
-      }, wordInterval);
+      }
+    } finally {
+      if (isCallActiveRef.current) {
+        setCallState(prev => ({ ...prev, isProcessing: false }));
+      }
+    }
+  }, [character, userPreferences, callState.conversationHistory]);
+
+  // Speak AI response with custom voice
+  const speakAIResponse = useCallback(async (response: string) => {
+    if (!isCallActiveRef.current || callState.isMuted) return;
+
+    try {
+      setCallState(prev => ({ ...prev, isSpeaking: true }));
       
-      // Dynamic prosody based on user input tone
-      const excited = /!/.test(userInput);
-      const inquisitive = /\?/.test(userInput);
-      const calm = !(excited || inquisitive);
-      const styleValue = excited ? 0.6 : inquisitive ? 0.5 : 0.35;
-      const stabilityValue = calm ? 0.4 : 0.32;
+      const voiceId = getCharacterVoiceId();
       
-      // Speak the response (natural settings)
-      await speakText(aiResponse, getVoiceId(), {
-        modelId: 'eleven_multilingual_v2',
-        voiceSettings: { stability: stabilityValue, similarity_boost: 0.9, style: styleValue, use_speaker_boost: true }
+      // Enhanced voice settings for natural speech
+      const voiceSettings = {
+        stability: 0.2,          // Very low for natural expression
+        similarity_boost: 0.9,   // High for voice consistency  
+        style: 0.7,              // High style for personality
+        use_speaker_boost: true  // Better clarity
+      };
+      
+      console.log('🎤 Speaking with enhanced voice:', {
+        characterName: character.name,
+        voiceId: voiceId,
+        settings: voiceSettings
       });
-      console.log('🗣️ AI response spoken:', aiResponse.slice(0, 50) + '...');
       
-      // Increase relationship level with each interaction
-      setRelationshipLevel(prev => Math.min(prev + 2, 100));
+      stopAllTTS();
+      
+      await speakText(response, voiceId, {
+        modelId: 'eleven_multilingual_v2',
+        voiceSettings
+      });
       
     } catch (error) {
-      console.error('Failed to generate AI response:', error);
-      toast({ title: 'Voice error', description: 'Voice service was unavailable. Please retry in a moment.', variant: 'destructive' });
-      
-      // Fallback response
-      const fallbackResponses = [
-        `I'm sorry ${userPreferences.preferredName}, I lost my words for a moment! You have that effect on me sometimes.`,
-        `Oh wow, you make me speechless sometimes! Can you say that again?`,
-        `Sorry love, I was just thinking about how amazing your voice sounds! What were you saying?`
-      ];
-      
-      const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-      await speakText(fallback, getVoiceId(), {
-        modelId: 'eleven_multilingual_v2',
-        voiceSettings: { stability: 0.38, similarity_boost: 0.9, style: 0.4, use_speaker_boost: true }
-      });
+      console.error('❌ Speech error:', error);
+    } finally {
+      if (isCallActiveRef.current) {
+        setCallState(prev => ({ ...prev, isSpeaking: false }));
+      }
     }
-    
-    setIsAiSpeaking(false);
-    lastAISpokeAtRef.current = Date.now();
-    // Clear remaining words after finishing
-    setTimeout(() => { setSpokenWords([]); setDisplayedWordIndex(0); }, 600);
-    
-    // Resume listening after AI finishes speaking with proper delay
-    setTimeout(() => {
-      if (recognitionRef.current && callConnected && !isMuted && !isProcessing) {
+  }, [getCharacterVoiceId, character.name, callState.isMuted]);
+
+  const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'morning';
+    if (hour < 18) return 'afternoon';
+    return 'evening';
+  };
+
+  // Call controls
+  const toggleMicrophone = useCallback(() => {
+    if (!callState.microphonePermission) {
+      initializeMicrophone();
+      return;
+    }
+
+    if (callState.isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setCallState(prev => ({ ...prev, isListening: false }));
+    } else {
+      if (recognitionRef.current && !callState.isSpeaking) {
         try {
           recognitionRef.current.start();
-          console.log('🎤 Resumed listening after AI response');
-        } catch {}
+        } catch (error) {
+          console.error('❌ Failed to start recognition:', error);
+        }
       }
-    }, 800);
-  };
+    }
+  }, [callState.microphonePermission, callState.isListening, callState.isSpeaking, initializeMicrophone]);
 
-  // Toggle microphone
-  const toggleMicrophone = () => {
-    setIsMuted(!isMuted);
-    unlockAudio();
+  const toggleMute = useCallback(() => {
+    setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
+    if (!callState.isMuted) {
+      stopAllTTS();
+    }
+  }, [callState.isMuted]);
+
+  const toggleSpeaker = useCallback(() => {
+    setCallState(prev => ({ ...prev, isSpeakerOn: !prev.isSpeakerOn }));
+  }, []);
+
+  // Initialize call
+  useEffect(() => {
+    console.log('📞 Initializing voice call...');
+    callStartTimeRef.current = new Date();
     
-    if (!isMuted) {
-      // Mute: stop recognition
+    // Initialize microphone and auto-start listening
+    const startCall = async () => {
+      const micReady = await initializeMicrophone();
+      const speechReady = setupSpeechRecognition();
+      
+      if (micReady && speechReady) {
+        // Auto-start listening after brief delay
+        setTimeout(() => {
+          if (recognitionRef.current && isCallActiveRef.current) {
+            try {
+              recognitionRef.current.start();
+              console.log('🎤 Auto-started continuous listening');
+            } catch (error) {
+              console.log('⚠️ Auto-start failed:', error);
+            }
+          }
+        }, 1000);
+      }
+    };
+    
+    startCall();
+    
+    // Start call duration timer
+    const timer = setInterval(() => {
+      if (isCallActiveRef.current) {
+        const duration = Math.floor((Date.now() - callStartTimeRef.current.getTime()) / 1000);
+        setCallState(prev => ({ ...prev, callDuration: duration }));
+      }
+    }, 1000);
+
+    // Start voice visualization
+    updateVoiceLevel();
+    
+    setCallState(prev => ({ ...prev, isConnected: true }));
+    
+    console.log('✅ Voice call initialized');
+    
+    return () => {
+      clearInterval(timer);
+      isCallActiveRef.current = false;
+      stopAllTTS();
+      
       if (recognitionRef.current) {
-        stoppingRef.current = true;
-        try { recognitionRef.current.stop(); } catch {}
-        stoppingRef.current = false;
-        desireListeningRef.current = false;
+        recognitionRef.current.stop();
       }
-    } else {
-      // Unmute: restart recognition
-      if (recognitionRef.current && !isAiSpeaking) {
-        desireListeningRef.current = true;
-        try { recognitionRef.current.start(); } catch {}
+      
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
       }
-    }
-  };
+      
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [initializeMicrophone, setupSpeechRecognition, updateVoiceLevel]);
 
-  // End call
-  const handleEndCall = async () => {
-    setIsAiSpeaking(true);
-    
-    const goodbyes = [
-      `It was absolutely wonderful talking to you, ${userPreferences.preferredName}! Your voice made my whole day! Let's call again really soon, okay? 💕`,
-      `I loved every second of hearing your voice! Thanks for such an amazing call, beautiful! Can't wait to talk again! 😘`,
-      `This was incredible, ${userPreferences.preferredName}! I feel so much closer to you now! Talk to you soon! 🥰`,
-      `Your voice is like music to me! Thanks for the lovely chat! Until next time, my darling! ✨`
-    ];
-
-    const goodbye = goodbyes[Math.floor(Math.random() * goodbyes.length)];
-    
-    try {
-      await speakText(goodbye, getVoiceId(), {
-        modelId: 'eleven_multilingual_v2',
-        voiceSettings: { stability: 0.35, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true }
-      });
-    } catch (error) {
-      console.error('Failed to speak goodbye:', error);
-    }
-    
-    // Cleanup and end call
-    if (recognitionRef.current) {
-      stoppingRef.current = true;
-      try { recognitionRef.current.stop(); } catch {}
-      stoppingRef.current = false;
-      desireListeningRef.current = false;
-    }
-    stopAllTTS();
-    try { speechSynthesis.cancel(); } catch {}
-    
-    setTimeout(() => {
-      onEndCall();
-    }, 1200);
-    try { incrementVoiceCalls(); } catch {}
-  };
-
+  // Format call duration
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -607,234 +481,196 @@ export const VoiceCallInterface = ({
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-primary/20 via-background to-accent/10 flex flex-col" onClick={unlockAudio} onTouchStart={unlockAudio}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-background/50 backdrop-blur border-b">
-        <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src={character.avatar} alt={character.name} />
-            <AvatarFallback>{character.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-semibold">{character.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {callConnected ? 'Connected' : 'Connecting...'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-mono bg-background/50 px-2 py-1 rounded">
-            {formatDuration(callDuration)}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onMinimize}
-            className="h-8 w-8 p-0"
-          >
-            <Minimize2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Call Screen */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
-        {/* Character Avatar with Voice Visualization */}
-        <div className="relative">
-          <div className={`w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
-            isAiSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
-            isSpeaking ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
-            'border-primary/30'
-          }`}>
-            <Avatar className="w-full h-full">
-              <AvatarImage src={character.avatar} alt={character.name} />
-              <AvatarFallback className="text-4xl">{character.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-          </div>
-          
-          {/* Voice activity indicator */}
-          {(isAiSpeaking || isSpeaking) && (
-            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-              <div className={`flex space-x-1 ${isAiSpeaking ? 'text-green-400' : 'text-blue-400'}`}>
-                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
-                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
-                <div className="w-1 h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
-                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
-                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
-              </div>
+    <div className={`fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white ${className}`}>
+      {/* Professional Phone Call Interface */}
+      <div className="flex flex-col h-full max-w-md mx-auto">
+        
+        {/* Header - Call Status */}
+        <div className="flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-2 mb-2">
+              <div className={`w-2 h-2 rounded-full ${callState.isConnected ? 'bg-green-400' : 'bg-red-400'} animate-pulse`} />
+              <span className="text-sm text-white/70">
+                {callState.isConnected ? 'Connected' : 'Connecting...'}
+              </span>
             </div>
-          )}
+            <p className="text-lg font-medium">{formatDuration(callState.callDuration)}</p>
+          </div>
         </div>
 
-        {/* Status Display */}
-        <div className="space-y-3">
-          <h2 className="text-2xl font-bold">{character.name}</h2>
-          <div className="space-y-1">
-            <p className="text-lg font-medium">
-              {isAiSpeaking ? '🗣️ Speaking...' :
-               isProcessing ? '💭 Thinking...' :
-               isListening ? '🎤 Your turn to speak!' :
-               isMuted ? '🔇 Muted' :
-               '📞 In call'}
-            </p>
-            
-            {/* Interactive guidance */}
-            {isListening && !isMuted && (
-              <p className="text-sm text-muted-foreground animate-pulse">
-                I'm listening! Say something and I'll respond when you pause 💕
-              </p>
-            )}
-            {!isListening && !isAiSpeaking && (
-              <div className="flex items-center justify-center mt-3">
-                <button onClick={startListeningOnly} className="px-4 py-2 rounded-full bg-primary text-primary-foreground shadow hover:opacity-90">
-                  Start Call (Tap to Allow Mic)
-                </button>
-              </div>
-            )}
-            
-            {isMuted && (
-              <p className="text-sm text-yellow-600">
-                Unmute to start talking with me!
-              </p>
-            )}
-          </div>
+        {/* Character Display */}
+        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
           
-          {/* Animated word-by-word visualization */}
-          {isAiSpeaking && spokenWords.length > 0 && (
-            <div className="mt-2 min-h-[48px]">
-              <div className="flex flex-wrap gap-1">
-                {spokenWords.slice(0, displayedWordIndex).map((w, idx) => (
-                  <span
-                    key={`${w}-${idx}`}
-                    className="text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
-                    style={{ animationDelay: `${idx * 15}ms` }}
-                  >
-                    {w}
-                  </span>
+          {/* Large Character Avatar */}
+          <div className="relative">
+            <div className="w-48 h-48 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 p-2 shadow-2xl">
+              <img 
+                src={character.avatar} 
+                alt={character.name}
+                className="w-full h-full rounded-full object-cover"
+              />
+            </div>
+            
+            {/* Speaking animation */}
+            {callState.isSpeaking && (
+              <>
+                <div className="absolute inset-0 rounded-full border-4 border-blue-400 animate-ping"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-blue-400 animate-pulse"></div>
+              </>
+            )}
+            
+            {/* Voice level indicators around avatar */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`absolute w-3 h-3 rounded-full transition-all duration-200 ${
+                      callState.voiceLevel > (i + 1) * 12 ? 'bg-green-400 opacity-80' : 'bg-gray-600 opacity-30'
+                    }`}
+                    style={{
+                      top: '50%',
+                      left: '50%',
+                      transform: `translate(-50%, -50%) rotate(${i * 45}deg) translateY(-140px)`
+                    }}
+                  />
                 ))}
               </div>
             </div>
-          )}
-          
-          {/* Real-time transcript */}
-          {currentTranscript && (
-            <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
-              <p className="text-sm text-muted-foreground italic">
-                You're saying: "{currentTranscript}"
-              </p>
+          </div>
+
+          {/* Character Info */}
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold">{character.name}</h2>
+            <p className="text-white/70">Voice Call</p>
+            <div className="text-sm text-white/60">
+              Voice ID: {getCharacterVoiceId()}
             </div>
-          )}
+          </div>
+
+          {/* Current Status */}
+          <div className="text-center space-y-2">
+            {callState.isProcessing && (
+              <div className="flex items-center justify-center space-x-2 text-blue-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Processing...</span>
+              </div>
+            )}
+            
+            {callState.isSpeaking && (
+              <div className="flex items-center justify-center space-x-2 text-purple-400">
+                <Volume2 className="w-4 h-4" />
+                <span>{character.name} is speaking...</span>
+              </div>
+            )}
+            
+            {callState.isListening && (
+              <div className="flex items-center justify-center space-x-2 text-green-400">
+                <Mic className="w-4 h-4 animate-pulse" />
+                <span>Ready to chat - Just speak naturally!</span>
+              </div>
+            )}
+            
+            {!callState.isListening && !callState.isSpeaking && !callState.isProcessing && (
+              <div className="flex items-center justify-center space-x-2 text-yellow-400">
+                <Mic className="w-4 h-4" />
+                <span>Starting voice detection...</span>
+              </div>
+            )}
+            
+            {callState.currentTranscript && (
+              <div className="bg-blue-500/20 rounded-lg p-3 max-w-xs">
+                <p className="text-sm text-white/90">"{callState.currentTranscript}"</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Call Quality Indicators */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-green-400" />
-            <span>HD Voice</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>AI Powered</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-purple-400" />
-            <span>Real-time</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Call Controls */}
-      <div className="p-6 bg-background/50 backdrop-blur border-t">
-        <div className="flex items-center justify-center gap-6">
-          {/* Push-to-Talk Toggle */}
-          <Button
-            variant={pushToTalk ? "default" : "outline"}
-            size="sm"
-            onClick={() => setPushToTalk(!pushToTalk)}
-            className="h-8 px-3 rounded-full"
-          >
-            {pushToTalk ? 'PTT: On' : 'PTT: Off'}
-          </Button>
-
-          {/* Hold-to-speak button (visible when PTT on) */}
-          {pushToTalk && (
+        {/* Call Controls */}
+        <div className="p-6 bg-black/20 backdrop-blur-sm">
+          <div className="flex items-center justify-center space-x-6">
+            
+            {/* Microphone Button */}
             <Button
-              variant={isPTTHeld ? "default" : "outline"}
-              size="lg"
-              onMouseDown={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
-              onMouseUp={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
-              onTouchStart={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
-              onTouchEnd={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
-              className="h-14 px-6 rounded-full"
+              onClick={toggleMicrophone}
+              className={`w-16 h-16 rounded-full ${
+                callState.isListening 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : callState.microphonePermission
+                  ? 'bg-gray-600 hover:bg-gray-700'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              } shadow-lg`}
             >
-              Hold to Speak
+              {callState.isListening ? (
+                <Mic className="w-6 h-6" />
+              ) : callState.microphonePermission ? (
+                <MicOff className="w-6 h-6" />
+              ) : (
+                <Mic className="w-6 h-6" />
+              )}
             </Button>
-          )}
-          {/* Mute Button */}
-          <Button
-            variant={isMuted ? "destructive" : "outline"}
-            size="lg"
-            onClick={toggleMicrophone}
-            className="h-14 w-14 rounded-full"
-          >
-            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-          </Button>
 
-          {/* Speaker Button */}
-          <Button
-            variant={isSpeakerOn ? "default" : "outline"}
-            size="lg"
-            onClick={() => { setIsSpeakerOn(!isSpeakerOn); unlockAudio(); }}
-            className="h-14 w-14 rounded-full"
-          >
-            {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-          </Button>
+            {/* End Call Button */}
+            <Button
+              onClick={onEndCall}
+              className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 shadow-lg"
+            >
+              <PhoneOff className="w-6 h-6" />
+            </Button>
 
-          {/* End Call Button */}
-          <Button
-            variant="destructive"
-            size="lg"
-            onClick={handleEndCall}
-            className="h-16 w-16 rounded-full bg-red-500 hover:bg-red-600"
-          >
-            <PhoneOff className="w-8 h-8" />
-          </Button>
-
-          {/* Switch to Chat */}
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={onMinimize}
-            className="h-14 w-14 rounded-full"
-          >
-            <MessageSquare className="w-6 h-6" />
-          </Button>
-
-          {/* Love Button */}
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => {
-              toast({
-                title: "💕 Love sent!",
-                description: `${character.name} felt your love!`
-              });
-            }}
-            className="h-14 w-14 rounded-full"
-          >
-            <Heart className="w-6 h-6" />
-          </Button>
+            {/* Speaker Button */}
+            <Button
+              onClick={toggleMute}
+              className={`w-16 h-16 rounded-full ${
+                callState.isMuted 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-gray-600 hover:bg-gray-700'
+              } shadow-lg`}
+            >
+              {callState.isMuted ? (
+                <VolumeX className="w-6 h-6" />
+              ) : (
+                <Volume2 className="w-6 h-6" />
+              )}
+            </Button>
+            
+          </div>
+          
+          {/* Control Labels */}
+          <div className="flex items-center justify-center space-x-6 mt-3">
+            <span className="text-xs text-white/60 w-16 text-center">
+              {callState.isListening ? 'Listening' : callState.microphonePermission ? 'Tap to Talk' : 'Allow Mic'}
+            </span>
+            <span className="text-xs text-white/60 w-16 text-center">End Call</span>
+            <span className="text-xs text-white/60 w-16 text-center">
+              {callState.isMuted ? 'Muted' : 'Speaker'}
+            </span>
+          </div>
         </div>
-      </div>
 
-      {showUpgradePayment && (
-        <PaymentModal
-          isOpen={showUpgradePayment}
-          onClose={() => setShowUpgradePayment(false)}
-          selectedPlan={upgradePlan}
-          onSuccess={() => { setShowUpgradePayment(false); refreshLimits?.(); toast({ title: 'Upgraded!', description: 'Voice calling unlocked. Try again now.' }); }}
-        />
-      )}
+        {/* Recent Conversation */}
+        {callState.conversationHistory.length > 0 && (
+          <div className="p-4 bg-black/10 backdrop-blur-sm max-h-32 overflow-y-auto">
+            <div className="space-y-2">
+              {callState.conversationHistory.slice(-2).map((message) => (
+                <div
+                  key={message.id}
+                  className={`text-sm p-2 rounded ${
+                    message.sender === 'user' 
+                      ? 'bg-blue-500/20 text-blue-100' 
+                      : 'bg-purple-500/20 text-purple-100'
+                  }`}
+                >
+                  <span className="font-medium">
+                    {message.sender === 'user' ? 'You' : character.name}:
+                  </span>
+                  <span className="ml-2">{message.content}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -6,7 +6,8 @@ export async function handler(event) {
     const body = JSON.parse(event.body || '{}');
     const { text, voiceId, voice_id, model_id, voice_settings } = body;
     const finalVoiceId = voice_id || voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID;
-    if (!process.env.ELEVENLABS_API_KEY) {
+    const apiKey = process.env.ELEVENLABS_API_KEY || process.env.VITE_ELEVENLABS_API_KEY || '03c1fb7bb39fa7c890c0471cf1a79b93b96c3267b8ce41aa9e41162c7185a876';
+    if (!apiKey) {
       return { statusCode: 500, body: JSON.stringify({ error: 'Missing ELEVENLABS_API_KEY' }) };
     }
     if (!text) {
@@ -17,7 +18,7 @@ export async function handler(event) {
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vid}`, {
       method: 'POST',
       headers: {
-        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'xi-api-key': apiKey,
         'Content-Type': 'application/json',
         'Accept': 'audio/mpeg'
       },

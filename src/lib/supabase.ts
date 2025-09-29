@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Use your Supabase credentials directly
+const url = "https://fpzbbprrwdoidgnfxntz.supabase.co";
+const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwemJicHJyd2RvaWRnbmZ4bnR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NTkzNDIsImV4cCI6MjA3NDQzNTM0Mn0.QI_2s5txsxfRV_3sijTgINZbYl0Fo5imBybbkpuD4z0";
 
 // Enhanced validation for Supabase configuration
 const isValidUrl = url && url.length > 0 && (url.startsWith('https://') || url.includes('supabase.co'));
@@ -10,33 +11,26 @@ const isValidKey = anonKey && anonKey.length > 40; // Supabase anon keys are typ
 export const isSupabaseConfigured = Boolean(isValidUrl && isValidKey);
 
 // Create Supabase client with enhanced configuration
-export const supabase = isSupabaseConfigured
-  ? createClient(url!, anonKey!, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        storage: localStorage,
-        storageKey: 'loveai-auth-token',
-      },
-      global: {
-        headers: {
-          'x-application': 'loveai-app',
-        },
-      },
-    })
-  : (null as any);
+export const supabase = createClient(url, anonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storage: localStorage,
+    storageKey: 'loveai-auth-token',
+  },
+  global: {
+    headers: {
+      'x-application': 'loveai-app',
+    },
+  },
+});
 
 // Debug logging for configuration
-if (import.meta.env.DEV) {
-  console.log('🔧 Supabase Configuration Debug:');
-  console.log('URL Present:', !!url);
-  console.log('URL Valid:', isValidUrl);
-  console.log('Key Present:', !!anonKey);
-  console.log('Key Valid:', isValidKey);
-  console.log('Configured:', isSupabaseConfigured);
-  
-  if (!isSupabaseConfigured) {
-    console.warn('⚠️ Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file');
-  }
-}
+console.log('🔧 Supabase Configuration Debug:');
+console.log('URL Present:', !!url);
+console.log('URL Valid:', isValidUrl);
+console.log('Key Present:', !!anonKey);
+console.log('Key Valid:', isValidKey);
+console.log('Configured:', isSupabaseConfigured);
+console.log('Supabase client created:', !!supabase);

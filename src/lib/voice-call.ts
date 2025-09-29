@@ -53,8 +53,8 @@ export class VoiceCallManager {
       // Initialize real-time speech recognition
       await this.setupAdvancedSpeechRecognition(sessionId);
       
-      // Start with personalized AI greeting
-      await this.speakAIGreeting(sessionId);
+      // Don't start with automatic greeting - let user initiate conversation
+      console.log('🎤 Voice call ready - waiting for user to speak first');
 
       console.log('✅ Voice call session initialized successfully');
       return sessionId;

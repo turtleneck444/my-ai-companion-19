@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { SimpleChatInterface } from "@/components/SimpleChatInterface";
+import { EnhancedChatInterface } from "@/components/EnhancedChatInterface";
 import { VoiceCallInterface } from "@/components/VoiceCallInterface";
 import { UserProfile } from "@/components/UserProfile";
 import { 
@@ -355,7 +356,6 @@ const EnhancedIndex = () => {
       <VoiceCallInterface 
         character={selectedCharacter}
         onEndCall={handleBackToHome}
-        onMinimize={() => setCurrentView('chat')}
         userPreferences={userPreferences}
       />
     );
