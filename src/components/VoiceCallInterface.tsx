@@ -15,7 +15,7 @@ import {
   X
 } from 'lucide-react';
 import { personalityAI } from '@/lib/ai-chat';
-import { speakText, stopAllTTS } from '@/lib/voice';
+import { speakText, stopAllSpeech } from '@/lib/voice';
 
 interface Character {
   id: string;
@@ -295,7 +295,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       
       console.log('🎤 Speaking:', { characterName: character.name, voiceId });
       
-      stopAllTTS();
+      stopAllSpeech();
       
       await speakText(response, voiceId, {
         modelId: 'eleven_multilingual_v2',
@@ -349,7 +349,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     console.log('📞 Ending voice call...');
     isCallActiveRef.current = false;
     
-    stopAllTTS();
+    stopAllSpeech();
     
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -401,7 +401,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     return () => {
       clearInterval(timer);
       isCallActiveRef.current = false;
-      stopAllTTS();
+      stopAllSpeech();
       
       if (recognitionRef.current) {
         recognitionRef.current.stop();

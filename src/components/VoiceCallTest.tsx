@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Mic, MicOff, Volume2, VolumeX, Play, Pause, Settings, CheckCircle, XCircle } from 'lucide-react';
-import { speakText, stopAllTTS, testVoice, isTTSPlaying, getAvailableVoices } from '@/lib/voice';
+import { speakText, stopAllSpeech, testVoice, isTTSPlaying, getAvailableVoices } from '@/lib/voice';
 import { useToast } from '@/hooks/use-toast';
 
 export const VoiceCallTest = () => {
@@ -218,7 +218,7 @@ export const VoiceCallTest = () => {
   };
 
   const stopSpeaking = () => {
-    stopAllTTS();
+    stopAllSpeech();
     setIsSpeaking(false);
   };
 

@@ -247,3 +247,12 @@ export async function startVoiceCall(characterId: string, voiceSettings: VoiceCa
 export async function endVoiceCall(): Promise<void> {
   stopAllSpeech();
 }
+
+// Additional exports for compatibility
+export function isTTSPlaying(): boolean {
+  return speechSynthesis.speaking;
+}
+
+export function getAvailableVoices(): SpeechSynthesisVoice[] {
+  return speechSynthesis.getVoices();
+}
