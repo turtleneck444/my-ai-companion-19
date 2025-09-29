@@ -1,27 +1,56 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { speakText, stopAllTTS, getNaturalVoiceSettings } from '@/lib/voice';
-import { personalityAI, ChatMessage, Character, UserPreferences, ChatContext } from '@/lib/ai-chat';
 import { 
   Mic, 
   MicOff, 
-  Volume2, 
-  VolumeX, 
   Phone, 
   PhoneOff, 
+  Volume2, 
+  VolumeX,
   Loader2,
-  Settings,
-  MessageCircle,
-  User,
-  Waves,
-  Signal,
-  Pause,
-  Play
+  Check,
+  X
 } from 'lucide-react';
+import { personalityAI } from '@/lib/ai-chat';
+import { speakText, stopAllTTS } from '@/lib/voice';
+
+interface Character {
+  id: string;
+  name: string;
+  avatar: string;
+  bio: string;
+  personality: string[];
+  voice?: {
+    voice_id: string;
+    name: string;
+  };
+  voiceId?: string;
+}
+
+interface UserPreferences {
+  preferredName?: string;
+  petName?: string;
+  treatmentStyle?: string;
+}
+
+interface ChatMessage {
+  id: string;
+  content: string;
+  sender: 'user' | 'ai';
+  timestamp: Date;
+}
+
+interface ChatContext {
+  character: Character;
+  userPreferences: UserPreferences;
+  conversationHistory: ChatMessage[];
+  relationshipLevel: number;
+  timeOfDay: string;
+  sessionMemory: Record<string, any>;
+}
 
 interface VoiceCallInterfaceProps {
   character: Character;
@@ -34,12 +63,10 @@ interface CallState {
   isConnected: boolean;
   isListening: boolean;
   isMuted: boolean;
-  isSpeakerOn: boolean;
   isProcessing: boolean;
   isSpeaking: boolean;
   currentTranscript: string;
   conversationHistory: ChatMessage[];
-  voiceLevel: number;
   callDuration: number;
   microphonePermission: boolean;
 }
@@ -56,89 +83,53 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     isConnected: false,
     isListening: false,
     isMuted: false,
-    isSpeakerOn: true,
     isProcessing: false,
     isSpeaking: false,
     currentTranscript: '',
     conversationHistory: [],
-    voiceLevel: 0,
     callDuration: 0,
     microphonePermission: false
   });
 
-  // Refs
+  // Refs for cleanup
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationRef = useRef<number | null>(null);
-  const isCallActiveRef = useRef<boolean>(true);
   const callStartTimeRef = useRef<Date>(new Date());
+  const isCallActiveRef = useRef<boolean>(true);
   const isRecognitionActiveRef = useRef<boolean>(false);
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get character's custom voice ID
+  // Get character's voice ID (optimized)
   const getCharacterVoiceId = useCallback(() => {
-    // Always use your custom voice for Luna
-    if (character.name.toLowerCase() === 'luna') {
-      console.log('🎤 Using custom Luna voice: NAW2WDhAioeiIYFXitBQ');
-      return 'NAW2WDhAioeiIYFXitBQ';
-    }
-    
-    // For other characters, try to get their voice ID
-    const voiceId = character.voice?.voice_id || 
-                   character.voiceId || 
-                   (character as any).voice_id ||
-                   'NAW2WDhAioeiIYFXitBQ'; // Fallback to custom voice
-    
-    console.log('🎤 Character voice ID:', voiceId);
-    return voiceId;
+    return character.voice?.voice_id || 
+           character.voiceId || 
+           'NAW2WDhAioeiIYFXitBQ'; // Default to Luna's voice
   }, [character]);
 
-  // Initialize microphone with permission
+  // Initialize microphone (simplified)
   const initializeMicrophone = useCallback(async () => {
     try {
-      console.log('🎤 Initializing microphone...');
-      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 44100
+          autoGainControl: true
         } 
       });
       
       setCallState(prev => ({ ...prev, microphonePermission: true }));
-      
-      // Setup audio context for voice visualization
-      audioContextRef.current = new AudioContext();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
-      source.connect(analyserRef.current);
-      
-      console.log('✅ Microphone initialized successfully');
-      
-      toast({
-        title: "Microphone Ready",
-        description: "Click the microphone button to start speaking",
-      });
-      
       return true;
     } catch (error) {
-      console.error('❌ Microphone initialization failed:', error);
-      setCallState(prev => ({ ...prev, microphonePermission: false }));
-      
+      console.error('❌ Microphone access denied:', error);
       toast({
         title: "Microphone Access Required",
-        description: "Please allow microphone access to use voice calls",
+        description: "Please allow microphone access for voice calls",
         variant: "destructive"
       });
-      
       return false;
     }
   }, [toast]);
 
-  // Setup speech recognition
+  // Setup speech recognition (optimized)
   const setupSpeechRecognition = useCallback(() => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       toast({
@@ -153,7 +144,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     const recognition = new SpeechRecognition();
     
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = false; // Only final results for better performance
     recognition.lang = 'en-US';
     recognition.maxAlternatives = 1;
     
@@ -166,19 +157,12 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       if (!isCallActiveRef.current) return;
       
-      let finalTranscript = '';
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
       
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        }
-      }
-
-      if (finalTranscript && isCallActiveRef.current) {
-        console.log('🎯 User said:', finalTranscript);
-        setCallState(prev => ({ ...prev, currentTranscript: finalTranscript }));
-        handleUserMessage(finalTranscript);
+      if (transcript) {
+        console.log('🎯 User said:', transcript);
+        setCallState(prev => ({ ...prev, currentTranscript: transcript }));
+        handleUserMessage(transcript);
       }
     };
 
@@ -193,76 +177,36 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           description: "Please allow microphone access",
           variant: "destructive"
         });
-      } else if (event.error === 'aborted') {
-        // Auto-restart on abort (common browser behavior)
-        setTimeout(() => {
-          if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
-            try {
-              recognitionRef.current.start();
-              console.log('🔄 Auto-restarted after abort');
-            } catch (error) {
-              console.log('⚠️ Restart after abort failed:', error);
-            }
-          }
-        }, 100);
       }
     };
 
     recognition.onend = () => {
-      console.log('🔄 Speech recognition ended - auto-restarting...');
+      console.log('🔄 Speech recognition ended');
       isRecognitionActiveRef.current = false;
       setCallState(prev => ({ ...prev, isListening: false }));
       
-      // Auto-restart after a brief delay (unless call ended or AI is speaking)
-      if (isCallActiveRef.current) {
+      // Only restart if call is active and not processing
+      if (isCallActiveRef.current && !callState.isProcessing && !callState.isSpeaking) {
         setTimeout(() => {
-          if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current && !callState.isSpeaking) {
+          if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
             try {
               recognitionRef.current.start();
-              console.log('✅ Speech recognition auto-restarted');
+              console.log('✅ Speech recognition restarted');
             } catch (error) {
-              console.log('⚠️ Auto-restart failed, will retry in 1s...', error);
-              // If restart fails, try again after longer delay
-              setTimeout(() => {
-                if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
-                  try {
-                    recognitionRef.current.start();
-                    console.log('✅ Speech recognition retry successful');
-                  } catch (retryError) {
-                    console.log('❌ Speech recognition retry failed:', retryError);
-                  }
-                }
-              }, 1000);
+              console.log('⚠️ Restart failed:', error);
             }
           }
-        }, 300);
+        }, 1000); // Longer delay to prevent rapid restarts
       }
     };
 
     recognitionRef.current = recognition;
     return true;
-  }, [toast]);
+  }, [toast, callState.isProcessing, callState.isSpeaking]);
 
-  // Voice level visualization
-  const updateVoiceLevel = useCallback(() => {
-    if (!analyserRef.current || !isCallActiveRef.current) return;
-
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
-    
-    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-    const voiceLevel = Math.min(100, average * 2);
-    
-    setCallState(prev => ({ ...prev, voiceLevel }));
-
-    if (isCallActiveRef.current) {
-      animationRef.current = requestAnimationFrame(updateVoiceLevel);
-    }
-  }, []);
-
-  // Handle user message
+  // Handle user message (optimized)
   const handleUserMessage = useCallback(async (message: string) => {
-    if (!message.trim() || !isCallActiveRef.current) return;
+    if (!message.trim() || !isCallActiveRef.current || callState.isProcessing) return;
 
     console.log('💬 Processing:', message);
     
@@ -330,9 +274,9 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         setCallState(prev => ({ ...prev, isProcessing: false }));
       }
     }
-  }, [character, userPreferences, callState.conversationHistory]);
+  }, [character, userPreferences, callState.conversationHistory, callState.isProcessing]);
 
-  // Speak AI response with custom voice
+  // Speak AI response (optimized)
   const speakAIResponse = useCallback(async (response: string) => {
     if (!isCallActiveRef.current || callState.isMuted) return;
 
@@ -341,19 +285,15 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       
       const voiceId = getCharacterVoiceId();
       
-      // Enhanced voice settings for natural speech
+      // Optimized voice settings
       const voiceSettings = {
-        stability: 0.2,          // Very low for natural expression
-        similarity_boost: 0.9,   // High for voice consistency  
-        style: 0.7,              // High style for personality
-        use_speaker_boost: true  // Better clarity
+        stability: 0.3,
+        similarity_boost: 0.9,
+        style: 0.6,
+        use_speaker_boost: true
       };
       
-      console.log('🎤 Speaking with enhanced voice:', {
-        characterName: character.name,
-        voiceId: voiceId,
-        settings: voiceSettings
-      });
+      console.log('🎤 Speaking:', { characterName: character.name, voiceId });
       
       stopAllTTS();
       
@@ -378,7 +318,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     return 'evening';
   };
 
-  // Call controls
+  // Call controls (simplified)
   const toggleMicrophone = useCallback(() => {
     if (!callState.microphonePermission) {
       initializeMicrophone();
@@ -391,7 +331,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       }
       setCallState(prev => ({ ...prev, isListening: false }));
     } else {
-      if (recognitionRef.current && !callState.isSpeaking) {
+      if (recognitionRef.current && !callState.isSpeaking && !callState.isProcessing) {
         try {
           recognitionRef.current.start();
         } catch (error) {
@@ -399,47 +339,56 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         }
       }
     }
-  }, [callState.microphonePermission, callState.isListening, callState.isSpeaking, initializeMicrophone]);
+  }, [callState.microphonePermission, callState.isListening, callState.isSpeaking, callState.isProcessing, initializeMicrophone]);
 
   const toggleMute = useCallback(() => {
     setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
-    if (!callState.isMuted) {
-      stopAllTTS();
-    }
-  }, [callState.isMuted]);
-
-  const toggleSpeaker = useCallback(() => {
-    setCallState(prev => ({ ...prev, isSpeakerOn: !prev.isSpeakerOn }));
   }, []);
 
-  // Initialize call
+  const endCall = useCallback(() => {
+    console.log('📞 Ending voice call...');
+    isCallActiveRef.current = false;
+    
+    stopAllTTS();
+    
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current);
+    }
+    
+    onEndCall();
+  }, [onEndCall]);
+
+  // Initialize call (optimized)
   useEffect(() => {
     console.log('📞 Initializing voice call...');
     callStartTimeRef.current = new Date();
     
-    // Initialize microphone and auto-start listening
     const startCall = async () => {
       const micReady = await initializeMicrophone();
       const speechReady = setupSpeechRecognition();
       
       if (micReady && speechReady) {
-        // Auto-start listening after brief delay
+        // Start listening after a delay
         setTimeout(() => {
           if (recognitionRef.current && isCallActiveRef.current) {
             try {
               recognitionRef.current.start();
-              console.log('🎤 Auto-started continuous listening');
+              console.log('🎤 Started listening');
             } catch (error) {
-              console.log('⚠️ Auto-start failed:', error);
+              console.log('⚠️ Start failed:', error);
             }
           }
-        }, 1000);
+        }, 2000); // Longer delay for stability
       }
     };
     
     startCall();
     
-    // Start call duration timer
+    // Call duration timer (simplified)
     const timer = setInterval(() => {
       if (isCallActiveRef.current) {
         const duration = Math.floor((Date.now() - callStartTimeRef.current.getTime()) / 1000);
@@ -447,12 +396,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       }
     }, 1000);
 
-    // Start voice visualization
-    updateVoiceLevel();
-    
     setCallState(prev => ({ ...prev, isConnected: true }));
-    
-    console.log('✅ Voice call initialized');
     
     return () => {
       clearInterval(timer);
@@ -462,16 +406,8 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-      
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
     };
-  }, [initializeMicrophone, setupSpeechRecognition, updateVoiceLevel]);
+  }, [initializeMicrophone, setupSpeechRecognition]);
 
   // Format call duration
   const formatDuration = (seconds: number) => {
@@ -481,196 +417,132 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   };
 
   return (
-    <div className={`fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white ${className}`}>
-      {/* Professional Phone Call Interface */}
-      <div className="flex flex-col h-full max-w-md mx-auto">
+    <div className={`fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white 
+      flex flex-col ${className}`}>
+      
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-slate-700">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center">
+            <img 
+              src={character.avatar} 
+              alt={character.name}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">{character.name}</h2>
+            <p className="text-slate-400 text-sm">Voice Call</p>
+          </div>
+        </div>
         
-        {/* Header - Call Status */}
-        <div className="flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm">
-          <div className="text-center">
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <div className={`w-2 h-2 rounded-full ${callState.isConnected ? 'bg-green-400' : 'bg-red-400'} animate-pulse`} />
-              <span className="text-sm text-white/70">
-                {callState.isConnected ? 'Connected' : 'Connecting...'}
-              </span>
-            </div>
-            <p className="text-lg font-medium">{formatDuration(callState.callDuration)}</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="bg-green-600">
+            {formatDuration(callState.callDuration)}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={endCall}
+            className="text-red-400 hover:text-red-300"
+          >
+            <PhoneOff className="w-4 h-4" />
+          </Button>
         </div>
+      </div>
 
-        {/* Character Display */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        
+        {/* Character Avatar */}
+        <div className="relative mb-8">
+          <div className="w-32 h-32 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 p-1">
+            <img 
+              src={character.avatar} 
+              alt={character.name}
+              className="w-full h-full rounded-full object-cover"
+            />
+          </div>
           
-          {/* Large Character Avatar */}
-          <div className="relative">
-            <div className="w-48 h-48 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 p-2 shadow-2xl">
-              <img 
-                src={character.avatar} 
-                alt={character.name}
-                className="w-full h-full rounded-full object-cover"
-              />
-            </div>
-            
-            {/* Speaking animation */}
+          {/* Status Indicators */}
+          <div className="absolute -bottom-2 -right-2 flex gap-1">
             {callState.isSpeaking && (
-              <>
-                <div className="absolute inset-0 rounded-full border-4 border-blue-400 animate-ping"></div>
-                <div className="absolute inset-0 rounded-full border-4 border-blue-400 animate-pulse"></div>
-              </>
-            )}
-            
-            {/* Voice level indicators around avatar */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`absolute w-3 h-3 rounded-full transition-all duration-200 ${
-                      callState.voiceLevel > (i + 1) * 12 ? 'bg-green-400 opacity-80' : 'bg-gray-600 opacity-30'
-                    }`}
-                    style={{
-                      top: '50%',
-                      left: '50%',
-                      transform: `translate(-50%, -50%) rotate(${i * 45}deg) translateY(-140px)`
-                    }}
-                  />
-                ))}
+              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                <Volume2 className="w-3 h-3 text-white" />
               </div>
-            </div>
-          </div>
-
-          {/* Character Info */}
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold">{character.name}</h2>
-            <p className="text-white/70">Voice Call</p>
-            <div className="text-sm text-white/60">
-              Voice ID: {getCharacterVoiceId()}
-            </div>
-          </div>
-
-          {/* Current Status */}
-          <div className="text-center space-y-2">
+            )}
             {callState.isProcessing && (
-              <div className="flex items-center justify-center space-x-2 text-blue-400">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Processing...</span>
-              </div>
-            )}
-            
-            {callState.isSpeaking && (
-              <div className="flex items-center justify-center space-x-2 text-purple-400">
-                <Volume2 className="w-4 h-4" />
-                <span>{character.name} is speaking...</span>
-              </div>
-            )}
-            
-            {callState.isListening && (
-              <div className="flex items-center justify-center space-x-2 text-green-400">
-                <Mic className="w-4 h-4 animate-pulse" />
-                <span>Ready to chat - Just speak naturally!</span>
-              </div>
-            )}
-            
-            {!callState.isListening && !callState.isSpeaking && !callState.isProcessing && (
-              <div className="flex items-center justify-center space-x-2 text-yellow-400">
-                <Mic className="w-4 h-4" />
-                <span>Starting voice detection...</span>
-              </div>
-            )}
-            
-            {callState.currentTranscript && (
-              <div className="bg-blue-500/20 rounded-lg p-3 max-w-xs">
-                <p className="text-sm text-white/90">"{callState.currentTranscript}"</p>
+              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                <Loader2 className="w-3 h-3 text-white animate-spin" />
               </div>
             )}
           </div>
         </div>
 
-        {/* Call Controls */}
-        <div className="p-6 bg-black/20 backdrop-blur-sm">
-          <div className="flex items-center justify-center space-x-6">
-            
-            {/* Microphone Button */}
-            <Button
-              onClick={toggleMicrophone}
-              className={`w-16 h-16 rounded-full ${
-                callState.isListening 
-                  ? 'bg-green-600 hover:bg-green-700' 
-                  : callState.microphonePermission
-                  ? 'bg-gray-600 hover:bg-gray-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } shadow-lg`}
-            >
-              {callState.isListening ? (
-                <Mic className="w-6 h-6" />
-              ) : callState.microphonePermission ? (
-                <MicOff className="w-6 h-6" />
-              ) : (
-                <Mic className="w-6 h-6" />
-              )}
-            </Button>
-
-            {/* End Call Button */}
-            <Button
-              onClick={onEndCall}
-              className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 shadow-lg"
-            >
-              <PhoneOff className="w-6 h-6" />
-            </Button>
-
-            {/* Speaker Button */}
-            <Button
-              onClick={toggleMute}
-              className={`w-16 h-16 rounded-full ${
-                callState.isMuted 
-                  ? 'bg-red-600 hover:bg-red-700' 
-                  : 'bg-gray-600 hover:bg-gray-700'
-              } shadow-lg`}
-            >
-              {callState.isMuted ? (
-                <VolumeX className="w-6 h-6" />
-              ) : (
-                <Volume2 className="w-6 h-6" />
-              )}
-            </Button>
-            
-          </div>
-          
-          {/* Control Labels */}
-          <div className="flex items-center justify-center space-x-6 mt-3">
-            <span className="text-xs text-white/60 w-16 text-center">
-              {callState.isListening ? 'Listening' : callState.microphonePermission ? 'Tap to Talk' : 'Allow Mic'}
-            </span>
-            <span className="text-xs text-white/60 w-16 text-center">End Call</span>
-            <span className="text-xs text-white/60 w-16 text-center">
-              {callState.isMuted ? 'Muted' : 'Speaker'}
-            </span>
-          </div>
+        {/* Status Messages */}
+        <div className="text-center mb-8">
+          {callState.isSpeaking && (
+            <p className="text-green-400 text-lg">🎤 {character.name} is speaking...</p>
+          )}
+          {callState.isProcessing && (
+            <p className="text-blue-400 text-lg">🤔 {character.name} is thinking...</p>
+          )}
+          {callState.isListening && !callState.isSpeaking && !callState.isProcessing && (
+            <p className="text-slate-400 text-lg">👂 Listening for your voice...</p>
+          )}
+          {!callState.isListening && !callState.isSpeaking && !callState.isProcessing && (
+            <p className="text-slate-400 text-lg">💬 Say something to {character.name}...</p>
+          )}
         </div>
 
-        {/* Recent Conversation */}
-        {callState.conversationHistory.length > 0 && (
-          <div className="p-4 bg-black/10 backdrop-blur-sm max-h-32 overflow-y-auto">
-            <div className="space-y-2">
-              {callState.conversationHistory.slice(-2).map((message) => (
-                <div
-                  key={message.id}
-                  className={`text-sm p-2 rounded ${
-                    message.sender === 'user' 
-                      ? 'bg-blue-500/20 text-blue-100' 
-                      : 'bg-purple-500/20 text-purple-100'
-                  }`}
-                >
-                  <span className="font-medium">
-                    {message.sender === 'user' ? 'You' : character.name}:
-                  </span>
-                  <span className="ml-2">{message.content}</span>
-                </div>
-              ))}
-            </div>
+        {/* Current Transcript */}
+        {callState.currentTranscript && (
+          <div className="bg-slate-800 rounded-lg p-4 mb-6 max-w-md">
+            <p className="text-slate-300 text-sm">You said:</p>
+            <p className="text-white">{callState.currentTranscript}</p>
           </div>
         )}
+
+        {/* Controls */}
+        <div className="flex gap-4">
+          <Button
+            onClick={toggleMicrophone}
+            disabled={!callState.microphonePermission}
+            className={`w-16 h-16 rounded-full ${
+              callState.isListening 
+                ? 'bg-red-500 hover:bg-red-600' 
+                : 'bg-green-500 hover:bg-green-600'
+            }`}
+          >
+            {callState.isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          </Button>
+          
+          <Button
+            onClick={toggleMute}
+            variant="outline"
+            className="w-16 h-16 rounded-full border-slate-600"
+          >
+            {callState.isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+          </Button>
+        </div>
       </div>
+
+      {/* Conversation History (Collapsible) */}
+      {callState.conversationHistory.length > 0 && (
+        <div className="border-t border-slate-700 p-4 max-h-40 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-slate-400 mb-2">Conversation</h3>
+          <div className="space-y-2">
+            {callState.conversationHistory.slice(-3).map((message) => (
+              <div key={message.id} className="text-xs">
+                <span className="text-slate-500">
+                  {message.sender === 'user' ? 'You' : character.name}:
+                </span>
+                <span className="text-slate-300 ml-2">{message.content}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
