@@ -97,7 +97,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
     incrementVoiceCalls,
     isLoading: usageLoading,
     showUpgradePrompt: upgradePromptVisible,
-    setShowUpgradePrompt: setUpgradePromptVisible,
+    hideUpgrade,
     handleUpgrade,
     isUpgrading: upgradeInProgress
   } = useEnhancedUsageTracking();
@@ -163,7 +163,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
           .select('id, sender, content, created_at')
           .eq('user_id', user.id)
           .eq('character_id', character.id)
-          .order('created_at', 'asc')
+          .order('created_at', { ascending: true })
           .limit(500);
 
         if (error) {

@@ -5,6 +5,22 @@ export interface Voice {
   name: string;
 }
 
+// Database character type (as stored in Supabase)
+export interface DbCharacter {
+  id: string;
+  name: string;
+  avatar_url: string;
+  bio: string;
+  personality: string; // JSON string in database
+  voice: string; // Voice ID string in database
+  user_id: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  description?: string;
+}
+
+// Application character type (with parsed fields)
 export interface Character {
   id: string;
   name: string;
@@ -22,6 +38,21 @@ export interface Character {
   is_public?: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+// Helper to convert database character to app character
+export function dbCharacterToCharacter(dbChar: DbCharacter): Character {
+  return {
+    ...dbChar,
+    avatar: dbChar.avatar_url,
+    personality: typeof dbChar.personality === 'string' 
+      ? JSON.parse(dbChar.personality) 
+      : Array.isArray(dbChar.personality) ? dbChar.personality : [],
+    voice: {
+      voice_id: dbChar.voice || 'EXAVITQu4vr4xnSDxMaL',
+      name: 'Default Voice'
+    }
+  };
 }
 
 export interface UserPreferences {

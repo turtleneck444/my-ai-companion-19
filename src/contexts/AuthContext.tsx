@@ -83,15 +83,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Return error instead of demo mode
       return { error: new Error('Supabase not configured') as AuthError };
-      
-      // Simulate user state update immediately (no timeout)
-      setUser({
-        id: demoUser.id,
-        email: demoUser.email,
-        user_metadata: userData
-      } as User);
-      
-      return { error: null };
     }
     
     try {
