@@ -127,7 +127,7 @@ export const VoiceCallTest = () => {
 
   const testElevenLabsTTS = async (): Promise<boolean> => {
     try {
-      await testVoice(selectedVoice);
+      await testVoice(selectedVoice, "Hello! This is a test of my voice.");
       return true;
     } catch (error) {
       console.error('ElevenLabs TTS test failed:', error);

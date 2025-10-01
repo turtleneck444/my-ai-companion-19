@@ -1,63 +1,7 @@
 import { buildSystemPrompt } from './ai';
+import type { Character, UserPreferences, ChatMessage, ChatContext } from '@/types/character';
 
-export interface ChatMessage {
-  id: string;
-  content: string;
-  sender: 'user' | 'ai';
-  timestamp: Date;
-  isTyping?: boolean;
-  emotion?: string;
-  topics?: string[];
-}
-
-export interface Character {
-  id: string;
-  name: string;
-  avatar: string;
-  bio: string;
-  personality: string[];
-  personalityTraits?: Record<string, number>;
-  voice?: {
-    voice_id: string;
-    name: string;
-  };
-  isOnline?: boolean;
-  mood?: string;
-  relationshipLevel?: number;
-}
-
-export interface UserPreferences {
-  preferredName: string;
-  petName?: string; // Added pet name support
-  treatmentStyle: string;
-  age: string;
-  contentFilter: boolean;
-}
-
-export interface ChatContext {
-  character: Character;
-  userPreferences: UserPreferences;
-  conversationHistory: ChatMessage[];
-  relationshipLevel: number;
-  timeOfDay: 'morning' | 'afternoon' | 'evening';
-  sessionMemory?: {
-    userMood?: string;
-    topics?: string[];
-    personalDetails?: Record<string, string>;
-    preferences?: Record<string, string>;
-    keyMoments?: string[];
-    lastUserMessage?: string;
-    conversationFlow?: string[];
-    userProfile?: {
-      name: string;
-      petName?: string;
-      age?: string;
-      interests?: string[];
-      goals?: string[];
-      challenges?: string[];
-    };
-  };
-}
+export type { Character, UserPreferences, ChatMessage, ChatContext };
 
 // Super Smart AI Response Generation System with Advanced Intelligence
 export class PersonalityAI {
@@ -65,10 +9,8 @@ export class PersonalityAI {
   private sessionMemory: Map<string, any> = new Map();
 
   constructor() {
-    // Use correct API endpoint based on environment
-    this.apiEndpoint = '/.netlify/functions/openai-chat' 
-      ? '/api/openai-chat' 
-      : '/.netlify/functions/openai-chat';
+    // Use correct API endpoint - prefer /api over netlify functions
+    this.apiEndpoint = '/api/openai-chat';
     
     console.log('🔧 Super Smart PersonalityAI initialized with endpoint:', this.apiEndpoint);
     console.log('🚀 AI Chat System v4.0 - Super Intelligent Conversation');

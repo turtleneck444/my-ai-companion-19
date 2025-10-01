@@ -16,7 +16,7 @@ interface UsageData {
 
 export const useEnhancedUsageTracking = () => {
   const { user } = useAuth();
-  const { checkLimitsAndPromptUpgrade, showUpgradePrompt, setShowUpgradePrompt, handleUpgrade, isUpgrading } = useUpgrade();
+  const { checkLimitsAndPromptUpgrade, showUpgradePrompt, handleUpgrade, isUpgrading, hideUpgrade } = useUpgrade();
   const [usage, setUsage] = useState<UsageData>({
     messagesUsed: 0,
     voiceCallsUsed: 0,
@@ -148,8 +148,8 @@ export const useEnhancedUsageTracking = () => {
     loadUsageData,
     // Also return upgrade state
     showUpgradePrompt,
-    setShowUpgradePrompt,
+    hideUpgrade,
     handleUpgrade,
     isUpgrading
   };
-}; 
+};

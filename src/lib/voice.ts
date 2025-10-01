@@ -246,12 +246,10 @@ export async function startVoiceCall(characterId: string, voiceSettings: VoiceCa
     // Track voice call usage
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase.from('usage_tracking').upsert({
+      await supabase.from('usage_tracking').insert({
         user_id: user.id,
         date: new Date().toISOString().split('T')[0],
-        voice_calls_made: 1
-      }, {
-        onConflict: 'user_id,date'
+        feature: 'voice_call'
       });
     }
   } catch (error) {

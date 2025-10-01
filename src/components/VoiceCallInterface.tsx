@@ -16,41 +16,7 @@ import {
 } from 'lucide-react';
 import { personalityAI } from '@/lib/ai-chat';
 import { speakText, stopAllSpeech } from '@/lib/voice';
-
-interface Character {
-  id: string;
-  name: string;
-  avatar: string;
-  bio: string;
-  personality: string[];
-  voice?: {
-    voice_id: string;
-    name: string;
-  };
-  voiceId?: string;
-}
-
-interface UserPreferences {
-  preferredName?: string;
-  petName?: string;
-  treatmentStyle?: string;
-}
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  sender: 'user' | 'ai';
-  timestamp: Date;
-}
-
-interface ChatContext {
-  character: Character;
-  userPreferences: UserPreferences;
-  conversationHistory: ChatMessage[];
-  relationshipLevel: number;
-  timeOfDay: string;
-  sessionMemory: Record<string, any>;
-}
+import type { Character, UserPreferences, ChatMessage, ChatContext } from '@/types/character';
 
 interface VoiceCallInterfaceProps {
   character: Character;
@@ -100,9 +66,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
 
   // Get character's voice ID (optimized)
   const getCharacterVoiceId = useCallback(() => {
-    return character.voice?.voice_id || 
-           character.voiceId || 
-           'NAW2WDhAioeiIYFXitBQ'; // Default to Luna's voice
+    return character.voice.voice_id || 'EXAVITQu4vr4xnSDxMaL'; // Default to Luna's voice
   }, [character]);
 
   // Initialize microphone (simplified)
@@ -297,10 +261,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       
       stopAllSpeech();
       
-      await speakText(response, voiceId, {
-        modelId: 'eleven_multilingual_v2',
-        voiceSettings
-      });
+      await speakText(response, voiceId, voiceSettings);
       
     } catch (error) {
       console.error('❌ Speech error:', error);

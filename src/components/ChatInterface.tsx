@@ -13,7 +13,8 @@ import {
   Heart
 } from "lucide-react";
 import { speakText } from "@/lib/voice";
-import { buildSystemPrompt } from "@/lib/ai";
+import { buildSystemPrompt, SystemPromptContext } from "@/lib/ai";
+import type { Character, UserPreferences } from "@/types/character";
 
 interface Message {
   id: string;
@@ -23,25 +24,11 @@ interface Message {
   isTyping?: boolean;
 }
 
-interface Character {
-  id: string;
-  name: string;
-  avatar: string;
-  bio: string;
-  personality: string[];
-  voice: string;
-  isOnline: boolean;
-  voiceId?: string;
-}
-
 interface ChatInterfaceProps {
   character: Character;
   onBack: () => void;
   onStartCall: () => void;
-  userPreferences: {
-    preferredName: string;
-    treatmentStyle: string;
-  };
+  userPreferences: UserPreferences;
 }
 
 export const ChatInterface = ({ character, onBack, onStartCall, userPreferences }: ChatInterfaceProps) => {
@@ -64,10 +51,20 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
     const greet = async () => {
       setIsAiTyping(true);
       try {
-        const system = buildSystemPrompt({
-          character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
-          userPreferences
-        });
+        const promptContext: SystemPromptContext = {
+          character: { 
+            name: character.name, 
+            bio: character.bio, 
+            personality: character.personality, 
+            voice: character.voice 
+          },
+          userPreferences: {
+            preferredName: userPreferences.preferredName,
+            treatmentStyle: userPreferences.treatmentStyle,
+            age: userPreferences.age
+          }
+        };
+        const system = buildSystemPrompt(promptContext);
         const res = await fetch('/api/openai-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -84,11 +81,11 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
         const content = data?.message || `Hey ${userPreferences.preferredName}, it's ${character.name}.`;
         const aiMsg: Message = { id: Date.now().toString(), content, sender: 'ai', timestamp: new Date() };
         setMessages([aiMsg]);
-        try { await speakText(aiMsg.content, character.voiceId || defaultVoiceId); } catch {}
+        try { await speakText(aiMsg.content, character.voice.voice_id || defaultVoiceId); } catch {}
       } catch {
         const fallbackMsg: Message = { id: Date.now().toString(), content: `Hey ${userPreferences.preferredName}! I'm ${character.name}. 💕`, sender: 'ai', timestamp: new Date() };
         setMessages([fallbackMsg]);
-        try { await speakText(fallbackMsg.content, character.voiceId || defaultVoiceId); } catch {}
+        try { await speakText(fallbackMsg.content, character.voice.voice_id || defaultVoiceId); } catch {}
       } finally {
         setIsAiTyping(false);
       }
@@ -114,10 +111,20 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 20000);
-      const system = buildSystemPrompt({
-        character: { name: character.name, bio: character.bio, personality: character.personality, voice: character.voice },
-        userPreferences
-      });
+      const promptContext: SystemPromptContext = {
+        character: { 
+          name: character.name, 
+          bio: character.bio, 
+          personality: character.personality, 
+          voice: character.voice 
+        },
+        userPreferences: {
+          preferredName: userPreferences.preferredName,
+          treatmentStyle: userPreferences.treatmentStyle,
+          age: userPreferences.age
+        }
+      };
+      const system = buildSystemPrompt(promptContext);
       const res = await fetch('/api/openai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,7 +152,7 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
         timestamp: new Date()
       };
       setMessages(prev => [...prev, aiMessage]);
-      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
+      try { await speakText(aiMessage.content, character.voice.voice_id || defaultVoiceId); } catch {}
     } catch (err) {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -154,7 +161,7 @@ export const ChatInterface = ({ character, onBack, onStartCall, userPreferences 
         timestamp: new Date()
       };
       setMessages(prev => [...prev, aiMessage]);
-      try { await speakText(aiMessage.content, character.voiceId || defaultVoiceId); } catch {}
+      try { await speakText(aiMessage.content, character.voice.voice_id || defaultVoiceId); } catch {}
     } finally {
       setIsAiTyping(false);
     }
