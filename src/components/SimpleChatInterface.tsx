@@ -251,8 +251,10 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
       // Generate AI response
       const context: ChatContext = {
         character,
-        messages: [...messages, userMessage],
-        userPreferences
+        conversationHistory: [...messages, userMessage],
+        userPreferences,
+        relationshipLevel: 1,
+        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'
       };
 
       // Temporarily bypass personalityAI for debugging
@@ -304,8 +306,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
       console.error('Error details:', {
         message: error.message,
         stack: error.stack,
-        name: error.name,
-        endpoint: personalityAI.apiEndpoint // Added for debugging
+        name: error.name
       });
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -646,7 +647,11 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
           onBack={() => setShowGames(false)}
           onSendMessage={(message) => {
             setInput(message);
-            handleSendMessage();
+            setTimeout(() => {
+              if (message) {
+                sendMessage(message);
+              }
+            }, 100);
           }}
         />
             </div>

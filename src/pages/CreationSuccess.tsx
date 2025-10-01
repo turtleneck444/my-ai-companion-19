@@ -125,13 +125,20 @@ const CreationSuccess = () => {
     }
   };
 
+  // Convert character voice to Voice object if needed
+  const characterWithVoice = {
+    ...character,
+    voice: typeof character.voice === 'string' 
+      ? { voice_id: character.voice, name: 'Default Voice' }
+      : character.voice
+  };
+
   // Render different views
   if (currentView === 'call') {
     return (
       <VoiceCallInterface 
-        character={character}
+        character={characterWithVoice}
         onEndCall={handleEndCall}
-        onMinimize={() => setCurrentView('chat')}
         userPreferences={{
           preferredName: 'Darling',
           treatmentStyle: 'affectionate',
@@ -145,7 +152,7 @@ const CreationSuccess = () => {
   if (currentView === 'chat') {
     return (
       <SimpleChatInterface 
-        character={character}
+        character={characterWithVoice}
         onBack={() => setCurrentView('success')}
         onStartCall={handleStartCall}
         userPreferences={{

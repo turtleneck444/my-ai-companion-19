@@ -134,16 +134,33 @@ const Create = () => {
   // Check companion limit
   useEffect(() => {
     const checkLimit = async () => {
-      if (user && !usageLoading) {
-        const canCreate = await checkCompanionLimit(user.id, usage?.plan || 'free');
-        if (!canCreate) {
-          showUpgrade('message');
-          setUpgradePlan('premium');
+      if (user && !usageLoading && usage && isSupabaseConfigured) {
+        try {
+          // Query database for actual companion count
+          const { count, error } = await supabase
+            .from('characters')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+          
+          if (error) {
+            console.error('Error checking companion count:', error);
+            return;
+          }
+          
+          const companionsCreated = count || 0;
+          const canCreate = checkCompanionLimit(usage.plan || 'free', companionsCreated);
+          
+          if (!canCreate) {
+            showUpgrade('message');
+            setUpgradePlan('premium');
+          }
+        } catch (error) {
+          console.error('Error in companion limit check:', error);
         }
       }
     };
     checkLimit();
-  }, [user, usage, usageLoading]);
+  }, [user, usage, usageLoading, showUpgrade]);
 
   const currentStepIndex = steps.indexOf(currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
@@ -188,15 +205,12 @@ const Create = () => {
       // Test the voice with a sample text
       const sampleText = `Hello! I'm ${character.name || 'your AI companion'}. I'm so excited to meet you!`;
       
-      await testVoice(voice.voice_id);
+      await testVoice(voice.voice_id, sampleText);
       await speakText(sampleText, voice.voice_id, {
-        modelId: 'eleven_multilingual_v2',
-        voiceSettings: {
-          stability: 0.35,
-          similarity_boost: 0.9,
-          style: 0.4,
-          use_speaker_boost: true
-        }
+        stability: 0.35,
+        similarity_boost: 0.9,
+        style: 0.4,
+        use_speaker_boost: true
       });
       
       toast({
@@ -231,11 +245,18 @@ const Create = () => {
       setIsGeneratingImage(true);
       setImageGenerationError(null);
       
-      const validatedPrompt = validateImagePrompt(imagePrompt);
-      const imageUrl = await generateAvatarImage(validatedPrompt);
+      const validation = validateImagePrompt(imagePrompt);
+      if (!validation.isValid) {
+        throw new Error(validation.message || 'Invalid prompt');
+      }
       
-      setGeneratedImageUrl(imageUrl);
-      setCharacter(prev => ({ ...prev, avatarUrl: imageUrl }));
+      const result = await generateAvatarImage({ prompt: imagePrompt });
+      if (!result) {
+        throw new Error('Failed to generate image');
+      }
+      
+      setGeneratedImageUrl(result.url);
+      setCharacter(prev => ({ ...prev, avatarUrl: result.url }));
       
       toast({
         title: "Image Generated!",
@@ -759,7 +780,6 @@ const Create = () => {
               <Stepper
                 steps={steps}
                 currentStep={currentStepIndex}
-                onStepClick={(step) => setCurrentStep(step)}
               />
               <Progress value={progress} className="mt-4" />
             </div>
@@ -809,10 +829,9 @@ const Create = () => {
         <UpgradePrompt
           isOpen={showUpgradePrompt}
           onClose={() => hideUpgrade()}
-          onUpgrade={() => handleUpgrade(upgradePlan || 'premium')}
+          onUpgrade={() => handleUpgrade({ planId: upgradePlan || 'premium' })}
           isUpgrading={isUpgrading}
           currentPlan={usage?.plan || 'free'}
-          upgradePlan={upgradePlan || 'premium'}
         />
       )}
     </div>

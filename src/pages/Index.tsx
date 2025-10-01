@@ -141,32 +141,33 @@ const Index = () => {
     });
   };
 
+  // Convert character voice to Voice object if needed
+  const convertedCharacter = selectedCharacter ? {
+    ...selectedCharacter,
+    voice: typeof selectedCharacter.voice === 'string' 
+      ? { voice_id: selectedCharacter.voice, name: 'Default Voice' }
+      : selectedCharacter.voice
+  } : null;
+
   // Render different views
   if (currentView === 'profile') {
-    return (
-      <UserProfile 
-        onBack={handleBackToHome}
-        userPreferences={userPreferences}
-        onUpdatePreferences={handleUpdatePreferences}
-      />
-    );
+    return <UserProfile />;
   }
 
-  if (currentView === 'call' && selectedCharacter) {
+  if (currentView === 'call' && convertedCharacter) {
     return (
       <VoiceCallInterface 
-        character={selectedCharacter}
+        character={convertedCharacter}
         onEndCall={handleEndCall}
-        onMinimize={() => setCurrentView('chat')}
         userPreferences={userPreferences}
       />
     );
   }
 
-  if (currentView === 'chat' && selectedCharacter) {
+  if (currentView === 'chat' && convertedCharacter) {
     return (
       <ChatInterface 
-        character={selectedCharacter}
+        character={convertedCharacter}
         onBack={handleBackToHome}
         onStartCall={() => handleStartCall()}
         userPreferences={userPreferences}
