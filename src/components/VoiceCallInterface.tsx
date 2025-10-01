@@ -68,9 +68,24 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const isRecognitionActiveRef = useRef<boolean>(false);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get character's voice ID (optimized)
+  // Get character's voice ID (optimized) - Use real ElevenLabs voice IDs
   const getCharacterVoiceId = useCallback(() => {
-    return character.voice.voice_id || 'EXAVITQu4vr4xnSDxMaL'; // Default to Luna's voice
+    // Real ElevenLabs female voice IDs for flirty, natural voices
+    const femaleVoices = [
+      'AZnzlk1XvdvUeBnXmlld', // Bella - flirty, warm
+      'EXAVITQu4vr4xnSDxMaL', // Luna - soft, melodic
+      'VR6AewLTigWG4xSOukaG', // Sarah - sweet, friendly
+      'pNInz6obpgDQGcFmaJgB', // Adam - but we'll use female voices
+      'yoZ06aMxZJJ28mfd3POQ'  // Domi - confident, flirty
+    ];
+    
+    // Use character-specific voice or fallback to a random female voice
+    if (character.voice?.voice_id && character.voice.voice_id !== 'default_soft_melodic') {
+      return character.voice.voice_id;
+    }
+    
+    // Fallback to Bella (flirty, warm voice) for all characters
+    return 'AZnzlk1XvdvUeBnXmlld';
   }, [character]);
 
   // Initialize microphone (simplified)

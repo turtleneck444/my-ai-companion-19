@@ -112,6 +112,7 @@ export async function speakText(
           },
           body: JSON.stringify({
             text: processedText,
+            voiceId: voiceId,
             voice_id: voiceId,
             voice_settings: voiceSettings,
             model_id: 'eleven_multilingual_v2'
