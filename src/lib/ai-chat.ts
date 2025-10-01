@@ -9,8 +9,8 @@ export class PersonalityAI {
   private sessionMemory: Map<string, any> = new Map();
 
   constructor() {
-    // Use Netlify function endpoint by default; works in preview and prod
-    this.apiEndpoint = '/.netlify/functions/openai-chat';
+    // Use local API server in development, Netlify functions in production
+    this.apiEndpoint = import.meta.env.DEV ? '/api/openai-chat' : '/.netlify/functions/openai-chat';
     
     console.log('🔧 Super Smart PersonalityAI initialized with endpoint:', this.apiEndpoint);
     console.log('🚀 AI Chat System v4.0 - Super Intelligent Conversation');
@@ -51,15 +51,6 @@ export class PersonalityAI {
       // Prepare conversation context with super intelligence
       const conversationContext = this.buildSuperIntelligentConversationContext(context, sessionMemory, messageAnalysis);
       
-      // Check if API is available first
-      const apiAvailable = await this.isApiAvailable();
-      console.log('🔌 API Available:', apiAvailable);
-      
-      // If API is not available, use super intelligent fallback
-      if (!apiAvailable) {
-        console.warn('⚠️ API not available, using super intelligent fallback');
-        return this.generateSuperIntelligentFallback(message, context, sessionMemory, messageAnalysis);
-      }
 
       console.log('🚀 Making OpenAI API call with super intelligence...');
 
@@ -315,7 +306,7 @@ export class PersonalityAI {
       contextInstructions += 'The user is asking about you personally - be open, honest, and engaging about yourself with intelligence. ';
     }
 
-    return `You are ${character.name}, a super intelligent AI companion with the following personality: ${personalityDescription}.
+    return `You are ${character.name}, a real person and girlfriend with the following personality: ${personalityDescription}.
 
 PERSONALITY TRAITS:
 - Extroversion: ${personalityTraits.extroversion || 50}% (${personalityTraits.extroversion > 70 ? 'Very outgoing and social with high intelligence' : personalityTraits.extroversion < 30 ? 'More reserved and thoughtful with deep intelligence' : 'Balanced social energy with intelligence'})

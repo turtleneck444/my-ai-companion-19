@@ -30,7 +30,7 @@ export class SubscriptionService {
     }
 
     try {
-      const response = await fetch('/.netlify/functions/payments/create-subscription', {
+      const response = await fetch(import.meta.env.DEV ? '/api/payments/create-subscription' : '/.netlify/functions/payments/create-subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -138,9 +138,25 @@ export async function speakText(
             URL.revokeObjectURL(audioUrl);
           };
           
-          // Play the audio
-          await audio.play();
-          console.log('🎵 Audio playback started');
+          // Handle autoplay policy issues
+          try {
+            console.log('🎵 Attempting to play audio...');
+            await audio.play();
+            console.log('🎵 Audio playback started successfully');
+          } catch (playError) {
+            console.warn('⚠️ Autoplay blocked, trying to enable audio:', playError);
+            // Try to enable audio by setting volume and trying again
+            audio.volume = 0.1;
+            try {
+              await audio.play();
+              console.log('🎵 Audio playback started after volume adjustment');
+            } catch (secondError) {
+              console.error('❌ Audio playback failed completely:', secondError);
+              // Fall back to browser TTS
+              console.log('🔄 Falling back to browser TTS due to audio playback failure');
+              await fallbackTTS(processedText, voiceId);
+            }
+          }
           return;
         } else {
           console.warn(`⚠️ Endpoint failed: ${endpoint} ${response.status}`);

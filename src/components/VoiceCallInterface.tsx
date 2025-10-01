@@ -15,6 +15,8 @@ import {
   X
 } from 'lucide-react';
 import { personalityAI } from '@/lib/ai-chat';
+import { memoryService } from '@/lib/memory-service';
+import { useAuth } from '@/contexts/AuthContext';
 import { speakText, stopAllSpeech } from '@/lib/voice';
 import type { Character, UserPreferences, ChatMessage, ChatContext } from '@/types/character';
 
@@ -35,6 +37,7 @@ interface CallState {
   conversationHistory: ChatMessage[];
   callDuration: number;
   microphonePermission: boolean;
+  microphoneDisabled: boolean;
 }
 
 export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
@@ -44,6 +47,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   className = ''
 }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const [callState, setCallState] = useState<CallState>({
     isConnected: false,
@@ -149,24 +153,32 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       isRecognitionActiveRef.current = false;
       setCallState(prev => ({ ...prev, isListening: false }));
       
-      // Only restart if call is active and not processing
-      if (isCallActiveRef.current && !callState.isProcessing && !callState.isSpeaking) {
-        setTimeout(() => {
-          if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
-            try {
-              recognitionRef.current.start();
-              console.log('✅ Speech recognition restarted');
-            } catch (error) {
-              console.log('⚠️ Restart failed:', error);
-            }
-          }
-        }, 1000); // Longer delay to prevent rapid restarts
-      }
     };
 
     recognitionRef.current = recognition;
     return true;
   }, [toast, callState.isProcessing, callState.isSpeaking]);
+
+  // Manual restart function for speech recognition
+  const restartSpeechRecognition = useCallback(() => {
+    if (isCallActiveRef.current && recognitionRef.current) {
+      try {
+        if (isRecognitionActiveRef.current) {
+          recognitionRef.current.stop();
+        }
+        setTimeout(() => {
+          if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
+            recognitionRef.current.start();
+            isRecognitionActiveRef.current = true;
+            setCallState(prev => ({ ...prev, isListening: true }));
+            console.log("🎤 MANUAL RESTART - Speech recognition restarted");
+          }
+        }, 100);
+      } catch (error) {
+        console.log("⚠️ Manual restart failed:", error);
+      }
+    }
+  }, []);
 
   // Handle user message (optimized)
   const handleUserMessage = useCallback(async (message: string) => {
@@ -217,12 +229,16 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         timestamp: new Date()
       };
 
+      // Update conversation history
       setCallState(prev => ({
         ...prev,
-        conversationHistory: [...prev.conversationHistory, aiMessage]
+        conversationHistory: [...prev.conversationHistory, userMessage, aiMessage]
       }));
 
+      console.log("🔊 About to call speakAIResponse with:", aiResponse.substring(0, 50) + "...");
+      console.log("🔊 isCallActiveRef.current before speakAIResponse:", isCallActiveRef.current);
       await speakAIResponse(aiResponse);
+      console.log("🔊 speakAIResponse call completed");
 
     } catch (error) {
       console.error('❌ Error processing message:', error);
@@ -243,6 +259,23 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   // Speak AI response (optimized)
   const speakAIResponse = useCallback(async (response: string) => {
     if (!isCallActiveRef.current || callState.isMuted) return;
+
+    // NUCLEAR BLOCKING: Set all blocking flags immediately
+    window.aiSpeaking = true;
+    window.aiProcessing = true;
+    window.aiSpeakingTimestamp = Date.now();
+    
+    // Stop speech recognition immediately
+    if (recognitionRef.current && isRecognitionActiveRef.current) {
+      try {
+        recognitionRef.current.stop();
+        isRecognitionActiveRef.current = false;
+        setCallState(prev => ({ ...prev, isListening: false }));
+        console.log("🚫 STOPPED speech recognition - AI is about to speak");
+      } catch (error) {
+        console.log("⚠️ Error stopping recognition:", error);
+      }
+    }
 
     try {
       setCallState(prev => ({ ...prev, isSpeaking: true }));
@@ -268,6 +301,30 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     } finally {
       if (isCallActiveRef.current) {
         setCallState(prev => ({ ...prev, isSpeaking: false }));
+        
+        // AUTOMATIC RESTART: Clear all flags and automatically restart like a real call
+        setTimeout(() => {
+          // Clear ALL advanced flags
+          window.aiSpeaking = false;
+          window.aiProcessing = false;
+          window.aiJustFinished = false;
+          console.log("🔇 ADVANCED CLEANUP - All flags cleared");
+          
+          // Re-enable microphone
+          setCallState(prev => ({ 
+            ...prev, 
+            microphoneDisabled: false,
+            isListening: false,
+            isSpeaking: false,
+            isProcessing: false
+          }));
+          
+          // AUTOMATIC RESTART: Use the dedicated restart function
+          setTimeout(() => {
+            restartSpeechRecognition();
+          }, 2000); // Wait 2 seconds after AI finishes before restarting
+          
+        }, 2000); // Wait 2 seconds after AI finishes
       }
     }
   }, [getCharacterVoiceId, character.name, callState.isMuted]);
@@ -280,7 +337,20 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   };
 
   // Call controls (simplified)
-  const toggleMicrophone = useCallback(() => {
+  const toggleMicrophone = useCallback(async () => {
+    // Initialize audio context on first user interaction
+    try {
+      if (typeof window !== "undefined" && "AudioContext" in window) {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+          console.log("🔊 Audio context resumed on user interaction");
+        }
+      }
+    } catch (error) {
+      console.log("⚠️ Audio context initialization failed:", error);
+    }
+    
     if (!callState.microphonePermission) {
       initializeMicrophone();
       return;
@@ -329,6 +399,19 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     callStartTimeRef.current = new Date();
     
     const startCall = async () => {
+      // Initialize audio context to help with autoplay
+      try {
+        if (typeof window !== 'undefined' && 'AudioContext' in window) {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+            console.log('🔊 Audio context initialized and resumed');
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ Audio context initialization failed:', error);
+      }
+      
       const micReady = await initializeMicrophone();
       const speechReady = setupSpeechRecognition();
       
@@ -368,7 +451,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         recognitionRef.current.stop();
       }
     };
-  }, [initializeMicrophone, setupSpeechRecognition]);
+  }, []); // Run only once on mount
 
   // Format call duration
   const formatDuration = (seconds: number) => {
@@ -378,13 +461,22 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   };
 
   return (
-    <div className={`fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white 
-      flex flex-col ${className}`}>
+    <div className={`fixed inset-0 z-50 bg-gradient-to-br from-pink-50 via-white to-pink-100 text-gray-900 
+      flex flex-col backdrop-blur-sm overflow-hidden ${className}`}>
+      {/* Enhanced Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-20 left-20 w-40 h-40 bg-pink-300 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute bottom-32 right-32 w-32 h-32 bg-pink-400 rounded-full blur-2xl animate-float" style={{animationDelay: "2s"}}></div>
+        <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-pink-200 rounded-full blur-xl animate-float" style={{animationDelay: "4s"}}></div>
+        <div className="absolute top-1/3 right-1/3 w-20 h-20 bg-pink-300 rounded-full blur-lg animate-float" style={{animationDelay: "1s"}}></div>
+      </div>
       
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-700">
+      {/* Enhanced Header */}
+      <div className="flex items-center justify-between p-6 border-b border-pink-200 bg-white/95 backdrop-blur-md shadow-xl relative z-10">
+        {/* Header Background Pattern */}
+        <div className="absolute inset-0 bg-gradient-to-r from-pink-50/50 to-white/50"></div>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-pink-600 flex items-center justify-center shadow-lg">
             <img 
               src={character.avatar} 
               alt={character.name}
@@ -392,20 +484,21 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             />
           </div>
           <div>
-            <h2 className="text-xl font-semibold">{character.name}</h2>
-            <p className="text-slate-400 text-sm">Voice Call</p>
+            <h2 className="text-xl font-semibold text-gray-900">{character.name}</h2>
+            <p className="text-pink-600 text-sm font-medium">Voice Call</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="bg-green-600">
+          <Badge variant="secondary" className="bg-pink-100 text-pink-700 border-pink-200">
             {formatDuration(callState.callDuration)}
           </Badge>
+          {/* Clear chat history button removed to prevent crashes */}
           <Button
             variant="ghost"
             size="sm"
             onClick={endCall}
-            className="text-red-400 hover:text-red-300"
+            className="text-red-500 hover:text-red-600 hover:bg-red-50"
           >
             <PhoneOff className="w-4 h-4" />
           </Button>
@@ -413,59 +506,96 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
+        {/* Beautiful background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-10 left-10 w-32 h-32 bg-pink-300 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-20 w-24 h-24 bg-pink-400 rounded-full blur-2xl"></div>
+          <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-pink-200 rounded-full blur-xl"></div>
+        </div>
         
-        {/* Character Avatar */}
-        <div className="relative mb-8">
-          <div className="w-32 h-32 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 p-1">
+        {/* Enhanced Character Avatar */}
+        <div className="relative mb-8 z-10">
+          <div className={`w-36 h-36 rounded-full bg-gradient-to-r from-pink-500 to-pink-600 p-3 shadow-2xl transition-all duration-500 ${
+            callState.isSpeaking ? "animate-pulse scale-110 shadow-pink-500/50" : "hover:scale-105"
+          }`}>
             <img 
               src={character.avatar} 
               alt={character.name}
-              className="w-full h-full rounded-full object-cover"
+              className="w-full h-full rounded-full object-cover transition-transform duration-300"
             />
           </div>
           
-          {/* Status Indicators */}
-          <div className="absolute -bottom-2 -right-2 flex gap-1">
+          {/* Enhanced Status Indicators */}
+          <div className="absolute -bottom-3 -right-3 flex gap-2">
             {callState.isSpeaking && (
-              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                <Volume2 className="w-3 h-3 text-white" />
+              <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center shadow-xl animate-bounce">
+                <Volume2 className="w-4 h-4 text-white animate-pulse" />
               </div>
             )}
             {callState.isProcessing && (
-              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                <Loader2 className="w-3 h-3 text-white animate-spin" />
+              <div className="w-8 h-8 bg-pink-400 rounded-full flex items-center justify-center shadow-xl animate-pulse">
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
               </div>
             )}
+          </div>
+          
+          {/* Enhanced Speaking Animation Rings */}
+          {callState.isSpeaking && (
+            <>
+              <div className="absolute inset-0 rounded-full border-4 border-pink-300 animate-ping"></div>
+              <div className="absolute inset-0 rounded-full border-2 border-pink-200 animate-ping" style={{animationDelay: "0.5s"}}></div>
+            </>
+          )}
+          
+          {/* Character Name Badge */}
+          <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-pink-200">
+            <span className="text-pink-700 font-semibold text-sm">{character.name}</span>
           </div>
         </div>
 
         {/* Status Messages */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative z-10">
           {callState.isSpeaking && (
-            <p className="text-green-400 text-lg">🎤 {character.name} is speaking...</p>
+            <div className="bg-pink-100 rounded-2xl p-4 shadow-lg animate-pulse">
+              <p className="text-pink-700 text-lg font-semibold animate-bounce">🎤 {character.name} is speaking...</p>
+            </div>
           )}
           {callState.isProcessing && (
-            <p className="text-blue-400 text-lg">🤔 {character.name} is thinking...</p>
+            <div className="bg-pink-50 rounded-2xl p-4 shadow-lg">
+              <p className="text-pink-600 text-lg font-semibold">🤔 {character.name} is thinking...</p>
+            </div>
           )}
           {callState.isListening && !callState.isSpeaking && !callState.isProcessing && (
-            <p className="text-slate-400 text-lg">👂 Listening for your voice...</p>
+            <div className="bg-green-50 rounded-2xl p-4 shadow-lg animate-pulse">
+              <p className="text-green-700 text-lg font-semibold">👂 Listening for your voice...</p>
+            </div>
           )}
           {!callState.isListening && !callState.isSpeaking && !callState.isProcessing && (
-            <p className="text-slate-400 text-lg">💬 Say something to {character.name}...</p>
+            <div className="bg-gray-50 rounded-2xl p-4 shadow-lg">
+              <p className="text-gray-700 text-lg font-semibold">💬 Say something to {character.name}...</p>
+            </div>
           )}
         </div>
 
-        {/* Current Transcript */}
+        {/* Enhanced Current Transcript */}
         {callState.currentTranscript && (
-          <div className="bg-slate-800 rounded-lg p-4 mb-6 max-w-md">
-            <p className="text-slate-300 text-sm">You said:</p>
-            <p className="text-white">{callState.currentTranscript}</p>
+          <div className="flex justify-end mb-6 animate-fadeIn">
+            <div className="max-w-md px-6 py-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-2xl rounded-br-md shadow-2xl">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-pink-200 rounded-full animate-pulse"></div>
+                <span className="text-pink-100 text-xs font-semibold uppercase tracking-wide">You said:</span>
+                <span className="text-pink-200 text-xs">
+                  {new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}
+                </span>
+              </div>
+              <p className="text-white text-base font-medium leading-relaxed">{callState.currentTranscript}</p>
+            </div>
           </div>
         )}
 
         {/* Controls */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 relative z-10">
           <Button
             onClick={toggleMicrophone}
             disabled={!callState.microphonePermission}
