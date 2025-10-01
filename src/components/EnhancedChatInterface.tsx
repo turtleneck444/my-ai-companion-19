@@ -19,7 +19,8 @@ import {
   Zap,
   Loader2,
   Lock,
-  Crown
+  Crown,
+  MessageSquare
 } from "lucide-react";
 import { speakText } from "@/lib/voice";
 import { buildSystemPrompt } from "@/lib/ai";
@@ -38,17 +39,21 @@ interface Message {
   mood?: 'happy' | 'excited' | 'loving' | 'playful';
 }
 
+interface Voice {
+  voice_id: string;
+  name: string;
+}
+
 interface Character {
   id: string;
   name: string;
   avatar: string;
   bio: string;
   personality: string[];
-  voice: string;
+  voice: Voice;
   isOnline: boolean;
   mood?: string;
   relationshipLevel?: number;
-  voiceId?: string;
 }
 
 interface EnhancedChatInterfaceProps {
@@ -186,7 +191,7 @@ export const EnhancedChatInterface = ({
     incrementMessages();
 
     try {
-      const systemPrompt = buildSystemPrompt(character);
+      const systemPrompt = buildSystemPrompt({ character, userPreferences: userPreferences || { preferredName: 'friend', treatmentStyle: 'casual', age: '25', contentFilter: true } });
       
       const response = await fetch('/api/openai-chat', {
         method: 'POST',
@@ -468,7 +473,7 @@ export const EnhancedChatInterface = ({
         {/* Emoji Picker */}
         {showEmojiPicker && (
           <div className="absolute bottom-20 left-4 z-10">
-            <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+            <EmojiPicker onEmojiSelect={handleEmojiSelect} onClose={() => setShowEmojiPicker(false)} />
           </div>
         )}
       </div>
@@ -477,9 +482,8 @@ export const EnhancedChatInterface = ({
       <UpgradePrompt
         isOpen={showUpgradePrompt}
         onClose={() => setShowUpgradePrompt(false)}
-        limitType={upgradePromptType}
+        limitType={upgradePromptType === 'messages' ? 'message' : 'voice_call'}
         currentPlan={currentPlan}
-        remaining={upgradePromptType === 'messages' ? remainingMessages : remainingVoiceCalls}
       />
     </div>
   );

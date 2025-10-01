@@ -68,9 +68,14 @@ export class SubscriptionService {
 
   async cancelSubscription(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase.rpc('cancel_subscription', {
-        p_user_id: userId
-      });
+      // Directly update the subscription status in the database
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ 
+          subscription_status: 'canceled',
+          subscription_plan_id: 'free' 
+        })
+        .eq('id', userId);
 
       if (error) {
         console.error('Subscription cancellation error:', error);

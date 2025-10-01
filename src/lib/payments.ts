@@ -38,6 +38,10 @@ export interface Subscription {
   currentPeriodStart: number;
   currentPeriodEnd: number;
   planId: string;
+  success?: boolean;
+  paymentStatus?: string;
+  error?: string;
+  subscription?: any;
 }
 
 export interface PaymentMethod {
@@ -332,6 +336,16 @@ export class PaymentProcessor {
   // Get configuration
   getConfig(): PaymentConfig {
     return { ...this.config };
+  }
+
+  // Check if payment processor is configured
+  isConfigured(): boolean {
+    return !!this.config.publishableKey;
+  }
+
+  // Get provider name
+  getProvider(): string {
+    return this.config.provider;
   }
 
   // Check if Stripe is properly configured and initialized

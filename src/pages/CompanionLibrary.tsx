@@ -28,14 +28,18 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+interface Voice {
+  voice_id: string;
+  name: string;
+}
+
 interface Character {
   id: string;
   name: string;
   avatar: string;
   bio: string;
   personality: string[];
-  voice: string;
-  voice_id?: string;
+  voice: Voice;
   isOnline: boolean;
   mood?: string;
   lastMessage?: string;
@@ -76,8 +80,10 @@ const CompanionLibrary = () => {
         avatar: char.avatar_url || '/placeholder.svg',
         bio: char.description || '',
         personality: char.personality ? char.personality.split(',') : [],
-        voice: char.voice || 'default',
-        voice_id: char.voice_id,
+        voice: {
+          voice_id: char.voice || 'EXAVITQu4vr4xnSDxMaL',
+          name: char.voice || 'Default Voice'
+        },
         isOnline: true,
         mood: 'happy',
         lastMessage: 'Ready to chat!',
@@ -147,6 +153,12 @@ const CompanionLibrary = () => {
         character={selectedCharacter}
         onEndCall={() => {
           setShowVoiceCall(false);
+        }}
+        userPreferences={{
+          preferredName: 'friend',
+          treatmentStyle: 'casual',
+          age: '25',
+          contentFilter: true
         }}
       />
     );
@@ -227,7 +239,11 @@ const CompanionLibrary = () => {
                   setSelectedCharacter(character);
                   setShowChat(true);
                 }}
-                onDelete={() => handleDeleteCharacter(character.id)}
+                onStartCall={() => {
+                  setSelectedCharacter(character);
+                  setShowVoiceCall(true);
+                }}
+                onFavorite={() => {}}
                 viewMode={viewMode}
               />
             ))}

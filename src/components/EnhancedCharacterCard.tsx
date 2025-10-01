@@ -13,13 +13,18 @@ import {
   Volume2
 } from "lucide-react";
 
+interface Voice {
+  voice_id: string;
+  name: string;
+}
+
 interface Character {
   id: string;
   name: string;
   avatar: string;
   bio: string;
   personality: string[];
-  voice: string;
+  voice: Voice;
   isOnline: boolean;
   mood?: string;
   lastMessage?: string;
@@ -33,6 +38,7 @@ interface EnhancedCharacterCardProps {
   onFavorite: (character: Character) => void;
   isFavorite?: boolean;
   variant?: 'default' | 'compact' | 'featured';
+  viewMode?: 'grid' | 'list';
 }
 
 export const EnhancedCharacterCard = ({ 
@@ -140,7 +146,7 @@ export const EnhancedCharacterCard = ({
             <h3 className="font-display font-semibold text-lg">{character.name}</h3>
             <div className="flex items-center gap-2 text-sm opacity-90">
               <Volume2 className="w-3 h-3" />
-              <span>{character.voice}</span>
+              <span>{character.voice.name}</span>
             </div>
           </div>
         </div>
@@ -242,7 +248,7 @@ export const EnhancedCharacterCard = ({
                 <h3 className="font-display font-semibold text-lg mb-1">{character.name}</h3>
                 <div className="flex items-center gap-2 text-sm opacity-90">
                   <Volume2 className="w-3 h-3" />
-                  <span>{character.voice}</span>
+                  <span>{character.voice.name}</span>
                 </div>
               </div>
               

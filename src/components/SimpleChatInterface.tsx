@@ -36,22 +36,25 @@ import { getPlanById, getRemainingMessages } from '@/lib/payments';
 
 // Using ChatMessage from ai-chat.ts instead of local Message interface
 
+interface Voice {
+  voice_id: string;
+  name: string;
+}
+
 interface Character {
   id: string;
   name: string;
   avatar: string;
   bio: string;
   personality: string[];
-  voice?: {
-    voice_id: string;
-    name: string;
-  };
+  voice: Voice;
 }
 
 interface UserPreferences {
-  voiceEnabled: boolean;
-  autoPlay: boolean;
-  soundEffects: boolean;
+  preferredName: string;
+  treatmentStyle: string;
+  age: string;
+  contentFilter: boolean;
 }
 
 interface SimpleChatInterfaceProps {
@@ -77,10 +80,11 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [replies, setReplies] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [userPreferences, setUserPreferences] = useState<UserPreferences>({
-    voiceEnabled: true,
-    autoPlay: true,
-    soundEffects: true
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>(propUserPreferences || {
+    preferredName: 'friend',
+    treatmentStyle: 'casual',
+    age: '25',
+    contentFilter: true
   });
 
   // Voice recording states
@@ -573,8 +577,8 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
       {upgradePromptVisible && (
         <UpgradePrompt
           isOpen={upgradePromptVisible}
-          onClose={() => setUpgradePromptVisible(false)}
-          onUpgrade={handleUpgrade}
+          onClose={hideUpgrade}
+          onUpgrade={(planId) => handleUpgrade({ planId })}
           currentPlan={usage.plan || 'free'}
           isUpgrading={upgradeInProgress}
         />
@@ -600,10 +604,10 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
               </p>
               <div className="space-y-4">
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
                     setShowPaymentForm(false);
                     setSelectedPlanForPayment(null);
-                    handleUpgrade();
+                    await handleUpgrade({ planId: selectedPlanForPayment || 'premium' });
                   }}
                   className="w-full"
                 >
@@ -637,10 +641,14 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
               </Button>
             </div>
             <div className="p-4">
-              <InteractiveGames 
-                character={character}
-                onClose={() => setShowGames(false)}
-              />
+        <InteractiveGames
+          characterName={character.name}
+          onBack={() => setShowGames(false)}
+          onSendMessage={(message) => {
+            setInput(message);
+            handleSendMessage();
+          }}
+        />
             </div>
           </div>
         </div>
