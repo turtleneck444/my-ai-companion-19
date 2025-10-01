@@ -162,13 +162,20 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
       }
 
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('messages')
           .select('id, sender, content, created_at')
           .eq('user_id', user.id)
-          .eq('character_id', character.id)
           .order('created_at', { ascending: true })
           .limit(500);
+
+        // Only filter by character_id if it looks like a UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(character.id)) {
+          query = query.eq('character_id', character.id);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.warn('Could not load chat history', error);
@@ -240,10 +247,12 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
     try {
       // Save user message to database
       if (isSupabaseConfigured && user) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         await supabase.from('messages').insert({
           user_id: user.id,
-          character_id: character.id,
+          character_id: uuidRegex.test(character.id) ? character.id : null,
           sender: 'user',
+          role: 'user',
           content: currentInput
         });
       }
@@ -293,10 +302,12 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
 
       // Save AI message to database
       if (isSupabaseConfigured && user) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         await supabase.from('messages').insert({
           user_id: user.id,
-          character_id: character.id,
+          character_id: uuidRegex.test(character.id) ? character.id : null,
           sender: 'ai',
+          role: 'assistant',
           content: aiResponse
         });
       }

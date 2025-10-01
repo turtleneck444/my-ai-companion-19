@@ -9,8 +9,8 @@ export class PersonalityAI {
   private sessionMemory: Map<string, any> = new Map();
 
   constructor() {
-    // Use correct API endpoint - prefer /api over netlify functions
-    this.apiEndpoint = '/api/openai-chat';
+    // Use Netlify function endpoint by default; works in preview and prod
+    this.apiEndpoint = '/.netlify/functions/openai-chat';
     
     console.log('🔧 Super Smart PersonalityAI initialized with endpoint:', this.apiEndpoint);
     console.log('🚀 AI Chat System v4.0 - Super Intelligent Conversation');
