@@ -68,24 +68,24 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const isRecognitionActiveRef = useRef<boolean>(false);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get character's voice ID (optimized) - Use real ElevenLabs voice IDs
+  // Get character's voice ID (optimized) - Use cuter ElevenLabs voice IDs
   const getCharacterVoiceId = useCallback(() => {
-    // Real ElevenLabs female voice IDs for flirty, natural voices
-    const femaleVoices = [
-      'AZnzlk1XvdvUeBnXmlld', // Bella - flirty, warm
-      'EXAVITQu4vr4xnSDxMaL', // Luna - soft, melodic
-      'VR6AewLTigWG4xSOukaG', // Sarah - sweet, friendly
-      'pNInz6obpgDQGcFmaJgB', // Adam - but we'll use female voices
-      'yoZ06aMxZJJ28mfd3POQ'  // Domi - confident, flirty
+    // Cute ElevenLabs female voice IDs for adorable, sweet voices
+    const cuteVoices = [
+      'VR6AewLTigWG4xSOukaG', // Lily - sweet, cute voice
+      'XrExE9yKIg1WjnnlVkGX', // Matilda - sweet, adorable
+      'ErXwobaYiN019PkySvjV', // Elli - soft, cute voice
+      'XB0fDUnXU5powFXDhCwa', // Charlotte - calm, sweet
+      'kdmDKE6EkgrWrrykO9Qt'  // Emily - sophisticated but cute
     ];
     
-    // Use character-specific voice or fallback to a random female voice
+    // Use character-specific voice or fallback to a cute voice
     if (character.voice?.voice_id && character.voice.voice_id !== 'default_soft_melodic') {
       return character.voice.voice_id;
     }
     
-    // Fallback to Bella (flirty, warm voice) for all characters
-    return 'AZnzlk1XvdvUeBnXmlld';
+    // Fallback to Lily (sweet, cute voice) for all characters
+    return 'VR6AewLTigWG4xSOukaG';
   }, [character]);
 
   // Initialize microphone (simplified)
@@ -127,7 +127,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     const recognition = new SpeechRecognition();
     
     recognition.continuous = true;
-    recognition.interimResults = false; // Only final results for better performance
+    recognition.interimResults = true; // Enable interim results to capture full messages
     recognition.lang = 'en-US';
     recognition.maxAlternatives = 1;
     

@@ -177,6 +177,10 @@ export async function speakText(
     console.error('❌ TTS Error:', error);
     console.log('🔄 Falling back to browser TTS');
     await fallbackTTS(processedText, voiceId);
+  } finally {
+    // Release speech lock
+    isSpeaking = false;
+    console.log('🔓 SPEECH LOCK RELEASED');
   }
 }
 
@@ -215,6 +219,8 @@ async function fallbackTTS(text: string, voiceId: string): Promise<void> {
 
     utterance.onend = () => {
       console.log('🔊 Fallback TTS completed');
+      isSpeaking = false;
+      console.log('🔓 SPEECH LOCK RELEASED (fallback)');
       resolve();
     };
 
@@ -228,6 +234,9 @@ async function fallbackTTS(text: string, voiceId: string): Promise<void> {
 }
 
 // Stop all current speech
+// Global speech lock to prevent multiple voices
+let isSpeaking = false;
+let currentSpeechPromise: Promise<void> | null = null;
 export function stopAllSpeech(): void {
   console.log('🛑 Stopping all TTS');
   
