@@ -88,6 +88,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const [spokenWords, setSpokenWords] = useState<string[]>([]);
   const [displayedWordIndex, setDisplayedWordIndex] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   // Refs for cleanup and auto-scrolling
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -99,6 +100,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const autoRestartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSpeechTimeRef = useRef<number>(0);
   const speechDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const restartAttemptsRef = useRef<number>(0);
 
   // Get character's voice ID (optimized) - Use confirmed female voices
   const getCharacterVoiceId = useCallback(() => {
@@ -108,7 +110,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       'g6xIsTj2HwM6VR4iXFCw', // Jessica Anne Bogart - empathetic and expressive
       'OYTbf65OHHFELVut7v2H', // Hope - bright and uplifting
       'dj3G1R1ilKoFKhBnWOzG', // Eryn - friendly and relatable
-      'PT4nqlKZfc06V1BuClj', // Angela - raw and relatable
+      'PT4nqlKZfc06VW1BuClj', // Angela - raw and relatable
       '56AoDkrOh6qfVPDXZ7Pt'  // Cassidy - engaging and energetic
     ];
     
@@ -152,63 +154,21 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     }
     
     // Enhanced confidence and content filtering
-    if (confidence < 0.7) {
+    if (confidence < 0.6) {
       console.log("🚫 BLOCKED: Low confidence:", confidence);
       return false;
     }
     
-    // Filter out common AI speech patterns
-    const aiPatterns = [
-      /^(hello|hi|hey|good morning|good afternoon|good evening)$/i,
-      /^(thank you|thanks|you're welcome)$/i,
-      /^(how are you|how's it going|what's up)$/i,
-      /^(yes|no|okay|ok|sure|alright)$/i,
-      /^(I understand|I see|got it|I know)$/i,
-      /^(that's|that is|it's|it is).*(interesting|good|great|amazing|wonderful)$/i,
-      /^(I'm|I am).*(glad|happy|excited|pleased).*(to|that)/i,
-      /^(let me|let's|I'll|I will).*(help|assist|support)/i,
-      /^(I can|I could|I would|I might).*(help|assist|support)/i,
-      /^(what|how|when|where|why).*(would you like|do you want|can I help)/i
-    ];
-    
-    for (const pattern of aiPatterns) {
-      if (pattern.test(transcript)) {
-        console.log("🚫 BLOCKED: Matches AI speech pattern:", transcript);
-        return false;
-      }
-    }
-    
     // Filter out very short or repetitive speech
-    if (transcript.length < 3) {
+    if (transcript.length < 2) {
       console.log("🚫 BLOCKED: Too short");
-      return false;
-    }
-    
-    // Filter out repetitive words
-    const words = transcript.split(' ');
-    const uniqueWords = new Set(words);
-    if (words.length > 2 && uniqueWords.size < words.length * 0.6) {
-      console.log("🚫 BLOCKED: Too repetitive");
       return false;
     }
     
     // Filter out common filler words
     const fillerWords = ['uh', 'um', 'ah', 'oh', 'hmm', 'well', 'so', 'like', 'you know'];
-    if (words.length === 1 && fillerWords.includes(transcript.toLowerCase())) {
+    if (fillerWords.includes(transcript.toLowerCase())) {
       console.log("🚫 BLOCKED: Filler word");
-      return false;
-    }
-    
-    // Check for natural speech patterns (questions, statements, etc.)
-    const hasNaturalPattern = 
-      transcript.includes('?') || // Questions
-      transcript.includes('.') || // Statements
-      transcript.includes('!') || // Exclamations
-      words.length >= 3 || // Multi-word phrases
-      transcript.match(/^(can you|could you|would you|will you|do you|are you|is it|was it)/i); // Common question starters
-    
-    if (!hasNaturalPattern) {
-      console.log("🚫 BLOCKED: No natural speech pattern");
       return false;
     }
     
@@ -258,7 +218,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     }
   }, [toast]);
 
-  // Enhanced speech recognition setup
+  // Enhanced speech recognition setup with better error handling
   const setupSpeechRecognition = useCallback((): boolean => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       toast({
@@ -282,6 +242,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       console.log('🎤 Speech recognition started');
       isRecognitionActiveRef.current = true;
       setCallState(prev => ({ ...prev, isListening: true }));
+      restartAttemptsRef.current = 0; // Reset restart attempts on successful start
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -321,12 +282,25 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       isRecognitionActiveRef.current = false;
       setCallState(prev => ({ ...prev, isListening: false }));
       
+      // Handle specific errors
       if (event.error === 'not-allowed') {
         toast({
           title: "Microphone Permission Denied",
           description: "Please allow microphone access",
           variant: "destructive"
         });
+        return;
+      }
+      
+      if (event.error === 'aborted') {
+        console.log('⚠️ Speech recognition aborted - stopping auto-restart');
+        restartAttemptsRef.current = 0;
+        return;
+      }
+      
+      if (event.error === 'no-speech') {
+        console.log('⚠️ No speech detected - continuing to listen');
+        return;
       }
     };
 
@@ -335,18 +309,19 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       isRecognitionActiveRef.current = false;
       setCallState(prev => ({ ...prev, isListening: false }));
       
-      // Auto-restart speech recognition for continuous operation
-      if (isCallActiveRef.current && !callState.isSpeaking && !callState.isProcessing && window.speechDetectionEnabled) {
+      // Only auto-restart if we haven't exceeded max attempts and call is still active
+      if (isCallActiveRef.current && !callState.isSpeaking && !callState.isProcessing && window.speechDetectionEnabled && restartAttemptsRef.current < 3) {
+        restartAttemptsRef.current++;
         setTimeout(() => {
           if (isCallActiveRef.current && recognitionRef.current && !isRecognitionActiveRef.current) {
             try {
               recognitionRef.current.start();
-              console.log("🔄 AUTO-RESTART: Speech recognition restarted automatically");
+              console.log("🔄 AUTO-RESTART: Speech recognition restarted automatically (attempt", restartAttemptsRef.current, ")");
             } catch (error) {
               console.log("⚠️ Auto-restart failed:", error);
             }
           }
-        }, 1000);
+        }, 2000); // Increased delay to prevent rapid restarts
       }
     };
 
@@ -507,7 +482,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
                   console.log("⚠️ Auto-restart failed:", error);
                 }
               }
-            }, 2000); // Wait 2 seconds after AI finishes
+            }, 3000); // Wait 3 seconds after AI finishes
           }
         }, 1000); // Wait 1 second before clearing flags
       }
@@ -664,7 +639,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
               console.error('❌ Failed to start recognition:', error);
             }
           }
-        }, 1000);
+        }, 2000); // Increased delay to prevent issues
         
         setCallState(prev => ({ ...prev, isConnected: true }));
       }
@@ -751,6 +726,14 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           <span className="text-sm font-mono bg-background/50 px-2 py-1 rounded">
             {formatDuration(callState.callDuration)}
           </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTranscript(!showTranscript)}
+            className="h-8 px-3 rounded-full md:hidden"
+          >
+            <MessageSquare className="w-4 h-4" />
+          </Button>
           {onMinimize && (
             <Button
               variant="ghost"
@@ -764,20 +747,20 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex">
+      {/* Main Content Area - Mobile Responsive */}
+      <div className="flex-1 flex flex-col lg:flex-row">
         {/* Left Side - Character Avatar and Status */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 lg:p-8 text-center space-y-4 lg:space-y-8">
           {/* Character Avatar with Voice Visualization */}
           <div className="relative">
-            <div className={`w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
+            <div className={`w-24 h-24 lg:w-32 lg:h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
               callState.isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
               callState.isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
               'border-primary/30'
             }`}>
               <Avatar className="w-full h-full">
                 <AvatarImage src={character.avatar} alt={character.name} />
-                <AvatarFallback className="text-4xl">{character.name.charAt(0)}</AvatarFallback>
+                <AvatarFallback className="text-2xl lg:text-4xl">{character.name.charAt(0)}</AvatarFallback>
               </Avatar>
             </div>
             
@@ -785,21 +768,21 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             {(callState.isSpeaking || callState.isListening) && (
               <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
                 <div className={`flex space-x-1 ${callState.isSpeaking ? 'text-green-400' : 'text-blue-400'}`}>
-                  <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1 h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
-                  <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
-                  <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
+                  <div className="w-1 h-3 lg:h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1 h-4 lg:h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1 h-5 lg:h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
+                  <div className="w-1 h-4 lg:h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
+                  <div className="w-1 h-3 lg:h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
                 </div>
               </div>
             )}
           </div>
 
           {/* Status Display */}
-          <div className="space-y-3">
-            <h2 className="text-2xl font-bold">{character.name}</h2>
+          <div className="space-y-2 lg:space-y-3">
+            <h2 className="text-xl lg:text-2xl font-bold">{character.name}</h2>
             <div className="space-y-1">
-              <p className="text-lg font-medium">
+              <p className="text-base lg:text-lg font-medium">
                 {callState.isSpeaking ? '🗣️ Speaking...' :
                  callState.isProcessing ? '💭 Thinking...' :
                  callState.isListening ? '🎤 Your turn to speak!' :
@@ -809,13 +792,13 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
               
               {/* Interactive guidance */}
               {callState.isListening && !callState.isMuted && (
-                <p className="text-sm text-muted-foreground animate-pulse">
+                <p className="text-xs lg:text-sm text-muted-foreground animate-pulse">
                   I'm listening! Say something and I'll respond when you pause 💕
                 </p>
               )}
               
               {callState.isMuted && (
-                <p className="text-sm text-yellow-600">
+                <p className="text-xs lg:text-sm text-yellow-600">
                   Unmute to start talking with me!
                 </p>
               )}
@@ -823,12 +806,12 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             
             {/* Animated word-by-word visualization */}
             {callState.isSpeaking && spokenWords.length > 0 && (
-              <div className="mt-2 min-h-[48px]">
+              <div className="mt-2 min-h-[32px] lg:min-h-[48px]">
                 <div className="flex flex-wrap gap-1">
                   {spokenWords.slice(0, displayedWordIndex).map((w, idx) => (
                     <span
                       key={`${w}-${idx}`}
-                      className="text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
+                      className="text-sm lg:text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
                       style={{ animationDelay: `${idx * 15}ms` }}
                     >
                       {w}
@@ -841,7 +824,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             {/* Real-time transcript */}
             {callState.currentTranscript && (
               <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
-                <p className="text-sm text-muted-foreground italic">
+                <p className="text-xs lg:text-sm text-muted-foreground italic">
                   You're saying: "{callState.currentTranscript}"
                 </p>
               </div>
@@ -849,7 +832,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           </div>
 
           {/* Call Quality Indicators */}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 lg:gap-4 text-xs lg:text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-green-400" />
               <span>HD Voice</span>
@@ -865,8 +848,8 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           </div>
         </div>
 
-        {/* Right Side - Real-time Chat Transcript */}
-        <div className="w-96 border-l border-border/50 bg-background/30 backdrop-blur-sm">
+        {/* Right Side - Real-time Chat Transcript (Hidden on mobile by default) */}
+        <div className={`w-full lg:w-96 border-l border-border/50 bg-background/30 backdrop-blur-sm ${showTranscript ? 'block' : 'hidden lg:block'}`}>
           <div className="p-4 border-b border-border/50">
             <h3 className="font-semibold text-lg">Live Transcript</h3>
             <p className="text-sm text-muted-foreground">Real-time conversation</p>
@@ -874,7 +857,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           
           <div 
             ref={conversationRef}
-            className="flex-1 overflow-y-auto p-4 space-y-4 h-96"
+            className="flex-1 overflow-y-auto p-4 space-y-4 h-64 lg:h-96"
           >
             {callState.conversationHistory.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
@@ -934,14 +917,14 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       </div>
 
       {/* Call Controls */}
-      <div className="p-6 bg-background/50 backdrop-blur border-t">
-        <div className="flex items-center justify-center gap-6">
+      <div className="p-4 lg:p-6 bg-background/50 backdrop-blur border-t">
+        <div className="flex items-center justify-center gap-3 lg:gap-6 flex-wrap">
           {/* Push-to-Talk Toggle */}
           <Button
             variant={pushToTalk ? "default" : "outline"}
             size="sm"
             onClick={() => setPushToTalk(!pushToTalk)}
-            className="h-8 px-3 rounded-full"
+            className="h-8 px-3 rounded-full text-xs"
           >
             {pushToTalk ? 'PTT: On' : 'PTT: Off'}
           </Button>
@@ -950,12 +933,12 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           {pushToTalk && (
             <Button
               variant={isPTTHeld ? "default" : "outline"}
-              size="lg"
+              size="sm"
               onMouseDown={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
               onMouseUp={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
               onTouchStart={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
               onTouchEnd={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
-              className="h-14 px-6 rounded-full"
+              className="h-10 px-4 rounded-full text-xs"
             >
               Hold to Speak
             </Button>
@@ -964,58 +947,58 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           {/* Mute Button */}
           <Button
             variant={callState.isMuted ? "destructive" : "outline"}
-            size="lg"
+            size="sm"
             onClick={toggleMute}
-            className="h-14 w-14 rounded-full"
+            className="h-10 w-10 rounded-full"
           >
-            {callState.isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            {callState.isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </Button>
 
           {/* Speaker Button */}
           <Button
             variant={isSpeakerOn ? "default" : "outline"}
-            size="lg"
+            size="sm"
             onClick={() => { setIsSpeakerOn(!isSpeakerOn); unlockAudio(); }}
-            className="h-14 w-14 rounded-full"
+            className="h-10 w-10 rounded-full"
           >
-            {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+            {isSpeakerOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </Button>
 
           {/* End Call Button */}
           <Button
             variant="destructive"
-            size="lg"
+            size="sm"
             onClick={endCall}
-            className="h-16 w-16 rounded-full bg-red-500 hover:bg-red-600"
+            className="h-12 w-12 rounded-full bg-red-500 hover:bg-red-600"
           >
-            <PhoneOff className="w-8 h-8" />
+            <PhoneOff className="w-5 h-5" />
           </Button>
 
           {/* Switch to Chat */}
           {onMinimize && (
             <Button
               variant="outline"
-              size="lg"
+              size="sm"
               onClick={onMinimize}
-              className="h-14 w-14 rounded-full"
+              className="h-10 w-10 rounded-full"
             >
-              <MessageSquare className="w-6 h-6" />
+              <MessageSquare className="w-4 h-4" />
             </Button>
           )}
 
           {/* Love Button */}
           <Button
             variant="outline"
-            size="lg"
+            size="sm"
             onClick={() => {
               toast({
                 title: "💕 Love sent!",
                 description: `${character.name} felt your love!`
               });
             }}
-            className="h-14 w-14 rounded-full"
+            className="h-10 w-10 rounded-full"
           >
-            <Heart className="w-6 h-6" />
+            <Heart className="w-4 h-4" />
           </Button>
         </div>
       </div>
