@@ -21,12 +21,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 5175,
-      proxy: {
-        "/api": {
-          target: "http://localhost:3000",
-          changeOrigin: true,
-        },
-      },
+      // REMOVED: API proxy since we're using local API files
     },
     plugins,
     resolve: {

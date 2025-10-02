@@ -291,66 +291,91 @@ const Create = () => {
       // Upload avatar if file exists
       let uploaded = null;
       if (character.avatarFile) {
-        const formData = new FormData();
-        formData.append('file', character.avatarFile);
-        
-        const { data, error } = await supabase.storage
-          .from('avatars')
-          .upload(`${user.id}/${Date.now()}-${character.avatarFile.name}`, character.avatarFile);
-        
-        if (error) throw error;
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(data.path);
-        
-        uploaded = publicUrl;
+        try {
+          const formData = new FormData();
+          formData.append('file', character.avatarFile);
+          
+          const { data, error } = await supabase.storage
+            .from('avatars')
+            .upload(`${user.id}/${Date.now()}-${character.avatarFile.name}`, character.avatarFile);
+          
+          if (error) {
+            console.warn('Storage upload failed, using local URL:', error);
+            // Fallback to local URL if storage fails
+            uploaded = character.avatarUrl;
+          } else {
+            const { data: { publicUrl } } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(data.path);
+            
+            uploaded = publicUrl;
+          }
+        } catch (storageError) {
+          console.warn('Storage error, using local URL:', storageError);
+          // Fallback to local URL if storage fails
+          uploaded = character.avatarUrl;
+        }
       }
 
+      // Update the character creation to use correct column names
       const payload = {
         name: character.name,
-        bio: character.bio,
+        description: character.bio, // Use 'description' instead of 'bio'
         personality: character.personality,
-        personalityTraits: character.personalityTraits,
-        avatarUrl: uploaded || character.avatarUrl,
-        voice: character.voice?.name || "Default",
-        voiceId: character.voice?.voice_id
+        personality_traits: character.personalityTraits ? Object.keys(character.personalityTraits) : [],
+        avatar_url: uploaded || character.avatarUrl, // Use 'avatar_url' instead of 'avatarUrl'
+        voice_id: character.voice?.voice_id, // Use 'voice_id' instead of 'voice'
+        voice_settings: character.voice ? { name: character.voice.name } : null
       };
       
       let savedCharacter = null;
-      
-      if (isSupabaseConfigured) {
-        // FIXED: Include user_id for RLS policy compliance
-        const { data, error } = await supabase.from("characters").insert({
-          user_id: user.id, // This was missing!
-          name: payload.name,
-          description: payload.bio,
-          personality: JSON.stringify(payload.personality),
-          personality_traits: JSON.stringify(payload.personalityTraits),
-          voice: payload.voice,
-          voice_id: payload.voiceId,
-          avatar_url: payload.avatarUrl,
-          is_public: false
-        }).select().single();
 
-        if (error) {
-          console.error('Character creation error:', error);
-          throw new Error(`Failed to create character: ${error.message}`);
-        }
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from('characters')
+          .insert([{
+            name: payload.name,
+            description: payload.description, // Use 'description'
+            personality: JSON.stringify(payload.personality),
+            personality_traits: payload.personality_traits,
+            avatar_url: payload.avatar_url, // Use 'avatar_url'
+            voice_id: payload.voice_id, // Use 'voice_id'
+            voice_settings: payload.voice_settings,
+            user_id: user.id,
+            is_public: false
+          }])
+          .select()
+          .single();
+
+        if (error) throw new Error(`Failed to create character: ${error.message}`);
         savedCharacter = data;
+      } else {
+        // Fallback for when Supabase is not configured
+        savedCharacter = {
+          id: `local-${Date.now()}`,
+          name: payload.name,
+          description: payload.description,
+          personality: payload.personality,
+          personality_traits: payload.personalityTraits,
+          avatar_url: payload.avatar_url,
+          voice_id: payload.voice_id,
+          voice_settings: payload.voice_settings,
+          user_id: user.id,
+          is_public: false
+        };
       }
 
       // Create character object for success page
       const characterForSuccess = {
         id: savedCharacter?.id || `temp-${Date.now()}`,
         name: payload.name,
-        avatar: payload.avatarUrl || '/placeholder.svg',
-        bio: payload.bio,
+        avatar: payload.avatar_url || '/placeholder.svg',
+        bio: payload.description,
         personality: payload.personality,
         personalityTraits: payload.personalityTraits,
         voice: { 
-          voice_id: payload.voiceId, 
-          name: payload.voice 
+          voice_id: payload.voice_id, 
+          name: payload.voice_settings?.name || "Default" 
         },
         isOnline: true,
         relationshipLevel: 1.0

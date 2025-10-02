@@ -1,209 +1,190 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { 
-  Loader2, User, Mail, Settings, LogOut, Heart, Star, Calendar, Crown, 
-  Shield, Bell, Volume2, Eye, Trash2, Download, Upload, Camera,
-  CreditCard, Zap, BarChart3, MessageSquare, Phone, Timer,
-  Edit, Save, X, Check, AlertTriangle, Gift, Sparkles, ChevronRight,
-  Pause
+  User, 
+  Settings, 
+  Crown, 
+  MessageSquare, 
+  Phone, 
+  Heart, 
+  Brain, 
+  Zap,
+  Save,
+  Edit,
+  Check,
+  X,
+  Star,
+  Gift,
+  Shield,
+  Bell,
+  Palette,
+  Volume2,
+  Moon,
+  Sun,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEnhancedUsageTracking } from '../hooks/useEnhancedUsageTracking';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { PaymentModal } from '@/components/PaymentModal';
 
-interface PlanDetails {
-  name: string;
-  tier: 'free' | 'premium' | 'pro';
-  price: number;
-  features: string[];
-  limits: {
-    companions: number;
-    messages: number;
-    voiceCalls: number;
-  };
-  nextBilling?: string;
+interface UserProfileData {
+  id: string;
+  user_id: string;
+  email: string;
+  preferred_name: string;
+  date_of_birth: string | null;
+  location: string | null;
+  interests: string[];
+  pronouns: string | null;
+  plan: string;
+  subscription_status: string | null;
+  total_spent: number;
+  usage_messages_today: number;
+  usage_voice_calls_today: number;
+  usage_companions_created: number;
+  last_active_at: string;
+  created_at: string;
 }
 
-export const UserProfile = () => {
-  const { usage } = useEnhancedUsageTracking();
-  const { user, signOut, updateProfile } = useAuth();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showPayment, setShowPayment] = useState(false);
-  const [upgradePlan, setUpgradePlan] = useState<string | null>(null);
-  
-  // Profile data state
-  const [profileData, setProfileData] = useState({
-    preferredName: '',
-    treatmentStyle: 'romantic',
-    bio: '',
-    avatar: '',
-    age: '',
-    location: '',
-    interests: '',
-    relationship_status: 'single',
-    pronouns: 'they/them',
-    occupation: '',
-    languages: '',
-    love_language: 'quality_time',
-    favorite_music: '',
-    favorite_food: '',
-    favorite_shows: '',
-    work_schedule: ''
-  });
+interface UserPreferences {
+  communication_style: string;
+  emotional_tone: string;
+  response_length: string;
+  formality_level: string;
+  humor_level: string;
+  voice_preference: string;
+  theme_preference: string;
+  notification_settings: {
+    email_notifications: boolean;
+    push_notifications: boolean;
+    voice_call_notifications: boolean;
+    message_notifications: boolean;
+  };
+  privacy_settings: {
+    profile_visibility: string;
+    data_sharing: boolean;
+    analytics_tracking: boolean;
+  };
+}
 
-  // Settings state
-  const [settings, setSettings] = useState({
-    notifications: {
-      messages: true,
-      calls: true,
-      updates: false,
-      marketing: false
+const PLANS = {
+  free: {
+    name: 'Free',
+    price: 0,
+    messages: 10,
+    voice_calls: 2,
+    companions: 1,
+    features: ['Basic chat', '2 voice calls', '1 AI companion']
+  },
+  premium: {
+    name: 'Premium',
+    price: 19.99,
+    messages: 1000,
+    voice_calls: 100,
+    companions: 10,
+    features: ['Unlimited chat', '100 voice calls', '10 AI companions', 'Priority support']
+  },
+  pro: {
+    name: 'Pro',
+    price: 49.99,
+    messages: 10000,
+    voice_calls: 1000,
+    companions: 50,
+    features: ['Everything in Premium', '1000 voice calls', '50 AI companions', 'Advanced features', 'API access']
+  }
+};
+
+export const UserProfile = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [profileData, setProfileData] = useState<UserProfileData | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    communication_style: 'friendly',
+    emotional_tone: 'warm',
+    response_length: 'medium',
+    formality_level: 'casual',
+    humor_level: 'moderate',
+    voice_preference: 'default',
+    theme_preference: 'light',
+    notification_settings: {
+      email_notifications: true,
+      push_notifications: true,
+      voice_call_notifications: true,
+      message_notifications: true
     },
-    privacy: {
-      profileVisible: true,
-      showOnlineStatus: true,
-      allowVoiceCalls: true,
-      shareUsageData: false
-    },
-    preferences: {
-      voiceVolume: 75,
-      theme: 'system',
-      language: 'en',
-      contentFilter: true,
-      explicitContent: false
+    privacy_settings: {
+      profile_visibility: 'private',
+      data_sharing: false,
+      analytics_tracking: true
     }
   });
-
-  // Real usage statistics from database
-  const [usageStats, setUsageStats] = useState({
-    totalMessages: usage?.messagesUsed || 0,
-    totalCalls: usage?.voiceCallsUsed || 0,
-    totalMinutes: (usage?.voiceCallsUsed || 0) * 5,
-    favoriteCompanions: 3,
-    daysActive: 45,
-    level: 12,
-    xp: 8420,
-    xpToNext: 1580
-  });
-
-  // Current plan
-  const formatDate = (d: Date) => d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric' });
-  const nextBillingDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-  const [currentPlan, setCurrentPlan] = useState<PlanDetails>({
-    name: usage?.plan || 'free',
-    tier: 'free',
-    price: 0,
-    features: [
-      'Unlimited conversations',
-      'Voice calls (60 min/month)',
-      '3 AI companions',
-      'Basic customization',
-      'Community support'
-    ],
-    limits: {
-      companions: 3,
-      messages: -1, // unlimited
-      voiceCalls: 60
-    },
-    nextBilling: nextBillingDate
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    if (user?.user_metadata) {
-      setProfileData({
-        preferredName: user.user_metadata.preferred_name || '',
-        treatmentStyle: user.user_metadata.treatment_style || 'romantic',
-        bio: user.user_metadata.bio || '',
-        avatar: user.user_metadata.avatar || '',
-        age: user.user_metadata.age || '',
-        location: user.user_metadata.location || '',
-        interests: user.user_metadata.interests || '',
-        relationship_status: user.user_metadata.relationship_status || 'single',
-        pronouns: user.user_metadata.pronouns || 'they/them',
-        occupation: user.user_metadata.occupation || '',
-        languages: user.user_metadata.languages || '',
-        love_language: user.user_metadata.love_language || 'quality_time',
-        favorite_music: user.user_metadata.favorite_music || '',
-        favorite_food: user.user_metadata.favorite_food || '',
-        favorite_shows: user.user_metadata.favorite_shows || '',
-        work_schedule: user.user_metadata.work_schedule || ''
-      });
-    }
+    loadUserProfile();
   }, [user]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setProfileData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSettingChange = (category: string, field: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category as keyof typeof prev],
-        [field]: value
+  // Add this useEffect to refresh data periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user && !isSaving) {
+        loadUserProfile();
       }
-    }));
-  };
+    }, 30000); // Refresh every 30 seconds
 
-  const handleSaveProfile = async () => {
-    setIsLoading(true);
-    
+    return () => clearInterval(interval);
+  }, [user, isSaving]);
+
+  const loadUserProfile = async () => {
+    if (!user) return;
+
     try {
-      const { error } = await updateProfile({
-        preferred_name: profileData.preferredName,
-        treatment_style: profileData.treatmentStyle,
-        bio: profileData.bio,
-        avatar: profileData.avatar,
-        age: profileData.age,
-        location: profileData.location,
-        interests: profileData.interests,
-        relationship_status: profileData.relationship_status,
-        pronouns: profileData.pronouns,
-        occupation: profileData.occupation,
-        languages: profileData.languages,
-        love_language: profileData.love_language,
-        favorite_music: profileData.favorite_music,
-        favorite_food: profileData.favorite_food,
-        favorite_shows: profileData.favorite_shows,
-        work_schedule: profileData.work_schedule
-      });
-      
-      if (error) {
-        toast({
-          title: "Update failed",
-          description: error.message,
-          variant: "destructive"
-        });
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        setProfileData(data);
       } else {
-        toast({
-          title: "Profile updated! ✨",
-          description: "Your changes have been saved successfully.",
-        });
-        setIsEditing(false);
+        // Create profile if it doesn't exist
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert([{
+            user_id: user.id,
+            email: user.email,
+            preferred_name: user.user_metadata?.preferred_name || user.email?.split('@')[0] || 'User',
+            plan: 'free'
+          }])
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        setProfileData(newProfile);
       }
     } catch (error) {
+      console.error('Error loading profile:', error);
       toast({
-        title: "Update failed",
-        description: "An unexpected error occurred.",
+        title: "Error",
+        description: "Failed to load profile data",
         variant: "destructive"
       });
     } finally {
@@ -211,796 +192,469 @@ export const UserProfile = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    toast({
-      title: "Signed out 👋",
-      description: "You've been successfully signed out.",
-    });
-    // Redirect to homepage after sign out
+  const saveProfile = async () => {
+    if (!profileData || !user) return;
+
+    setIsSaving(true);
     try {
-      window.location.href = '/';
-    } catch {}
-  };
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          preferred_name: profileData.preferred_name,
+          date_of_birth: profileData.date_of_birth,
+          location: profileData.location,
+          interests: profileData.interests,
+          pronouns: profileData.pronouns,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
 
-  const handleDeleteAccount = () => {
-    toast({
-      title: "Account deletion",
-      description: "This feature will be available soon. Contact support for assistance.",
-      variant: "destructive"
-    });
-  };
+      if (error) throw error;
 
-  const handleUpgradePlan = () => {
-    setUpgradePlan('premium');
-    setShowPayment(true);
-  };
-
-  const getTreatmentStyleEmoji = (style: string) => {
-    switch (style) {
-      case 'romantic': return '💕';
-      case 'friendly': return '😊';
-      case 'playful': return '😏';
-      case 'caring': return '🤗';
-      case 'flirty': return '😉';
-      case 'intellectual': return '🤓';
-      default: return '💕';
+      toast({
+        title: "Success",
+        description: "Profile updated successfully"
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save profile",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const getPlanBadgeColor = (tier: string) => {
-    switch (tier) {
-      case 'free': return 'bg-green-100 text-green-800 border-green-200';
-      case 'premium': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'pro': return 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-yellow-400';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  const savePreferences = async () => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          communication_style: preferences.communication_style,
+          emotional_tone: preferences.emotional_tone,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Preferences updated successfully"
+      });
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save preferences",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  if (!user) return null;
+  const upgradePlan = async (newPlan: string) => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          plan: newPlan,
+          subscription_status: 'active',
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Upgraded to ${PLANS[newPlan as keyof typeof PLANS].name} plan`
+      });
+
+      // Reload profile data
+      await loadUserProfile();
+    } catch (error) {
+      console.error('Error upgrading plan:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upgrade plan",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!profileData) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">Failed to load profile data</p>
+      </div>
+    );
+  }
+
+  const currentPlan = PLANS[profileData.plan as keyof typeof PLANS] || PLANS.free;
+  const messageUsage = (profileData.usage_messages_today / currentPlan.messages) * 100;
+  const voiceUsage = (profileData.usage_voice_calls_today / currentPlan.voice_calls) * 100;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-6 pb-24">
-      {/* Profile Header */}
-      <Card className="bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 border-pink-200/50">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Avatar className="w-20 h-20 border-4 border-white shadow-xl">
-                  <AvatarImage src={profileData.avatar} alt={profileData.preferredName} />
-                  <AvatarFallback className="text-2xl bg-gradient-to-br from-pink-400 to-purple-500 text-white">
-                    {profileData.preferredName?.[0] || user.email?.[0] || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 rounded-full border-4 border-white flex items-center justify-center">
-                  <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                    {profileData.preferredName || 'Your Profile'}
-                  </h1>
-                  <Badge className={`${getPlanBadgeColor(currentPlan.tier)} font-semibold`}>
-                    <Crown className="w-3 h-3 mr-1" />
-                    {currentPlan.name}
-                  </Badge>
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <Badge variant="secondary" className="flex items-center space-x-1">
-                    <Mail className="w-3 h-3" />
-                    <span className="text-xs">{user.email}</span>
-                  </Badge>
-                  
-                  <Badge variant="outline" className="flex items-center space-x-1">
-                    <Heart className="w-3 h-3" />
-                    <span className="text-xs">
-                      {getTreatmentStyleEmoji(profileData.treatmentStyle)} {profileData.treatmentStyle}
-                    </span>
-                  </Badge>
-                  
-                  <Badge variant="outline" className="flex items-center space-x-1">
-                    <Star className="w-3 h-3 text-yellow-500" />
-                    <span className="text-xs">Level {usageStats.level}</span>
-                  </Badge>
-                  
-                  <Badge variant="outline" className="flex items-center space-x-1">
-                    <Calendar className="w-3 h-3" />
-                    <span className="text-xs">{usageStats.daysActive} days active</span>
-                  </Badge>
-                </div>
-                
-                {profileData.bio && (
-                  <p className="text-gray-600 mt-2 text-sm max-w-md">{profileData.bio}</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex flex-col md:flex-row gap-2">
-              <Button
-                variant={isEditing ? "secondary" : "outline"}
-                onClick={() => setIsEditing(!isEditing)}
-                className="flex items-center gap-2"
-              >
-                {isEditing ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
-                {isEditing ? 'Cancel' : 'Edit Profile'}
-              </Button>
-              
-              {isEditing && (
-                <Button
-                  onClick={handleSaveProfile}
-                  disabled={isLoading}
-                  className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-purple-600"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  Save Changes
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          {/* XP Progress */}
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="font-medium">Level Progress</span>
-              <span className="text-muted-foreground">{usageStats.xp} / {usageStats.xp + usageStats.xpToNext} XP</span>
-            </div>
-            <Progress 
-              value={(usageStats.xp / (usageStats.xp + usageStats.xpToNext)) * 100} 
-              className="h-2"
-            />
-          </div>
-        </CardHeader>
-      </Card>
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Profile Settings</h1>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadUserProfile}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Badge variant={profileData?.plan === 'free' ? 'secondary' : 'default'}>
+            {profileData ? PLANS[profileData.plan as keyof typeof PLANS].name : 'Loading'} Plan
+          </Badge>
+        </div>
+      </div>
 
-      {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-5">
-          <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-          <TabsTrigger value="plan" className="text-xs">Plan</TabsTrigger>
-          <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
-          <TabsTrigger value="privacy" className="text-xs">Privacy</TabsTrigger>
-          <TabsTrigger value="account" className="text-xs lg:block hidden">Account</TabsTrigger>
+      <Tabs defaultValue="profile" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="subscription">Subscription</TabsTrigger>
+          <TabsTrigger value="privacy">Privacy</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* Usage Statistics */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Usage Analytics
-              </CardTitle>
-              <CardDescription>Your activity and engagement metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 rounded-lg bg-pink-50 border border-pink-200">
-                  <MessageSquare className="w-8 h-8 text-pink-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-pink-600">{usageStats.totalMessages.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">Messages Sent</div>
-                </div>
-                
-                <div className="text-center p-4 rounded-lg bg-purple-50 border border-purple-200">
-                  <Phone className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-purple-600">{usageStats.totalCalls}</div>
-                  <div className="text-sm text-gray-600">Voice Calls</div>
-                </div>
-                
-                <div className="text-center p-4 rounded-lg bg-blue-50 border border-blue-200">
-                  <Timer className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-blue-600">{Math.round(usageStats.totalMinutes / 60)}h</div>
-                  <div className="text-sm text-gray-600">Talk Time</div>
-                </div>
-                
-                <div className="text-center p-4 rounded-lg bg-green-50 border border-green-200">
-                  <Heart className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-green-600">{usageStats.favoriteCompanions}</div>
-                  <div className="text-sm text-gray-600">Favorites</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Profile Information */}
+        {/* Profile Tab */}
+        <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="w-5 h-5" />
-                Profile Information
+                Personal Information
               </CardTitle>
-              <CardDescription>
-                {isEditing ? 'Edit your personal information' : 'Your personal details and preferences'}
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="preferred-name">Preferred Name</Label>
+                <div>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="preferred-name"
-                    value={profileData.preferredName}
-                    onChange={(e) => handleInputChange('preferredName', e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="What should we call you?"
+                    id="email"
+                    value={profileData.email}
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
-
-                <div className="space-y-2">
+                <div>
+                  <Label htmlFor="preferred_name">Preferred Name</Label>
+                  <Input
+                    id="preferred_name"
+                    value={profileData.preferred_name}
+                    onChange={(e) => setProfileData(prev => prev ? { ...prev, preferred_name: e.target.value } : null)}
+                    disabled={!isEditing}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="date_of_birth">Date of Birth</Label>
+                  <Input
+                    id="date_of_birth"
+                    type="date"
+                    value={profileData.date_of_birth || ''}
+                    onChange={(e) => setProfileData(prev => prev ? { ...prev, date_of_birth: e.target.value } : null)}
+                    disabled={!isEditing}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="location">Location</Label>
+                  <Input
+                    id="location"
+                    value={profileData.location || ''}
+                    onChange={(e) => setProfileData(prev => prev ? { ...prev, location: e.target.value } : null)}
+                    disabled={!isEditing}
+                    placeholder="City, Country"
+                  />
+                </div>
+                <div>
                   <Label htmlFor="pronouns">Pronouns</Label>
                   <Select
-                    value={profileData.pronouns}
-                    onValueChange={(value) => handleInputChange('pronouns', value)}
+                    value={profileData.pronouns || ''}
+                    onValueChange={(value) => setProfileData(prev => prev ? { ...prev, pronouns: value } : null)}
                     disabled={!isEditing}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select pronouns" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="she/her">She/Her</SelectItem>
                       <SelectItem value="he/him">He/Him</SelectItem>
+                      <SelectItem value="she/her">She/Her</SelectItem>
                       <SelectItem value="they/them">They/Them</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
-                  <Input
-                    id="age"
-                    value={profileData.age}
-                    onChange={(e) => handleInputChange('age', e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Your age"
-                    type="number"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="relationship-status">Relationship Status</Label>
-                  <Select
-                    value={profileData.relationship_status}
-                    onValueChange={(value) => handleInputChange('relationship_status', value)}
-                    disabled={!isEditing}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="single">Single</SelectItem>
-                      <SelectItem value="taken">In a relationship</SelectItem>
-                      <SelectItem value="married">Married</SelectItem>
-                      <SelectItem value="divorced">Divorced</SelectItem>
-                      <SelectItem value="widowed">Widowed</SelectItem>
-                      <SelectItem value="complicated">It's complicated</SelectItem>
-                      <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="treatment-style">Treatment Style</Label>
-                  <Select
-                    value={profileData.treatmentStyle}
-                    onValueChange={(value) => handleInputChange('treatmentStyle', value)}
-                    disabled={!isEditing}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select treatment style" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="romantic">💕 Romantic</SelectItem>
-                      <SelectItem value="friendly">😊 Friendly</SelectItem>
-                      <SelectItem value="playful">😏 Playful</SelectItem>
-                      <SelectItem value="caring">🤗 Caring</SelectItem>
-                      <SelectItem value="flirty">😉 Flirty</SelectItem>
-                      <SelectItem value="intellectual">🤓 Intellectual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location (Optional)</Label>
-                  <Input
-                    id="location"
-                    value={profileData.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="City, Country"
-                  />
-                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  value={profileData.bio}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
-                  disabled={!isEditing}
-                  placeholder="Tell us about yourself..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="interests">Interests & Hobbies</Label>
+              <div>
+                <Label htmlFor="interests">Interests</Label>
                 <Textarea
                   id="interests"
-                  value={profileData.interests}
-                  onChange={(e) => handleInputChange('interests', e.target.value)}
+                  value={profileData.interests?.join(', ') || ''}
+                  onChange={(e) => setProfileData(prev => prev ? { 
+                    ...prev, 
+                    interests: e.target.value.split(',').map(i => i.trim()).filter(i => i) 
+                  } : null)}
                   disabled={!isEditing}
-                  placeholder="What do you enjoy? (e.g., reading, gaming, travel, cooking...)"
-                  rows={2}
+                  placeholder="Enter your interests separated by commas"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="avatar">Avatar URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="avatar"
-                    value={profileData.avatar}
-                    onChange={(e) => handleInputChange('avatar', e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="https://example.com/your-avatar.jpg"
-                  />
-                  {isEditing && (
-                    <Button variant="outline" size="icon" disabled>
-                      <Camera className="w-4 h-4" />
+              <div className="flex gap-2">
+                {isEditing ? (
+                  <>
+                    <Button onClick={saveProfile} disabled={isSaving}>
+                      <Save className="w-4 h-4 mr-2" />
+                      {isSaving ? 'Saving...' : 'Save Changes'}
                     </Button>
-                  )}
-                </div>
+                    <Button variant="outline" onClick={() => setIsEditing(false)}>
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={() => setIsEditing(true)}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Profile
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Plan Management Tab */}
-        <TabsContent value="plan" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                Current Plan
-              </CardTitle>
-              <CardDescription>Manage your subscription and billing</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-6 rounded-lg border-2 border-dashed border-pink-200 bg-gradient-to-r from-pink-50 to-purple-50">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">{currentPlan.name}</h3>
-                  <p className="text-gray-600">
-                    {currentPlan.price === 0 ? 'Free Plan' : `$${currentPlan.price}/month`}
-                  </p>
-                  {currentPlan.nextBilling && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Next billing: {new Date(currentPlan.nextBilling).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <Badge className={`${getPlanBadgeColor(currentPlan.tier)} text-lg px-3 py-1`}>
-                    <Crown className="w-4 h-4 mr-1" />
-                    {currentPlan.tier.toUpperCase()}
-                  </Badge>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-3">Plan Features</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {currentPlan.features.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span className="text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-3">Usage Limits</h4>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">AI Companions</span>
-                    <span className="text-sm font-medium">
-                      {usageStats.favoriteCompanions} / {currentPlan.limits.companions === -1 ? '∞' : currentPlan.limits.companions}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={currentPlan.limits.companions === -1 ? 30 : (usageStats.favoriteCompanions / currentPlan.limits.companions) * 100} 
-                    className="h-2"
-                  />
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Voice Call Minutes</span>
-                    <span className="text-sm font-medium">
-                      {Math.round(usageStats.totalMinutes)} / {currentPlan.limits.voiceCalls === -1 ? '∞' : currentPlan.limits.voiceCalls}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={currentPlan.limits.voiceCalls === -1 ? 45 : (usageStats.totalMinutes / currentPlan.limits.voiceCalls) * 100} 
-                    className="h-2"
-                  />
-                </div>
-              </div>
-
-              <Alert>
-                <Sparkles className="h-4 w-4" />
-                <AlertDescription>
-                </AlertDescription>
-              </Alert>
-
-              <div className="flex gap-3">
-                <Button onClick={handleUpgradePlan} className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600">
-                  <Crown className="w-4 h-4 mr-2" />
-                  Upgrade Plan
-                </Button>
-                <Button variant="outline" disabled>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Invoice
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Personal Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Personal Details
-              </CardTitle>
-              <CardDescription>Your account information</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Full Name</Label>
-                <Input value={profileData.preferredName} onChange={(e) => handleInputChange('preferredName', e.target.value)} placeholder="Your name" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Email</Label>
-                <Input value={user?.email || ''} disabled />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Occupation</Label>
-                <Input value={profileData.occupation} onChange={(e) => handleInputChange('occupation', e.target.value)} placeholder="What do you do?" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Languages</Label>
-                <Input value={profileData.languages} onChange={(e) => handleInputChange('languages', e.target.value)} placeholder="e.g. English, Spanish" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Love Language</Label>
-                <Select value={profileData.love_language} onValueChange={(v) => handleInputChange('love_language', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="words_of_affirmation">Words of Affirmation</SelectItem>
-                    <SelectItem value="quality_time">Quality Time</SelectItem>
-                    <SelectItem value="acts_of_service">Acts of Service</SelectItem>
-                    <SelectItem value="gifts">Gifts</SelectItem>
-                    <SelectItem value="physical_touch">Physical Touch</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Favorite Music</Label>
-                <Input value={profileData.favorite_music} onChange={(e) => handleInputChange('favorite_music', e.target.value)} placeholder="Genres or artists you love" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Favorite Food</Label>
-                <Input value={profileData.favorite_food} onChange={(e) => handleInputChange('favorite_food', e.target.value)} placeholder="Dishes or cuisines" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Favorite Shows</Label>
-                <Input value={profileData.favorite_shows} onChange={(e) => handleInputChange('favorite_shows', e.target.value)} placeholder="Series or movies" />
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-xs text-muted-foreground">Work Schedule</Label>
-                <Input value={profileData.work_schedule} onChange={(e) => handleInputChange('work_schedule', e.target.value)} placeholder="e.g., Mon–Fri 9–5, night shifts, flexible" />
-              </div>
-              <div className="md:col-span-2 flex gap-2 justify-end">
-                <Button variant="outline" onClick={handleSaveProfile} disabled={isLoading}>{isLoading ? 'Saving…' : 'Save Changes'}</Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Plan & Billing */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="w-5 h-5" />
-                Plan & Billing
-              </CardTitle>
-              <CardDescription>Your current plan and billing options</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-              <div>
-                <div className="text-sm text-muted-foreground">Current Plan</div>
-                <div className="text-base font-semibold">{currentPlan.name}</div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => window.location.href = '/pricing'}>Upgrade</Button>
-                <Button variant="outline" disabled>Manage Billing</Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Payment Methods */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                Payment Methods
-              </CardTitle>
-              <CardDescription>Manage your payment methods and billing details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-6 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-bold">
-                      VISA
-                    </div>
-                    <div>
-                      <p className="font-medium">•••• •••• •••• 4242</p>
-                      <p className="text-sm text-gray-600">Expires 12/25</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary">Primary</Badge>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" disabled>
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Add Payment Method
-                </Button>
-                <Button variant="outline" disabled>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
-              </div>
-
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Payment methods are now available for managing your subscription.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-
-          {/* Billing History */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Billing History
-              </CardTitle>
-              <CardDescription>View your past invoices and payments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="font-medium text-gray-900 mb-2">No billing history yet</h3>
-                <p className="text-gray-600 text-sm mb-4">
-                  Your billing history will appear here once your subscription begins.
-                </p>
-                <Button variant="outline" disabled>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download All Invoices
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Subscription Management */}
+        {/* Preferences Tab */}
+        <TabsContent value="preferences" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
-                Subscription Management
+                Communication Preferences
               </CardTitle>
-              <CardDescription>Control your subscription settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-medium">Auto-renewal</h4>
-                  <p className="text-sm text-gray-600">Automatically renew your subscription</p>
+                  <Label>Communication Style</Label>
+                  <Select
+                    value={preferences.communication_style}
+                    onValueChange={(value) => setPreferences(prev => ({ ...prev, communication_style: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="friendly">Friendly</SelectItem>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="casual">Casual</SelectItem>
+                      <SelectItem value="formal">Formal</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Switch checked={true} disabled />
-              </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
-                  <h4 className="font-medium">Usage alerts</h4>
-                  <p className="text-sm text-gray-600">Get notified when approaching limits</p>
+                  <Label>Emotional Tone</Label>
+                  <Select
+                    value={preferences.emotional_tone}
+                    onValueChange={(value) => setPreferences(prev => ({ ...prev, emotional_tone: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="warm">Warm</SelectItem>
+                      <SelectItem value="neutral">Neutral</SelectItem>
+                      <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
+                      <SelectItem value="calm">Calm</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Switch checked={true} disabled />
-              </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
-                  <h4 className="font-medium">Billing reminders</h4>
-                  <p className="text-sm text-gray-600">Email reminders before billing</p>
+                  <Label>Response Length</Label>
+                  <Select
+                    value={preferences.response_length}
+                    onValueChange={(value) => setPreferences(prev => ({ ...prev, response_length: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="short">Short</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="long">Long</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Switch checked={false} disabled />
+
+                <div>
+                  <Label>Humor Level</Label>
+                  <div className="space-y-2">
+                    <Slider
+                      value={[preferences.humor_level === 'none' ? 0 : preferences.humor_level === 'low' ? 1 : preferences.humor_level === 'moderate' ? 2 : 3]}
+                      onValueChange={([value]) => {
+                        const levels = ['none', 'low', 'moderate', 'high'];
+                        setPreferences(prev => ({ ...prev, humor_level: levels[value] }));
+                      }}
+                      max={3}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>None</span>
+                      <span>High</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <Separator />
 
-              <div className="space-y-2">
-                <Button variant="outline" className="w-full" disabled>
-                  <Pause className="w-4 h-4 mr-2" />
-                  Pause Subscription
-                </Button>
-                <Button variant="destructive" className="w-full" disabled>
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel Subscription
-                </Button>
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Notification Settings</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4" />
+                      <span>Email Notifications</span>
+                    </div>
+                    <Switch
+                      checked={preferences.notification_settings.email_notifications}
+                      onCheckedChange={(checked) => setPreferences(prev => ({
+                        ...prev,
+                        notification_settings: { ...prev.notification_settings, email_notifications: checked }
+                      }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Message Notifications</span>
+                    </div>
+                    <Switch
+                      checked={preferences.notification_settings.message_notifications}
+                      onCheckedChange={(checked) => setPreferences(prev => ({
+                        ...prev,
+                        notification_settings: { ...prev.notification_settings, message_notifications: checked }
+                      }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      <span>Voice Call Notifications</span>
+                    </div>
+                    <Switch
+                      checked={preferences.notification_settings.voice_call_notifications}
+                      onCheckedChange={(checked) => setPreferences(prev => ({
+                        ...prev,
+                        notification_settings: { ...prev.notification_settings, voice_call_notifications: checked }
+                      }))}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Subscription management is now available for all users.
-                  Contact support if you need assistance.
-                </AlertDescription>
-              </Alert>
+              <Button onClick={savePreferences} disabled={isSaving}>
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? 'Saving...' : 'Save Preferences'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Settings Tab */}
-        <TabsContent value="settings" className="space-y-6">
+        {/* Subscription Tab */}
+        <TabsContent value="subscription" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                App Preferences
+                <Crown className="w-5 h-5" />
+                Subscription & Usage
               </CardTitle>
-              <CardDescription>Customize your LoveAI experience</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="font-medium">Content Filter</Label>
-                    <p className="text-sm text-gray-600">Filter inappropriate content</p>
-                  </div>
-                  <Switch
-                    checked={settings.preferences.contentFilter}
-                    onCheckedChange={(checked) => handleSettingChange('preferences', 'contentFilter', checked)}
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center p-4 border rounded-lg">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 text-blue-500" />
+                  <h3 className="font-semibold">Messages</h3>
+                  <p className="text-2xl font-bold">{profileData.usage_messages_today} / {currentPlan.messages}</p>
+                  <Progress value={messageUsage} className="mt-2" />
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="font-medium">Explicit Content</Label>
-                    <p className="text-sm text-gray-600">Allow mature conversations (18+)</p>
-                  </div>
-                  <Switch
-                    checked={settings.preferences.explicitContent}
-                    onCheckedChange={(checked) => handleSettingChange('preferences', 'explicitContent', checked)}
-                  />
+                <div className="text-center p-4 border rounded-lg">
+                  <Phone className="w-8 h-8 mx-auto mb-2 text-green-500" />
+                  <h3 className="font-semibold">Voice Calls</h3>
+                  <p className="text-2xl font-bold">{profileData.usage_voice_calls_today} / {currentPlan.voice_calls}</p>
+                  <Progress value={voiceUsage} className="mt-2" />
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Voice Volume: {settings.preferences.voiceVolume}%</Label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={settings.preferences.voiceVolume}
-                    onChange={(e) => handleSettingChange('preferences', 'voiceVolume', parseInt(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="theme">Theme</Label>
-                  <Select
-                    value={settings.preferences.theme}
-                    onValueChange={(value) => handleSettingChange('preferences', 'theme', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select theme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                      <SelectItem value="system">System</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="language">Language</Label>
-                  <Select
-                    value={settings.preferences.language}
-                    onValueChange={(value) => handleSettingChange('preferences', 'language', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Español</SelectItem>
-                      <SelectItem value="fr">Français</SelectItem>
-                      <SelectItem value="de">Deutsch</SelectItem>
-                      <SelectItem value="ja">日本語</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="text-center p-4 border rounded-lg">
+                  <Heart className="w-8 h-8 mx-auto mb-2 text-pink-500" />
+                  <h3 className="font-semibold">Companions</h3>
+                  <p className="text-2xl font-bold">{profileData.usage_companions_created} / {currentPlan.companions}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5" />
-                Notifications
-              </CardTitle>
-              <CardDescription>Control what notifications you receive</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">New Messages</Label>
-                  <p className="text-sm text-gray-600">Get notified of new messages</p>
-                </div>
-                <Switch
-                  checked={settings.notifications.messages}
-                  onCheckedChange={(checked) => handleSettingChange('notifications', 'messages', checked)}
-                />
-              </div>
+              <Separator />
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Voice Call Requests</Label>
-                  <p className="text-sm text-gray-600">Notifications for incoming calls</p>
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Available Plans</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {Object.entries(PLANS).map(([key, plan]) => (
+                    <Card key={key} className={profileData.plan === key ? 'ring-2 ring-primary' : ''}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          {plan.name}
+                          {profileData.plan === key && <Badge>Current</Badge>}
+                        </CardTitle>
+                        <div className="text-3xl font-bold">${plan.price}/month</div>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="space-y-2 mb-4">
+                          {plan.features.map((feature, index) => (
+                            <li key={index} className="flex items-center gap-2">
+                              <Check className="w-4 h-4 text-green-500" />
+                              <span className="text-sm">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {profileData.plan !== key && (
+                          <Button 
+                            onClick={() => upgradePlan(key)}
+                            disabled={isSaving}
+                            className="w-full"
+                          >
+                            {isSaving ? 'Upgrading...' : 'Upgrade'}
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-                <Switch
-                  checked={settings.notifications.calls}
-                  onCheckedChange={(checked) => handleSettingChange('notifications', 'calls', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">App Updates</Label>
-                  <p className="text-sm text-gray-600">News about new features</p>
-                </div>
-                <Switch
-                  checked={settings.notifications.updates}
-                  onCheckedChange={(checked) => handleSettingChange('notifications', 'updates', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Marketing</Label>
-                  <p className="text-sm text-gray-600">Promotional offers and tips</p>
-                </div>
-                <Switch
-                  checked={settings.notifications.marketing}
-                  onCheckedChange={(checked) => handleSettingChange('notifications', 'marketing', checked)}
-                />
               </div>
             </CardContent>
           </Card>
@@ -1014,204 +668,70 @@ export const UserProfile = () => {
                 <Shield className="w-5 h-5" />
                 Privacy & Security
               </CardTitle>
-              <CardDescription>Control your privacy and data sharing</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Profile Visibility</Label>
-                  <p className="text-sm text-gray-600">Make your profile visible to other users</p>
-                </div>
-                <Switch
-                  checked={settings.privacy.profileVisible}
-                  onCheckedChange={(checked) => handleSettingChange('privacy', 'profileVisible', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Online Status</Label>
-                  <p className="text-sm text-gray-600">Show when you're online</p>
-                </div>
-                <Switch
-                  checked={settings.privacy.showOnlineStatus}
-                  onCheckedChange={(checked) => handleSettingChange('privacy', 'showOnlineStatus', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Voice Calls</Label>
-                  <p className="text-sm text-gray-600">Allow voice call requests</p>
-                </div>
-                <Switch
-                  checked={settings.privacy.allowVoiceCalls}
-                  onCheckedChange={(checked) => handleSettingChange('privacy', 'allowVoiceCalls', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-medium">Usage Analytics</Label>
-                  <p className="text-sm text-gray-600">Help improve LoveAI with anonymous usage data</p>
-                </div>
-                <Switch
-                  checked={settings.privacy.shareUsageData}
-                  onCheckedChange={(checked) => handleSettingChange('privacy', 'shareUsageData', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="w-5 h-5" />
-                Data Management
-              </CardTitle>
-              <CardDescription>Manage your personal data</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button variant="outline" className="flex items-center gap-2" disabled>
-                  <Download className="w-4 h-4" />
-                  Export Data
-                </Button>
-                
-                <Button variant="outline" className="flex items-center gap-2" disabled>
-                  <Upload className="w-4 h-4" />
-                  Import Data
-                </Button>
-              </div>
-              
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Data export and import features will be available soon. 
-                  Contact support if you need assistance with your data.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Account Tab */}
-        <TabsContent value="account" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
-                Support & Help
-              </CardTitle>
-              <CardDescription>Get help and contact our support team</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="p-4 rounded-lg border border-blue-200 bg-blue-50">
-                  <h4 className="font-medium mb-2 text-blue-900">Need Help?</h4>
-                  <p className="text-sm text-blue-700 mb-3">
-                    Our support team is here to help you with any questions or issues.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <Button asChild className="w-full">
-                      <a href="mailto:support@loveaicompanion.com" className="flex items-center gap-2">
-                        <Mail className="w-4 h-4" />
-                        Email Support
-                      </a>
-                    </Button>
-                    <Button variant="outline" asChild className="w-full">
-                      <a href="/support" className="flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4" />
-                        Support Center
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-                <div className="text-sm text-gray-600">
-                  <p><strong>Response Time:</strong> 24-48 hours</p>
-                  <p><strong>Hours:</strong> Monday - Friday, 9 AM - 6 PM EST</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>                Account Management
-              </CardTitle>
-              <CardDescription>Manage your account settings and preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg border border-gray-200 bg-gray-50">
-                  <h4 className="font-medium mb-2">Account Information</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Email:</span>
-                      <span className="font-medium">{user.email}</span>
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Profile Visibility</h3>
+                <Select
+                  value={preferences.privacy_settings.profile_visibility}
+                  onValueChange={(value) => setPreferences(prev => ({
+                    ...prev,
+                    privacy_settings: { ...prev.privacy_settings, profile_visibility: value }
+                  }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private</SelectItem>
+                    <SelectItem value="friends">Friends Only</SelectItem>
+                    <SelectItem value="public">Public</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Data & Analytics</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">Data Sharing</span>
+                      <p className="text-sm text-muted-foreground">Allow data to be used for improving the service</p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Account Created:</span>
-                      <span className="font-medium">{new Date(user.created_at).toLocaleDateString()}</span>
+                    <Switch
+                      checked={preferences.privacy_settings.data_sharing}
+                      onCheckedChange={(checked) => setPreferences(prev => ({
+                        ...prev,
+                        privacy_settings: { ...prev.privacy_settings, data_sharing: checked }
+                      }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">Analytics Tracking</span>
+                      <p className="text-sm text-muted-foreground">Help us understand how you use the app</p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Last Updated:</span>
-                      <span className="font-medium">{new Date(user.updated_at || user.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Account ID:</span>
-                      <span className="font-mono text-xs">{user.id.substring(0, 8)}...</span>
-                    </div>
+                    <Switch
+                      checked={preferences.privacy_settings.analytics_tracking}
+                      onCheckedChange={(checked) => setPreferences(prev => ({
+                        ...prev,
+                        privacy_settings: { ...prev.privacy_settings, analytics_tracking: checked }
+                      }))}
+                    />
                   </div>
                 </div>
-
-                <Separator />
-
-                <div className="flex flex-col gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleSignOut}
-                    className="flex items-center gap-2 justify-center"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    onClick={handleDeleteAccount}
-                    className="flex items-center gap-2 justify-center"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Account
-                  </Button>
-                </div>
-
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Account Deletion:</strong> This action cannot be undone. 
-                    All your data, conversations, and companions will be permanently deleted.
-                  </AlertDescription>
-                </Alert>
               </div>
+
+              <Button onClick={savePreferences} disabled={isSaving}>
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? 'Saving...' : 'Save Privacy Settings'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {upgradePlan && (
-        <PaymentModal
-          isOpen={showPayment}
-          onClose={() => { setShowPayment(false); setUpgradePlan(null); }}
-          selectedPlan={upgradePlan}
-          onSuccess={() => {
-            setShowPayment(false);
-            setUpgradePlan(null);
-            toast({ title: 'Upgraded!', description: 'Your plan has been updated.' });
-          }}
-        />
-      )}
     </div>
   );
 };

@@ -40,43 +40,64 @@ export type Database = {
       }
       characters: {
         Row: {
-          avatar_url: string | null
-          bio: string | null
-          created_at: string | null
-          description: string | null
           id: string
-          is_public: boolean | null
-          name: string
-          personality: string | null
-          updated_at: string | null
           user_id: string | null
-          voice: string | null
+          name: string
+          description: string | null
+          personality: string | null
+          personality_traits: string[] | null
+          voice_id: string | null
+          voice_settings: Json | null
+          background_story: string | null
+          relationship_type: string | null
+          age_range: string | null
+          interests: string[] | null
+          communication_style: string | null
+          emotional_tone: string | null
+          avatar_url: string | null
+          is_public: boolean | null
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string | null
-          description?: string | null
           id?: string
-          is_public?: boolean | null
-          name: string
-          personality?: string | null
-          updated_at?: string | null
           user_id?: string | null
-          voice?: string | null
+          name: string
+          description?: string | null
+          personality?: string | null
+          personality_traits?: string[] | null
+          voice_id?: string | null
+          voice_settings?: Json | null
+          background_story?: string | null
+          relationship_type?: string | null
+          age_range?: string | null
+          interests?: string[] | null
+          communication_style?: string | null
+          emotional_tone?: string | null
+          avatar_url?: string | null
+          is_public?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string | null
-          description?: string | null
           id?: string
-          is_public?: boolean | null
-          name?: string
-          personality?: string | null
-          updated_at?: string | null
           user_id?: string | null
-          voice?: string | null
+          name?: string
+          description?: string | null
+          personality?: string | null
+          personality_traits?: string[] | null
+          voice_id?: string | null
+          voice_settings?: Json | null
+          background_story?: string | null
+          relationship_type?: string | null
+          age_range?: string | null
+          interests?: string[] | null
+          communication_style?: string | null
+          emotional_tone?: string | null
+          avatar_url?: string | null
+          is_public?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -520,6 +541,30 @@ export type Database = {
           usage_companions_created?: number | null
           usage_messages_today?: number | null
           usage_voice_calls_today?: number | null
+        }
+        Relationships: []
+      }
+      game_memory: {
+        Row: {
+          id: string
+          user_id: string | null
+          memory_data: Json | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          memory_data?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          memory_data?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }

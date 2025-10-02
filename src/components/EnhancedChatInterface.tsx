@@ -74,15 +74,30 @@ export const EnhancedChatInterface = ({
   onStartCall,
   userPreferences 
 }: EnhancedChatInterfaceProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
+  // FIXED: Character-specific message storage using character ID
+  const getCharacterMessages = () => {
+    const stored = localStorage.getItem(`chat_messages_${character.id}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        return parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+      } catch (error) {
+        console.error('Error parsing stored messages:', error);
+      }
+    }
+    return [{
       id: '1',
       content: `Hey there! I'm ${character.name}. ${character.bio} I'm so excited to chat with you! What's on your mind? 💕`,
-      sender: 'ai',
+      sender: 'ai' as const,
       timestamp: new Date(),
-      mood: 'happy'
-    }
-  ]);
+      mood: 'happy' as const
+    }];
+  };
+
+  const [messages, setMessages] = useState<Message[]>(getCharacterMessages());
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -94,6 +109,7 @@ export const EnhancedChatInterface = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
   const { 
@@ -105,6 +121,11 @@ export const EnhancedChatInterface = ({
     remainingMessages, 
     remainingVoiceCalls 
   } = useUsageTracking();
+
+  // FIXED: Save messages to character-specific storage
+  useEffect(() => {
+    localStorage.setItem(`chat_messages_${character.id}`, JSON.stringify(messages));
+  }, [messages, character.id]);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -136,7 +157,9 @@ export const EnhancedChatInterface = ({
   }, [toast]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -253,7 +276,7 @@ export const EnhancedChatInterface = ({
     }
 
     incrementVoiceCalls();
-                onStartCall?.();
+    onStartCall?.();
   };
 
   const getMoodEmoji = (mood?: string) => {
@@ -277,9 +300,9 @@ export const EnhancedChatInterface = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-background via-primary/5 to-accent/10">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-sm">
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10">
+      {/* FIXED: Header - Always visible and sticky */}
+      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-sm flex-shrink-0 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="w-4 h-4" />
@@ -344,8 +367,16 @@ export const EnhancedChatInterface = ({
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* FIXED: Messages - Only this section scrolls with proper height */}
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+        style={{
+          scrollBehavior: 'smooth',
+          WebkitOverflowScrolling: 'touch',
+          height: 'calc(100vh - 140px)' // FIXED: Set explicit height to prevent scrolling issues
+        }}
+      >
         {messages.map((message) => (
           <div
             key={message.id}
@@ -365,7 +396,7 @@ export const EnhancedChatInterface = ({
                   </div>
                 )}
                 <div className="flex-1">
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs opacity-70">
                       {message.timestamp.toLocaleTimeString([], { 
@@ -404,8 +435,8 @@ export const EnhancedChatInterface = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t bg-background/95 backdrop-blur-sm">
+      {/* FIXED: Input Area - Always visible at bottom and sticky */}
+      <div className="p-4 border-t bg-background/95 backdrop-blur-sm flex-shrink-0 sticky bottom-0 z-10">
         <div className="flex items-center gap-2">
           <div className="flex-1 relative">
             <Input

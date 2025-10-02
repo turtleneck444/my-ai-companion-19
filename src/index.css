@@ -439,3 +439,26 @@
 .shadow-romance-lg {
   box-shadow: 0 20px 60px rgba(236, 72, 153, 0.2);
 }
+
+/* Add custom scrollbar styles for conversation */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #fce7f3;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #f9a8d4;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #f472b6;
+}

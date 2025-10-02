@@ -30,6 +30,7 @@ interface InteractiveGamesProps {
   characterName: string;
   onBack: () => void;
   onSendMessage: (message: string) => void;
+  selectedGame?: GameType; // NEW: Optional prop to start with a specific game
 }
 
 type GameType = 'none' | 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay';
@@ -107,8 +108,8 @@ const roleplayScenarios = [
   }
 ];
 
-export const InteractiveGames = ({ characterName, onBack, onSendMessage }: InteractiveGamesProps) => {
-  const [currentGame, setCurrentGame] = useState<GameType>('none');
+export const InteractiveGames = ({ characterName, onBack, onSendMessage, selectedGame }: InteractiveGamesProps) => {
+  const [currentGame, setCurrentGame] = useState<GameType>(selectedGame || 'none');
   const [gameState, setGameState] = useState<any>({});
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
@@ -116,6 +117,14 @@ export const InteractiveGames = ({ characterName, onBack, onSendMessage }: Inter
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { saveGameState, loadGameState, addAchievement, getGameStats } = useGameMemory();
+
+  // NEW: Auto-start the selected game
+  useEffect(() => {
+    if (selectedGame && selectedGame !== 'none') {
+      setCurrentGame(selectedGame);
+      startGame(selectedGame);
+    }
+  }, [selectedGame]);
 
   // Load saved game state when switching games
   useEffect(() => {

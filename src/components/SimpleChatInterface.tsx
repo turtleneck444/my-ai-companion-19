@@ -64,6 +64,8 @@ interface SimpleChatInterfaceProps {
   userPreferences?: UserPreferences;
 }
 
+type GameType = 'none' | 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay';
+
 export const SimpleChatInterface = ({ character, onBack, onStartCall, userPreferences: propUserPreferences }: SimpleChatInterfaceProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -74,6 +76,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
   const [isRecording, setIsRecording] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGames, setShowGames] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<'none' | 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay'>('none'); // FIXED: Use correct GameType
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<string | null>(null);
@@ -81,13 +84,38 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
   const [replies, setReplies] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(propUserPreferences || {
-    preferredName: 'friend',
-    treatmentStyle: 'casual',
-    age: '25',
-    contentFilter: true
+    preferredName: "",
+    relationshipLevel: 1.0,
+    communicationStyle: "friendly",
+    interests: [],
+    goals: [],
+    boundaries: [],
+    preferredTopics: [],
+    avoidTopics: [],
+    responseLength: "medium",
+    formalityLevel: "casual",
+    humorLevel: "moderate",
+    emotionalSupport: true,
+    challengeLevel: "balanced",
+    feedbackFrequency: "occasional",
+    learningStyle: "visual",
+    motivationStyle: "encouraging",
+    conflictResolution: "collaborative",
+    celebrationStyle: "enthusiastic",
+    comfortLevel: "open",
+    trustLevel: "building",
+    intimacyLevel: "appropriate",
+    supportType: "emotional",
+    challengeType: "gentle",
+    feedbackType: "constructive",
+    learningType: "experiential",
+    motivationType: "intrinsic",
+    conflictType: "resolution",
+    celebrationType: "achievement",
+    comfortType: "emotional",
+    trustType: "mutual",
+    intimacyType: "emotional"
   });
-
-  // Voice recording states
   const [isRecordingVoiceNote, setIsRecordingVoiceNote] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [transcript, setTranscript] = useState("");
@@ -368,9 +396,9 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-xl">
+    <div className="fixed inset-0 flex flex-col bg-background">
+      {/* FIXED: Header - Always visible and sticky with games button */}
+      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-xl flex-shrink-0 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -397,6 +425,24 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
             {usage.plan || 'Free'}
           </Badge>
           
+          {/* Games Button in Header */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowGames(!showGames)}
+                className={`h-8 w-8 p-0 transition-all duration-200 ${
+                  showGames ? 'bg-purple-500/10 text-purple-600' : 'hover:bg-purple-500/10'
+                }`}
+              >
+                <Gamepad2 className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Play Games</TooltipContent>
+          </Tooltip>
+          
+          {/* Voice Call Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -418,8 +464,15 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* FIXED: Messages - Expanded to use more space */}
+      <div 
+        className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+        style={{
+          scrollBehavior: 'smooth',
+          WebkitOverflowScrolling: 'touch',
+          height: 'calc(100vh - 120px)'
+        }}
+      >
         {messages.map((message) => (
           <div
             key={message.id}
@@ -432,7 +485,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
                   : 'bg-muted'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
               <p className="text-xs opacity-70 mt-1">
                 {message.timestamp.toLocaleTimeString()}
               </p>
@@ -457,7 +510,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
 
       {/* Quick Reply Suggestions */}
       {replies.length > 0 && (
-        <div className="p-4 border-t bg-muted/20">
+        <div className="p-4 border-t bg-muted/20 flex-shrink-0">
           <div className="flex flex-wrap gap-2">
             {replies.map((reply, index) => (
               <Button
@@ -474,8 +527,8 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
         </div>
       )}
 
-      {/* Clean Mobile Input Area */}
-      <div className="p-4 bg-background/95 backdrop-blur-xl border-t">
+      {/* FIXED: Clean Input Area - Simplified without action buttons */}
+      <div className="p-4 bg-background/95 backdrop-blur-xl border-t flex-shrink-0 sticky bottom-0 z-10">
         {/* Emoji Picker */}
         {showEmojiPicker && (
           <div className="mb-4">
@@ -538,137 +591,120 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
             <Send className="w-4 h-4" />
           </Button>
         </div>
-
-        {/* Action Buttons Row */}
-        <div className="flex justify-center gap-4 mt-3">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => toast({ title: "📷 Camera", description: "Photo sharing coming soon!" })}
-                className="h-10 w-10 p-0 hover:bg-blue-500/10 text-blue-600"
-              >
-                <Camera className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Take photo</TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setShowGames(true)}
-                className="h-10 w-10 p-0 hover:bg-purple-500/10 text-purple-600"
-              >
-                <Gamepad2 className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Play games</TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => toast({ title: "🎁 Gifts", description: "Virtual gifts coming soon!" })}
-                className="h-10 w-10 p-0 hover:bg-pink-500/10 text-pink-600"
-              >
-                <Gift className="w-5 h-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Send gift</TooltipContent>
-          </Tooltip>
-        </div>
       </div>
 
-      {/* Upgrade Prompt Modal */}
-      {upgradePromptVisible && (
-        <UpgradePrompt
-          isOpen={upgradePromptVisible}
-          onClose={hideUpgrade}
-          onUpgrade={(planId) => handleUpgrade({ planId })}
-          currentPlan={usage.plan || 'free'}
-          isUpgrading={upgradeInProgress}
-        />
-      )}
-
-      {/* Payment Form Modal */}
-      {showPaymentForm && selectedPlanForPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Complete Payment</h3>
+      {/* Games Interface - Enhanced with Quick Game Selection */}
+      {showGames && (
+        <div className="absolute bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50 max-h-[70vh] overflow-y-auto">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-lg">🎮 Games & Activities with {character.name}</h3>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowPaymentForm(false)}
+                onClick={() => {
+                  setShowGames(false);
+                  setSelectedGame('none');
+                }}
+                className="h-8 w-8 p-0"
               >
-                ×
+                <ArrowLeft className="w-4 h-4" />
               </Button>
             </div>
-            <div className="p-4">
-              <p className="text-sm text-muted-foreground mb-4">
-                Please add a payment method to continue with your upgrade.
-              </p>
-              <div className="space-y-4">
+            
+            {/* Quick Game Selection */}
+            {selectedGame === 'none' && (
+              <div className="grid grid-cols-2 gap-3 mb-6">
                 <Button
-                  onClick={async () => {
-                    setShowPaymentForm(false);
-                    setSelectedPlanForPayment(null);
-                    await handleUpgrade({ planId: selectedPlanForPayment || 'premium' });
-                  }}
-                  className="w-full"
+                  onClick={() => setSelectedGame('chess')}
+                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
                 >
-                  Add Payment Method
+                  <div className="text-2xl">♔</div>
+                  <span className="text-sm font-medium">Chess</span>
                 </Button>
+                
                 <Button
-                  variant="outline"
-                  onClick={() => setShowPaymentForm(false)}
-                  className="w-full"
+                  onClick={() => setSelectedGame('20questions')}
+                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                 >
-                  Cancel
+                  <div className="text-2xl">❓</div>
+                  <span className="text-sm font-medium">20 Questions</span>
+                </Button>
+                
+                <Button
+                  onClick={() => setSelectedGame('riddles')}
+                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
+                >
+                  <div className="text-2xl">🧩</div>
+                  <span className="text-sm font-medium">Riddles</span>
+                </Button>
+                
+                <Button
+                  onClick={() => setSelectedGame('wordchain')}
+                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                >
+                  <div className="text-2xl">🔗</div>
+                  <span className="text-sm font-medium">Word Chain</span>
+                </Button>
+                
+                <Button
+                  onClick={() => setSelectedGame('truthordare')}
+                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white"
+                >
+                  <div className="text-2xl">💕</div>
+                  <span className="text-sm font-medium">Truth or Dare</span>
+                </Button>
+                
+                <Button
+                  onClick={() => setSelectedGame('roleplay')}
+                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                >
+                  <div className="text-2xl">🎭</div>
+                  <span className="text-sm font-medium">Roleplay</span>
                 </Button>
               </div>
-            </div>
+            )}
+            
+            {/* Game Interface */}
+            {selectedGame !== 'none' && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedGame('none')}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                  <h4 className="font-semibold capitalize">{selectedGame.replace(/([A-Z])/g, ' $1').trim()}</h4>
+                </div>
+                <InteractiveGames 
+                  characterName={character.name}
+                  onBack={() => {
+                    setShowGames(false);
+                    setSelectedGame('none');
+                  }}
+                  onSendMessage={(message: string) => {
+                    sendMessage(message);
+                    setShowGames(false);
+                    setSelectedGame('none');
+                  }}
+                  selectedGame={selectedGame}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Games Modal */}
-      {showGames && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Interactive Games</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowGames(false)}
-              >
-                ×
-              </Button>
-            </div>
-            <div className="p-4">
-        <InteractiveGames
-          characterName={character.name}
-          onBack={() => setShowGames(false)}
-          onSendMessage={(message) => {
-            setInput(message);
-            setTimeout(() => {
-              if (message) {
-                sendMessage(message);
-              }
-            }, 100);
-          }}
-        />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Upgrade Prompt */}
+      <UpgradePrompt
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        limitType="message"
+        currentPlan={usage.plan}
+      />
     </div>
   );
 };
