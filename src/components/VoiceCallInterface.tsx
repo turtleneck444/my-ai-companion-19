@@ -260,7 +260,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           ...userPreferences,
           preferredName: userPreferences.petName || userPreferences.preferredName || 'friend'
         },
-        conversationHistory: [...callState.conversationHistory, userMessage],
+        conversationHistory: callState.conversationHistory,
         relationshipLevel: 80,
         timeOfDay: getTimeOfDay(),
         sessionMemory: {}
@@ -546,9 +546,10 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             variant="ghost"
             size="sm"
             onClick={endCall}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            className="text-red-500 hover:text-red-600 hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-full p-2 transition-all duration-200 hover:scale-110"
+            title="End Call"
           >
-            <PhoneOff className="w-4 h-4" />
+            <PhoneOff className="w-5 h-5" />
           </Button>
         </div>
       </div>
@@ -666,17 +667,41 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Conversation History (Collapsible) */}
+      {/* Enhanced Conversation History */}
       {callState.conversationHistory.length > 0 && (
-        <div className="border-t border-slate-700 p-4 max-h-40 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-slate-400 mb-2">Conversation</h3>
-          <div className="space-y-2">
-            {callState.conversationHistory.slice(-3).map((message) => (
-              <div key={message.id} className="text-xs">
-                <span className="text-slate-500">
-                  {message.sender === 'user' ? 'You' : character.name}:
-                </span>
-                <span className="text-slate-300 ml-2">{message.content}</span>
+        <div className="border-t border-pink-200 bg-gradient-to-b from-pink-50/50 to-white/50 p-6 max-h-60 overflow-y-auto">
+          <h3 className="text-lg font-bold text-pink-700 mb-4 flex items-center gap-2">
+            <span className="w-2 h-2 bg-pink-400 rounded-full"></span>
+            Conversation with {character.name}
+          </h3>
+          <div className="space-y-4">
+            {callState.conversationHistory.slice(-5).map((message, index) => (
+              <div key={`${message.id}-${index}`} className="flex flex-col gap-2">
+                {message.sender === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-xs lg:max-w-md px-4 py-3 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-2xl rounded-br-md shadow-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-pink-100 text-xs font-semibold">You</span>
+                        <span className="text-pink-200 text-xs">
+                          {new Date(message.timestamp).toLocaleTimeString([], {hour: "-digit"", minute: "-digit""})}
+                        </span>
+                      </div>
+                      <p className="text-white text-sm font-medium leading-relaxed">{message.content}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-start">
+                    <div className="max-w-xs lg:max-w-md px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-bl-md shadow-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-blue-100 text-xs font-semibold">{character.name}</span>
+                        <span className="text-blue-200 text-xs">
+                          {new Date(message.timestamp).toLocaleTimeString([], {hour: "-digit"", minute: "-digit""})}
+                        </span>
+                      </div>
+                      <p className="text-white text-sm font-medium leading-relaxed">{message.content}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
