@@ -234,9 +234,36 @@ async function fallbackTTS(text: string, voiceId: string): Promise<void> {
 }
 
 // Stop all current speech
-// Global speech lock to prevent multiple voices
+// AGGRESSIVE speech lock to prevent multiple voices
 let isSpeaking = false;
 let currentSpeechPromise: Promise<void> | null = null;
+let speechLockTimeout: NodeJS.Timeout | null = null;
+
+// Force stop all speech immediately
+export function forceStopAllSpeech(): void {
+  console.log("🚫 FORCE STOPPING ALL SPEECH");
+  isSpeaking = false;
+  currentSpeechPromise = null;
+  
+  if (speechLockTimeout) {
+    clearTimeout(speechLockTimeout);
+    speechLockTimeout = null;
+  }
+  
+  // Stop browser TTS
+  if ("speechSynthesis" in window) {
+    speechSynthesis.cancel();
+  }
+  
+  // Stop any playing audio elements
+  const audioElements = document.querySelectorAll("audio");
+  audioElements.forEach(audio => {
+    if (!audio.paused) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  });
+}
 export function stopAllSpeech(): void {
   console.log('🛑 Stopping all TTS');
   

@@ -126,9 +126,12 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
     const recognition = new SpeechRecognition();
     
-    recognition.continuous = true;
-    recognition.interimResults = true; // Enable interim results to capture full messages
+    recognition.continuous = false; // Set to false to prevent false detection
+    recognition.interimResults = false; // Only final results to prevent false triggers
     recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
+    
+    // Add confidence threshold
     recognition.maxAlternatives = 1;
     
     recognition.onstart = () => {
@@ -140,15 +143,44 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       if (!isCallActiveRef.current) return;
       
-      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      // NUCLEAR BLOCKING: Block ALL speech input when AI is active
+      if (window.aiSpeaking || window.aiProcessing || callState.isSpeaking || callState.isProcessing) {
+        console.log("🚫 BLOCKED: AI is speaking/processing, ignoring speech input");
+        return;
+      }
       
-      if (transcript) {
-        console.log('🎯 User said:', transcript);
-        setCallState(prev => ({ ...prev, currentTranscript: transcript }));
-        handleUserMessage(transcript);
+      // Additional timestamp-based blocking
+      const now = Date.now();
+      if (window.aiJustFinishedSpeaking && (now - window.aiJustFinishedSpeaking < 2000)) {
+        console.log("🚫 BLOCKED: Too soon after AI finished speaking");
+        return;
+      }
+      
+      // Block if AI is processing
+      if (window.aiProcessingTimestamp && (now - window.aiProcessingTimestamp < 1000)) {
+        console.log("🚫 BLOCKED: AI is processing, ignoring speech input");
+        return;
+      }
+      
+      const lastResult = event.results[event.results.length - 1];
+      const transcript = lastResult[0].transcript.trim();
+      const confidence = lastResult[0].confidence || 0;
+      
+      // STRICT FILTERING: Only accept clear, intentional speech
+      if (transcript && transcript.length > 3 && confidence > 0.8) {
+        // Additional check for intentional speech
+        const words = transcript.split(" ");
+        if (words.length >= 2 && !transcript.match(/^(uh|um|ah|oh|hmm|yeah|ok|okay|hi|hey)$/i)) {
+          console.log("🎯 User said:", transcript, "(confidence:", confidence, ")");
+          setCallState(prev => ({ ...prev, currentTranscript: transcript }));
+          handleUserMessage(transcript);
+        } else {
+          console.log("🚫 Ignoring short/noise:", transcript);
+        }
+      } else {
+        console.log("🚫 Ignoring low confidence/noise:", transcript, "(confidence:", confidence, ")");
       }
     };
-
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('❌ Speech error:', event.error);
       isRecognitionActiveRef.current = false;
