@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Mic, 
@@ -12,7 +13,10 @@ import {
   VolumeX,
   Loader2,
   Check,
-  X
+  X,
+  Heart,
+  MessageSquare,
+  Minimize2
 } from 'lucide-react';
 import { personalityAI } from '@/lib/ai-chat';
 import { memoryService } from '@/lib/memory-service';
@@ -24,6 +28,7 @@ interface VoiceCallInterfaceProps {
   character: Character;
   userPreferences: UserPreferences;
   onEndCall: () => void;
+  onMinimize?: () => void;
   className?: string;
 }
 
@@ -44,6 +49,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   character,
   userPreferences,
   onEndCall,
+  onMinimize,
   className = ''
 }) => {
   const { toast } = useToast();
@@ -74,6 +80,13 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     callDuration: 0,
     microphonePermission: false
   });
+
+  // Additional state for original UI
+  const [pushToTalk, setPushToTalk] = useState(false);
+  const [isPTTHeld, setIsPTTHeld] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [spokenWords, setSpokenWords] = useState<string[]>([]);
+  const [displayedWordIndex, setDisplayedWordIndex] = useState(0);
 
   // Refs for cleanup and auto-scrolling
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -444,6 +457,11 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     try {
       setCallState(prev => ({ ...prev, isSpeaking: true }));
       
+      // Split response into words for animation
+      const words = response.split(' ');
+      setSpokenWords(words);
+      setDisplayedWordIndex(0);
+      
       const voiceId = getCharacterVoiceId();
       
       // Optimized voice settings
@@ -540,6 +558,29 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
 
   const toggleMute = useCallback(() => {
     setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
+  }, []);
+
+  const startListeningOnly = useCallback(() => {
+    if (recognitionRef.current && !callState.isSpeaking && !callState.isProcessing) {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('❌ Failed to start recognition:', error);
+      }
+    }
+  }, [callState.isSpeaking, callState.isProcessing]);
+
+  const unlockAudio = useCallback(() => {
+    try {
+      if (typeof window !== "undefined" && "AudioContext" in window) {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+      }
+    } catch (error) {
+      console.log("⚠️ Audio context initialization failed:", error);
+    }
   }, []);
 
   const endCall = useCallback(() => {
@@ -675,142 +716,253 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     return () => clearInterval(timer);
   }, [callState.isConnected]);
 
+  // Word animation effect
+  useEffect(() => {
+    if (callState.isSpeaking && spokenWords.length > 0) {
+      const interval = setInterval(() => {
+        setDisplayedWordIndex(prev => {
+          if (prev < spokenWords.length) {
+            return prev + 1;
+          }
+          return prev;
+        });
+      }, 150);
+      
+      return () => clearInterval(interval);
+    }
+  }, [callState.isSpeaking, spokenWords.length]);
+
   // Format call duration
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 ${className}`}>
-      <Card className="w-full max-w-4xl mx-4 bg-background/95 backdrop-blur-xl border-2">
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-                {character.name[0]}
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">{character.name}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {callState.isConnected ? `Connected • ${formatDuration(callState.callDuration)}` : 'Connecting...'}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Badge variant={callState.isListening ? "default" : "secondary"}>
-                {callState.isListening ? "Listening" : "Not Listening"}
-              </Badge>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={endCall}
-                className="text-red-500 hover:text-red-700"
-              >
-                <PhoneOff className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Conversation */}
-          <div 
-            ref={conversationRef}
-            className="h-96 overflow-y-auto border rounded-lg p-4 mb-6 bg-muted/30 space-y-4"
-          >
-            {callState.conversationHistory.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                <p>Start talking to {character.name}...</p>
-                <p className="text-sm mt-2">They're listening for your voice</p>
-              </div>
-            ) : (
-              callState.conversationHistory.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
-                      message.sender === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-            
-            {callState.currentTranscript && (
-              <div className="flex justify-end">
-                <div className="max-w-[80%] rounded-lg p-3 bg-primary/50 text-primary-foreground">
-                  <p className="text-sm italic">{callState.currentTranscript}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              variant={callState.isListening ? "default" : "outline"}
-              size="lg"
-              onClick={toggleMicrophone}
-              disabled={!callState.microphonePermission || callState.isProcessing}
-              className="w-16 h-16 rounded-full"
-            >
-              {callState.isProcessing ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : callState.isListening ? (
-                <Mic className="w-6 h-6" />
-              ) : (
-                <MicOff className="w-6 h-6" />
-              )}
-            </Button>
-            
-            <Button
-              variant={callState.isMuted ? "destructive" : "outline"}
-              size="lg"
-              onClick={toggleMute}
-              className="w-16 h-16 rounded-full"
-            >
-              {callState.isMuted ? (
-                <VolumeX className="w-6 h-6" />
-              ) : (
-                <Volume2 className="w-6 h-6" />
-              )}
-            </Button>
-          </div>
-
-          {/* Status */}
-          <div className="text-center mt-4 text-sm text-muted-foreground">
-            {callState.isProcessing ? (
-              <p className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {character.name} is thinking...
-              </p>
-            ) : callState.isSpeaking ? (
-              <p className="flex items-center justify-center gap-2">
-                <Volume2 className="w-4 h-4" />
-                {character.name} is speaking...
-              </p>
-            ) : callState.isListening ? (
-              <p className="flex items-center justify-center gap-2">
-                <Mic className="w-4 h-4" />
-                Listening for your voice...
-              </p>
-            ) : (
-              <p>Click the microphone to start talking</p>
-            )}
+    <div className="h-screen bg-gradient-to-br from-primary/20 via-background to-accent/10 flex flex-col" onClick={unlockAudio} onTouchStart={unlockAudio}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 bg-background/50 backdrop-blur border-b">
+        <div className="flex items-center gap-3">
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={character.avatar} alt={character.name} />
+            <AvatarFallback>{character.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h3 className="font-semibold">{character.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              {callState.isConnected ? 'Connected' : 'Connecting...'}
+            </p>
           </div>
         </div>
-      </Card>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-mono bg-background/50 px-2 py-1 rounded">
+            {formatDuration(callState.callDuration)}
+          </span>
+          {onMinimize && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onMinimize}
+              className="h-8 w-8 p-0"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Call Screen */}
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
+        {/* Character Avatar with Voice Visualization */}
+        <div className="relative">
+          <div className={`w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
+            callState.isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
+            callState.isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
+            'border-primary/30'
+          }`}>
+            <Avatar className="w-full h-full">
+              <AvatarImage src={character.avatar} alt={character.name} />
+              <AvatarFallback className="text-4xl">{character.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+          </div>
+          
+          {/* Voice activity indicator */}
+          {(callState.isSpeaking || callState.isListening) && (
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+              <div className={`flex space-x-1 ${callState.isSpeaking ? 'text-green-400' : 'text-blue-400'}`}>
+                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
+                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
+                <div className="w-1 h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
+                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
+                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Status Display */}
+        <div className="space-y-3">
+          <h2 className="text-2xl font-bold">{character.name}</h2>
+          <div className="space-y-1">
+            <p className="text-lg font-medium">
+              {callState.isSpeaking ? '��️ Speaking...' :
+               callState.isProcessing ? '💭 Thinking...' :
+               callState.isListening ? '🎤 Your turn to speak!' :
+               callState.isMuted ? '🔇 Muted' :
+               '📞 In call'}
+            </p>
+            
+            {/* Interactive guidance */}
+            {callState.isListening && !callState.isMuted && (
+              <p className="text-sm text-muted-foreground animate-pulse">
+                I'm listening! Say something and I'll respond when you pause 💕
+              </p>
+            )}
+            {!callState.isListening && !callState.isSpeaking && (
+              <div className="flex items-center justify-center mt-3">
+                <button onClick={startListeningOnly} className="px-4 py-2 rounded-full bg-primary text-primary-foreground shadow hover:opacity-90">
+                  Start Call (Tap to Allow Mic)
+                </button>
+              </div>
+            )}
+            
+            {callState.isMuted && (
+              <p className="text-sm text-yellow-600">
+                Unmute to start talking with me!
+              </p>
+            )}
+          </div>
+          
+          {/* Animated word-by-word visualization */}
+          {callState.isSpeaking && spokenWords.length > 0 && (
+            <div className="mt-2 min-h-[48px]">
+              <div className="flex flex-wrap gap-1">
+                {spokenWords.slice(0, displayedWordIndex).map((w, idx) => (
+                  <span
+                    key={`${w}-${idx}`}
+                    className="text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
+                    style={{ animationDelay: `${idx * 15}ms` }}
+                  >
+                    {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Real-time transcript */}
+          {callState.currentTranscript && (
+            <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
+              <p className="text-sm text-muted-foreground italic">
+                You're saying: "{callState.currentTranscript}"
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Call Quality Indicators */}
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-green-400" />
+            <span>HD Voice</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <span>AI Powered</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-purple-400" />
+            <span>Real-time</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Call Controls */}
+      <div className="p-6 bg-background/50 backdrop-blur border-t">
+        <div className="flex items-center justify-center gap-6">
+          {/* Push-to-Talk Toggle */}
+          <Button
+            variant={pushToTalk ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPushToTalk(!pushToTalk)}
+            className="h-8 px-3 rounded-full"
+          >
+            {pushToTalk ? 'PTT: On' : 'PTT: Off'}
+          </Button>
+
+          {/* Hold-to-speak button (visible when PTT on) */}
+          {pushToTalk && (
+            <Button
+              variant={isPTTHeld ? "default" : "outline"}
+              size="lg"
+              onMouseDown={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
+              onMouseUp={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
+              onTouchStart={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
+              onTouchEnd={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
+              className="h-14 px-6 rounded-full"
+            >
+              Hold to Speak
+            </Button>
+          )}
+          {/* Mute Button */}
+          <Button
+            variant={callState.isMuted ? "destructive" : "outline"}
+            size="lg"
+            onClick={toggleMute}
+            className="h-14 w-14 rounded-full"
+          >
+            {callState.isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          </Button>
+
+          {/* Speaker Button */}
+          <Button
+            variant={isSpeakerOn ? "default" : "outline"}
+            size="lg"
+            onClick={() => { setIsSpeakerOn(!isSpeakerOn); unlockAudio(); }}
+            className="h-14 w-14 rounded-full"
+          >
+            {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+          </Button>
+
+          {/* End Call Button */}
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={endCall}
+            className="h-16 w-16 rounded-full bg-red-500 hover:bg-red-600"
+          >
+            <PhoneOff className="w-8 h-8" />
+          </Button>
+
+          {/* Switch to Chat */}
+          {onMinimize && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={onMinimize}
+              className="h-14 w-14 rounded-full"
+            >
+              <MessageSquare className="w-6 h-6" />
+            </Button>
+          )}
+
+          {/* Love Button */}
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => {
+              toast({
+                title: "💕 Love sent!",
+                description: `${character.name} felt your love!`
+              });
+            }}
+            className="h-14 w-14 rounded-full"
+          >
+            <Heart className="w-6 h-6" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
