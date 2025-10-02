@@ -49,7 +49,10 @@ import { emailService } from '@/lib/email-service';
 import { EmailCollection } from '@/components/EmailCollection';
 import { InteractivePreview } from '@/components/InteractivePreview';
 
-export const LandingPage: React.FC = () => {
+export const LandingPage: React.FC = () => {  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();

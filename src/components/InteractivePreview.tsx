@@ -122,11 +122,16 @@ export const InteractivePreview: React.FC = () => {
   const [showCharacterSelect, setShowCharacterSelect] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [voiceCallCount, setVoiceCallCount] = useState(0);
+  const [showVoiceUpgradePrompt, setShowVoiceUpgradePrompt] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom only within chat container
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   // Initialize with welcome message
@@ -153,6 +158,18 @@ export const InteractivePreview: React.FC = () => {
       });
     }
   }, [messageCount, showSignupPrompt, toast]);
+
+  // Show voice upgrade prompt after 2 voice calls
+  useEffect(() => {
+    if (voiceCallCount >= 2 && !showVoiceUpgradePrompt) {
+      setShowVoiceUpgradePrompt(true);
+      toast({
+        title: "🎤 Voice calls are amazing!",
+        description: "Upgrade to continue having voice conversations!",
+        duration: 5000,
+      });
+    }
+  }, [voiceCallCount, showVoiceUpgradePrompt, toast]);
 
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || isTyping) return;
@@ -240,7 +257,9 @@ export const InteractivePreview: React.FC = () => {
     setSelectedCharacter(character);
     setMessages([]);
     setMessageCount(0);
+    setVoiceCallCount(0);
     setShowSignupPrompt(false);
+    setShowVoiceUpgradePrompt(false);
     setShowCharacterSelect(false);
     toast({
       title: `Switched to ${character.name}`,
@@ -248,16 +267,51 @@ export const InteractivePreview: React.FC = () => {
     });
   };
 
-  const handleVoiceCall = () => {
-    setIsCallActive(!isCallActive);
-    toast({
-      title: isCallActive ? "Call ended" : "Voice call started",
-      description: isCallActive ? "Thanks for the great conversation!" : `Now talking with ${selectedCharacter.name}`,
-    });
+  const handleVoiceCall = async () => {
+    if (!isCallActive) {
+      // Start voice call
+      setIsCallActive(true);
+      setVoiceCallCount(prev => prev + 1);
+      
+      toast({
+        title: "🎤 Voice call started!",
+        description: `Now talking with ${selectedCharacter.name}`,
+      });
+
+      // Simulate AI speaking
+      setTimeout(() => {
+        const voiceMessage: PreviewMessage = {
+          id: Date.now().toString(),
+          content: `Hi! I'm ${selectedCharacter.name}. It's so nice to hear your voice! How are you doing today?`,
+          sender: 'ai',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, voiceMessage]);
+      }, 1000);
+
+      // Show upgrade prompt after a few seconds
+      setTimeout(() => {
+        if (voiceCallCount >= 1) {
+          setShowVoiceUpgradePrompt(true);
+        }
+      }, 5000);
+    } else {
+      // End voice call
+      setIsCallActive(false);
+      toast({
+        title: "Call ended",
+        description: "Thanks for the great conversation!",
+      });
+    }
   };
 
   const handleSignupPrompt = (plan: 'free' | 'premium' | 'pro') => {
     setShowSignupPrompt(false);
+    navigate(`/auth?plan=${plan}`);
+  };
+
+  const handleVoiceUpgradePrompt = (plan: 'premium' | 'pro') => {
+    setShowVoiceUpgradePrompt(false);
     navigate(`/auth?plan=${plan}`);
   };
 
@@ -359,7 +413,7 @@ export const InteractivePreview: React.FC = () => {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-gray-600 hover:text-pink-600"
+                  className={`text-gray-600 hover:text-pink-600 ${isCallActive ? 'text-green-600' : ''}`}
                   onClick={handleVoiceCall}
                 >
                   {isCallActive ? <Phone className="w-5 h-5 text-green-600" /> : <Phone className="w-5 h-5" />}
@@ -370,8 +424,11 @@ export const InteractivePreview: React.FC = () => {
               </div>
             </div>
             
-            {/* Messages Area */}
-            <div className="p-4 space-y-4 h-80 overflow-y-auto bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white/80">
+            {/* Messages Area - Fixed height and scrollable */}
+            <div 
+              ref={chatContainerRef}
+              className="p-4 space-y-4 h-80 overflow-y-auto bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white/80"
+            >
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -422,33 +479,18 @@ export const InteractivePreview: React.FC = () => {
                   </div>
                 </div>
               )}
-              
-              <div ref={messagesEndRef} />
             </div>
             
-            {/* Input Area */}
+            {/* Input Area - Simplified and wider */}
             <div className="p-4 border-t border-pink-200/30 bg-white/80 backdrop-blur-sm">
               <form onSubmit={handleSubmit} className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" className="text-pink-500 hover:text-pink-600">
-                  <Camera className="w-5 h-5" />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-pink-500 hover:text-pink-600">
-                  <Smile className="w-5 h-5" />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-pink-500 hover:text-pink-600">
-                  <Gamepad2 className="w-5 h-5" />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-pink-500 hover:text-pink-600">
-                  <Gift className="w-5 h-5" />
-                </Button>
-                
                 <div className="flex-1 relative">
                   <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={`Message ${selectedCharacter.name}...`}
-                    className="w-full px-4 py-2 border border-pink-200 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-pink-200 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-base"
                     disabled={isTyping}
                   />
                 </div>
@@ -456,9 +498,9 @@ export const InteractivePreview: React.FC = () => {
                 <Button
                   type="submit"
                   disabled={!input.trim() || isTyping}
-                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full p-2"
+                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full p-3"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-5 h-5" />
                 </Button>
               </form>
             </div>
@@ -491,7 +533,7 @@ export const InteractivePreview: React.FC = () => {
               
               <Button
                 onClick={() => handleSignupPrompt('premium')}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white w-full"
               >
                 <Star className="w-4 h-4 mr-2" />
                 Get Premium ($19/month)
@@ -509,6 +551,49 @@ export const InteractivePreview: React.FC = () => {
             <Button
               variant="ghost"
               onClick={() => setShowSignupPrompt(false)}
+              className="w-full mt-4"
+            >
+              Maybe Later
+            </Button>
+          </Card>
+        </div>
+      )}
+
+      {/* Voice Upgrade Prompt Modal */}
+      {showVoiceUpgradePrompt && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mic className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">Voice calls are amazing! 🎤</h3>
+              <p className="text-muted-foreground">
+                You've made {voiceCallCount} voice calls! Upgrade to continue having voice conversations with your AI companions.
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <Button
+                onClick={() => handleVoiceUpgradePrompt('premium')}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
+              >
+                <Star className="w-4 h-4 mr-2" />
+                Get Premium ($19/month)
+              </Button>
+              
+              <Button
+                onClick={() => handleVoiceUpgradePrompt('pro')}
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                Go Pro ($49/month)
+              </Button>
+            </div>
+            
+            <Button
+              variant="ghost"
+              onClick={() => setShowVoiceUpgradePrompt(false)}
               className="w-full mt-4"
             >
               Maybe Later
