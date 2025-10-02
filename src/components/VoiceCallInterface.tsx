@@ -81,12 +81,13 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     microphonePermission: false
   });
 
-  // Additional state for original UI
+  // Additional state for enhanced UI
   const [pushToTalk, setPushToTalk] = useState(false);
   const [isPTTHeld, setIsPTTHeld] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [spokenWords, setSpokenWords] = useState<string[]>([]);
   const [displayedWordIndex, setDisplayedWordIndex] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Refs for cleanup and auto-scrolling
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -151,7 +152,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     }
     
     // Enhanced confidence and content filtering
-    if (confidence < 0.8) {
+    if (confidence < 0.7) {
       console.log("🚫 BLOCKED: Low confidence:", confidence);
       return false;
     }
@@ -560,16 +561,6 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
   }, []);
 
-  const startListeningOnly = useCallback(() => {
-    if (recognitionRef.current && !callState.isSpeaking && !callState.isProcessing) {
-      try {
-        recognitionRef.current.start();
-      } catch (error) {
-        console.error('❌ Failed to start recognition:', error);
-      }
-    }
-  }, [callState.isSpeaking, callState.isProcessing]);
-
   const unlockAudio = useCallback(() => {
     try {
       if (typeof window !== "undefined" && "AudioContext" in window) {
@@ -662,12 +653,13 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       const speechReady = setupSpeechRecognition();
       
       if (micReady && speechReady) {
-        // Start listening after a delay
+        // Start listening immediately after a short delay
         setTimeout(() => {
           if (recognitionRef.current && isCallActiveRef.current) {
             try {
               recognitionRef.current.start();
               console.log('🎤 Voice call started - listening for speech');
+              setIsInitialized(true);
             } catch (error) {
               console.error('❌ Failed to start recognition:', error);
             }
@@ -772,108 +764,171 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Call Screen */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
-        {/* Character Avatar with Voice Visualization */}
-        <div className="relative">
-          <div className={`w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
-            callState.isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
-            callState.isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
-            'border-primary/30'
-          }`}>
-            <Avatar className="w-full h-full">
-              <AvatarImage src={character.avatar} alt={character.name} />
-              <AvatarFallback className="text-4xl">{character.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-          </div>
-          
-          {/* Voice activity indicator */}
-          {(callState.isSpeaking || callState.isListening) && (
-            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-              <div className={`flex space-x-1 ${callState.isSpeaking ? 'text-green-400' : 'text-blue-400'}`}>
-                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
-                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
-                <div className="w-1 h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
-                <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
-                <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
-              </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex">
+        {/* Left Side - Character Avatar and Status */}
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
+          {/* Character Avatar with Voice Visualization */}
+          <div className="relative">
+            <div className={`w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
+              callState.isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
+              callState.isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
+              'border-primary/30'
+            }`}>
+              <Avatar className="w-full h-full">
+                <AvatarImage src={character.avatar} alt={character.name} />
+                <AvatarFallback className="text-4xl">{character.name.charAt(0)}</AvatarFallback>
+              </Avatar>
             </div>
-          )}
+            
+            {/* Voice activity indicator */}
+            {(callState.isSpeaking || callState.isListening) && (
+              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+                <div className={`flex space-x-1 ${callState.isSpeaking ? 'text-green-400' : 'text-blue-400'}`}>
+                  <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1 h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
+                  <div className="w-1 h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
+                  <div className="w-1 h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Status Display */}
+          <div className="space-y-3">
+            <h2 className="text-2xl font-bold">{character.name}</h2>
+            <div className="space-y-1">
+              <p className="text-lg font-medium">
+                {callState.isSpeaking ? '🗣️ Speaking...' :
+                 callState.isProcessing ? '💭 Thinking...' :
+                 callState.isListening ? '🎤 Your turn to speak!' :
+                 callState.isMuted ? '🔇 Muted' :
+                 '📞 In call'}
+              </p>
+              
+              {/* Interactive guidance */}
+              {callState.isListening && !callState.isMuted && (
+                <p className="text-sm text-muted-foreground animate-pulse">
+                  I'm listening! Say something and I'll respond when you pause 💕
+                </p>
+              )}
+              
+              {callState.isMuted && (
+                <p className="text-sm text-yellow-600">
+                  Unmute to start talking with me!
+                </p>
+              )}
+            </div>
+            
+            {/* Animated word-by-word visualization */}
+            {callState.isSpeaking && spokenWords.length > 0 && (
+              <div className="mt-2 min-h-[48px]">
+                <div className="flex flex-wrap gap-1">
+                  {spokenWords.slice(0, displayedWordIndex).map((w, idx) => (
+                    <span
+                      key={`${w}-${idx}`}
+                      className="text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
+                      style={{ animationDelay: `${idx * 15}ms` }}
+                    >
+                      {w}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Real-time transcript */}
+            {callState.currentTranscript && (
+              <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
+                <p className="text-sm text-muted-foreground italic">
+                  You're saying: "{callState.currentTranscript}"
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Call Quality Indicators */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-400" />
+              <span>HD Voice</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-blue-400" />
+              <span>AI Powered</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-purple-400" />
+              <span>Real-time</span>
+            </div>
+          </div>
         </div>
 
-        {/* Status Display */}
-        <div className="space-y-3">
-          <h2 className="text-2xl font-bold">{character.name}</h2>
-          <div className="space-y-1">
-            <p className="text-lg font-medium">
-              {callState.isSpeaking ? '��️ Speaking...' :
-               callState.isProcessing ? '💭 Thinking...' :
-               callState.isListening ? '🎤 Your turn to speak!' :
-               callState.isMuted ? '🔇 Muted' :
-               '📞 In call'}
-            </p>
-            
-            {/* Interactive guidance */}
-            {callState.isListening && !callState.isMuted && (
-              <p className="text-sm text-muted-foreground animate-pulse">
-                I'm listening! Say something and I'll respond when you pause 💕
-              </p>
-            )}
-            {!callState.isListening && !callState.isSpeaking && (
-              <div className="flex items-center justify-center mt-3">
-                <button onClick={startListeningOnly} className="px-4 py-2 rounded-full bg-primary text-primary-foreground shadow hover:opacity-90">
-                  Start Call (Tap to Allow Mic)
-                </button>
-              </div>
-            )}
-            
-            {callState.isMuted && (
-              <p className="text-sm text-yellow-600">
-                Unmute to start talking with me!
-              </p>
-            )}
+        {/* Right Side - Real-time Chat Transcript */}
+        <div className="w-96 border-l border-border/50 bg-background/30 backdrop-blur-sm">
+          <div className="p-4 border-b border-border/50">
+            <h3 className="font-semibold text-lg">Live Transcript</h3>
+            <p className="text-sm text-muted-foreground">Real-time conversation</p>
           </div>
           
-          {/* Animated word-by-word visualization */}
-          {callState.isSpeaking && spokenWords.length > 0 && (
-            <div className="mt-2 min-h-[48px]">
-              <div className="flex flex-wrap gap-1">
-                {spokenWords.slice(0, displayedWordIndex).map((w, idx) => (
-                  <span
-                    key={`${w}-${idx}`}
-                    className="text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
-                    style={{ animationDelay: `${idx * 15}ms` }}
-                  >
-                    {w}
-                  </span>
-                ))}
+          <div 
+            ref={conversationRef}
+            className="flex-1 overflow-y-auto p-4 space-y-4 h-96"
+          >
+            {callState.conversationHistory.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <p>Start talking to {character.name}...</p>
+                <p className="text-sm mt-2">Your conversation will appear here</p>
               </div>
-            </div>
-          )}
-          
-          {/* Real-time transcript */}
-          {callState.currentTranscript && (
-            <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
-              <p className="text-sm text-muted-foreground italic">
-                You're saying: "{callState.currentTranscript}"
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Call Quality Indicators */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-green-400" />
-            <span>HD Voice</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <span>AI Powered</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-purple-400" />
-            <span>Real-time</span>
+            ) : (
+              callState.conversationHistory.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`flex items-start gap-2 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {message.sender === 'ai' && (
+                      <Avatar className="w-6 h-6 flex-shrink-0">
+                        <AvatarImage src={character.avatar} alt={character.name} />
+                        <AvatarFallback className="text-xs">{character.name[0]}</AvatarFallback>
+                      </Avatar>
+                    )}
+                    
+                    <div
+                      className={`rounded-2xl px-3 py-2 text-sm ${
+                        message.sender === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className={`text-xs mt-1 ${
+                        message.sender === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      }`}>
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+            
+            {callState.isProcessing && (
+              <div className="flex items-start gap-2">
+                <Avatar className="w-6 h-6 flex-shrink-0">
+                  <AvatarImage src={character.avatar} alt={character.name} />
+                  <AvatarFallback className="text-xs">{character.name[0]}</AvatarFallback>
+                </Avatar>
+                <div className="bg-muted rounded-2xl px-3 py-2">
+                  <div className="flex space-x-1">
+                    <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce"></div>
+                    <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -905,6 +960,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
               Hold to Speak
             </Button>
           )}
+          
           {/* Mute Button */}
           <Button
             variant={callState.isMuted ? "destructive" : "outline"}
