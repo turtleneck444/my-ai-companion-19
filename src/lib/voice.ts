@@ -28,6 +28,12 @@ const VOICE_PRESETS: Record<string, ElevenLabsSettings> = {
   'XB0fDUnXU5powFXDhCwa': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Charlotte - calm female
   'VR6AewLTigWG4xSOukaG': { stability: 0.75, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true }, // Lily - sweet female
   'pqHfZKP75CvOlQylNhV4': { stability: 0.70, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Bella - seductive female
+  'kdmDKE6EkgrWrrykO9Qt': { stability: 0.60, similarity_boost: 0.90, style: 0.30, use_speaker_boost: true }, // Alexandra - super realistic, young female
+  'g6xIsTj2HwM6VR4iXFCw': { stability: 0.65, similarity_boost: 0.85, style: 0.25, use_speaker_boost: true }, // Jessica Anne Bogart - empathetic
+  'OYTbf65OHHFELVut7v2H': { stability: 0.70, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Hope - bright and uplifting
+  'dj3G1R1ilKoFKhBnWOzG': { stability: 0.60, similarity_boost: 0.85, style: 0.25, use_speaker_boost: true }, // Eryn - friendly and relatable
+  'PT4nqlKZfc06VW1BuClj': { stability: 0.55, similarity_boost: 0.80, style: 0.30, use_speaker_boost: true }, // Angela - raw and relatable
+  '56AoDkrOh6qfVPDXZ7Pt': { stability: 0.65, similarity_boost: 0.85, style: 0.35, use_speaker_boost: true } // Cassidy - engaging and energetic
 };
 
 // Default voice settings

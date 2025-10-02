@@ -68,24 +68,25 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const isRecognitionActiveRef = useRef<boolean>(false);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get character's voice ID (optimized) - Use cuter ElevenLabs voice IDs
+  // Get character's voice ID (optimized) - Use confirmed female voices
   const getCharacterVoiceId = useCallback(() => {
-    // Cute ElevenLabs female voice IDs for adorable, sweet voices
-    const cuteVoices = [
-      'VR6AewLTigWG4xSOukaG', // Lily - sweet, cute voice
-      'XrExE9yKIg1WjnnlVkGX', // Matilda - sweet, adorable
-      'ErXwobaYiN019PkySvjV', // Elli - soft, cute voice
-      'XB0fDUnXU5powFXDhCwa', // Charlotte - calm, sweet
-      'kdmDKE6EkgrWrrykO9Qt'  // Emily - sophisticated but cute
+    // Confirmed female voices from ElevenLabs documentation
+    const femaleVoices = [
+      'kdmDKE6EkgrWrrykO9Qt', // Alexandra - super realistic, young female voice
+      'g6xIsTj2HwM6VR4iXFCw', // Jessica Anne Bogart - empathetic and expressive
+      'OYTbf65OHHFELVut7v2H', // Hope - bright and uplifting
+      'dj3G1R1ilKoFKhBnWOzG', // Eryn - friendly and relatable
+      'PT4nqlKZfc06VW1BuClj', // Angela - raw and relatable
+      '56AoDkrOh6qfVPDXZ7Pt'  // Cassidy - engaging and energetic
     ];
     
-    // Use character-specific voice or fallback to a cute voice
+    // Use character-specific voice or fallback to a confirmed female voice
     if (character.voice?.voice_id && character.voice.voice_id !== 'default_soft_melodic') {
       return character.voice.voice_id;
     }
     
-    // Fallback to Lily (sweet, cute voice) for all characters
-    return 'VR6AewLTigWG4xSOukaG';
+    // Fallback to Alexandra (super realistic, young female voice) for Luna
+    return 'kdmDKE6EkgrWrrykO9Qt';
   }, [character]);
 
   // Initialize microphone (simplified)
