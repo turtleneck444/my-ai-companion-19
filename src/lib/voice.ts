@@ -44,6 +44,11 @@ const DEFAULT_VOICE_SETTINGS: ElevenLabsSettings = {
   use_speaker_boost: true
 };
 
+// Global speech control
+let isSpeaking = false;
+let currentSpeechPromise: Promise<void> | null = null;
+let currentAudio: HTMLAudioElement | null = null;
+
 // Get voice settings for a specific voice ID
 export function getVoiceSettings(voiceId: string): ElevenLabsSettings {
   return VOICE_PRESETS[voiceId] || DEFAULT_VOICE_SETTINGS;
@@ -79,7 +84,36 @@ export function processTextForSpeech(text: string): string {
   return processed;
 }
 
-// Main function to speak text using ElevenLabs - FIXED VERSION
+// Stop all current speech
+export function stopAllSpeech(): void {
+  console.log('🛑 Stopping all TTS');
+  
+  // Stop current audio
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
+  
+  // Stop browser TTS
+  if ('speechSynthesis' in window) {
+    speechSynthesis.cancel();
+  }
+  
+  // Reset flags
+  isSpeaking = false;
+  currentSpeechPromise = null;
+  
+  // Set global flags
+  if (typeof window !== "undefined") {
+    (window as any).isSpeaking = false;
+    (window as any).currentSpeechPromise = null;
+  }
+  
+  console.log('🔓 SPEECH LOCK RELEASED');
+}
+
+// Main function to speak text using ElevenLabs - ENHANCED VERSION
 export async function speakText(
   text: string, 
   voiceId: string = 'EXAVITQu4vr4xnSDxMaL', // Default to Luna (female)
@@ -92,8 +126,14 @@ export async function speakText(
   
   console.log('🎤 Speaking text:', text.substring(0, Math.min(50, text.length)) + '...', 'Voice ID:', voiceId);
   
-  // Stop any current speech
+  // Stop any current speech to prevent overlapping
   stopAllSpeech();
+  
+  // Set speaking flag
+  isSpeaking = true;
+  if (typeof window !== "undefined") {
+    (window as any).isSpeaking = true;
+  }
   
   const processedText = processTextForSpeech(text);
   const voiceSettings = settings || getVoiceSettings(voiceId);
@@ -133,16 +173,28 @@ export async function speakText(
           // Create audio element and play
           const audioUrl = URL.createObjectURL(audioBlob);
           const audio = new Audio(audioUrl);
+          currentAudio = audio;
           
           // Set up audio event handlers
           audio.onended = () => {
             URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+            isSpeaking = false;
+            if (typeof window !== "undefined") {
+              (window as any).isSpeaking = false;
+            }
             console.log('🔊 Audio playback completed');
+            console.log('🔓 SPEECH LOCK RELEASED');
           };
           
           audio.onerror = (error) => {
             console.error('❌ Audio playback error:', error);
             URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+            isSpeaking = false;
+            if (typeof window !== "undefined") {
+              (window as any).isSpeaking = false;
+            }
           };
           
           // Handle autoplay policy issues
@@ -186,6 +238,9 @@ export async function speakText(
   } finally {
     // Release speech lock
     isSpeaking = false;
+    if (typeof window !== "undefined") {
+      (window as any).isSpeaking = false;
+    }
     console.log('🔓 SPEECH LOCK RELEASED');
   }
 }
@@ -199,132 +254,78 @@ async function fallbackTTS(text: string, voiceId: string): Promise<void> {
 
   // Map voice IDs to browser voices - FEMALE ONLY
   const voiceMap: Record<string, string> = {
-    'EXAVITQu4vr4xnSDxMaL': 'Samantha', // Female
-    '21m00Tcm4TlvDq8ikWAM': 'Samantha', // Female
-    'AZnzlk1XvdvUeBnXmlld': 'Samantha', // Female
-    'ErXwobaYiN019PkySvjV': 'Samantha', // Female
-    'pNInz6obpgDQGcFmaJgB': 'Samantha', // Female
-    'onwK4e9ZLuTAKqWW03F9': 'Samantha', // Female
-    'kdmDKE6EkgrWrrykO9Qt': 'Samantha', // Female
-    'XrExE9yKIg1WjnnlVkGX': 'Samantha', // Female
-    'CYw3kZ02Hs0563khs1Fj': 'Samantha', // Female
-    'XB0fDUnXU5powFXDhCwa': 'Samantha', // Female
-    'VR6AewLTigWG4xSOukaG': 'Samantha', // Female
-    'pqHfZKP75CvOlQylNhV4': 'Samantha'  // Female
+    'EXAVITQu4vr4xnSDxMaL': 'Samantha', // Luna (Sarah)
+    '21m00Tcm4TlvDq8ikWAM': 'Samantha', // Bonquisha (Rachel)
+    'AZnzlk1XvdvUeBnXmlld': 'Samantha', // Bella
+    'ErXwobaYiN019PkySvjV': 'Samantha', // Elli
+    'pNInz6obpgDQGcFmaJgB': 'Samantha', // Olivia
+    'onwK4e9ZLuTAKqWW03F9': 'Samantha', // Domi
+    'kdmDKE6EkgrWrrykO9Qt': 'Samantha', // Emily
+    'XrExE9yKIg1WjnnlVkGX': 'Samantha', // Matilda
+    'CYw3kZ02Hs0563khs1Fj': 'Samantha', // Nova
+    'XB0fDUnXU5powFXDhCwa': 'Samantha', // Charlotte
+    'VR6AewLTigWG4xSOukaG': 'Samantha', // Lily
+    'pqHfZKP75CvOlQylNhV4': 'Samantha', // Bella
+    'g6xIsTj2HwM6VR4iXFCw': 'Samantha', // Jessica Anne Bogart
+    'OYTbf65OHHFELVut7v2H': 'Samantha', // Hope
+    'dj3G1R1ilKoFKhBnWOzG': 'Samantha', // Eryn
+    'PT4nqlKZfc06VW1BuClj': 'Samantha', // Angela
+    '56AoDkrOh6qfVPDXZ7Pt': 'Samantha'  // Cassidy
   };
 
-  const browserVoice = voiceMap[voiceId] || 'Samantha'; // Default to female
-  console.log('🎤 Using voice:', browserVoice);
-
+  const browserVoice = voiceMap[voiceId] || 'Samantha';
+  
+  console.log('🔄 Falling back to browser TTS');
+  
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = speechSynthesis.getVoices().find(voice => voice.name === browserVoice) || null;
+    
+    // Set voice
+    const voices = speechSynthesis.getVoices();
+    const selectedVoice = voices.find(voice => 
+      voice.name.includes(browserVoice) || 
+      voice.name.includes('Samantha') ||
+      voice.name.includes('Female')
+    );
+    
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      console.log('🎤 Using voice:', selectedVoice.name);
+    } else {
+      console.log('🎤 Using voice: Samantha');
+    }
+    
+    // Set speech parameters
     utterance.rate = 0.9;
     utterance.pitch = 1.0;
     utterance.volume = 0.8;
-
+    
     utterance.onend = () => {
       console.log('🔊 Fallback TTS completed');
       isSpeaking = false;
+      if (typeof window !== "undefined") {
+        (window as any).isSpeaking = false;
+      }
       console.log('🔓 SPEECH LOCK RELEASED (fallback)');
       resolve();
     };
-
-    utterance.onerror = (error) => {
-      console.error('❌ Fallback TTS error:', error);
+    
+    utterance.onerror = (event) => {
+      console.error('❌ Fallback TTS error:', event);
+      isSpeaking = false;
+      if (typeof window !== "undefined") {
+        (window as any).isSpeaking = false;
+      }
+      console.log('🔓 SPEECH LOCK RELEASED (fallback)');
       resolve();
     };
-
+    
     speechSynthesis.speak(utterance);
   });
 }
 
-// Stop all current speech
-// AGGRESSIVE speech lock to prevent multiple voices
-let isSpeaking = false;
-let currentSpeechPromise: Promise<void> | null = null;
-let speechLockTimeout: NodeJS.Timeout | null = null;
-
-// Force stop all speech immediately
-export function forceStopAllSpeech(): void {
-  console.log("🚫 FORCE STOPPING ALL SPEECH");
-  isSpeaking = false;
-  currentSpeechPromise = null;
-  
-  if (speechLockTimeout) {
-    clearTimeout(speechLockTimeout);
-    speechLockTimeout = null;
-  }
-  
-  // Stop browser TTS
-  if ("speechSynthesis" in window) {
-    speechSynthesis.cancel();
-  }
-  
-  // Stop any playing audio elements
-  const audioElements = document.querySelectorAll("audio");
-  audioElements.forEach(audio => {
-    if (!audio.paused) {
-      audio.pause();
-      audio.currentTime = 0;
-    }
-  });
-}
-export function stopAllSpeech(): void {
-  console.log('🛑 Stopping all TTS');
-  
-  // Stop browser TTS
-  if ('speechSynthesis' in window) {
-    speechSynthesis.cancel();
-  }
-  
-  // Stop any playing audio elements
-  const audioElements = document.querySelectorAll('audio');
-  audioElements.forEach(audio => {
-    if (!audio.paused) {
-      audio.pause();
-      audio.currentTime = 0;
-    }
-  });
-}
-
-// Test voice function for previews - FIXED VERSION
-export async function testVoice(voiceId: string, text: string): Promise<void> {
-  // Handle undefined text
-  if (!text || typeof text !== 'string') {
-    text = 'Hello! I am your AI companion.';
-  }
-  
+// Test voice function
+export async function testVoice(voiceId: string, text: string = "Hello! I'm your AI companion."): Promise<void> {
   console.log('🧪 Testing voice:', voiceId, 'with text:', text);
   await speakText(text, voiceId);
-}
-
-// Voice call utilities
-export async function startVoiceCall(characterId: string, voiceSettings: VoiceCallSettings): Promise<void> {
-  try {
-    // Track voice call usage
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from('usage_tracking').insert({
-        user_id: user.id,
-        date: new Date().toISOString().split('T')[0],
-        feature: 'voice_call'
-      });
-    }
-  } catch (error) {
-    console.error('Error tracking voice call usage:', error);
-  }
-}
-
-export async function endVoiceCall(): Promise<void> {
-  stopAllSpeech();
-}
-
-// Additional exports for compatibility
-export function isTTSPlaying(): boolean {
-  return speechSynthesis.speaking;
-}
-
-export function getAvailableVoices(): SpeechSynthesisVoice[] {
-  return speechSynthesis.getVoices();
 }
