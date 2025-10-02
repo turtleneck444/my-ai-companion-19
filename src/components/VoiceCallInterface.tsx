@@ -693,7 +693,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-pink-100 text-xs font-semibold">You</span>
                         <span className="text-pink-200 text-xs">
-                          {new Date(message.timestamp).toLocaleTimeString([], {hour: "-digit"", minute: "-digit""})}
+                          {new Date(message.timestamp).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}
                         </span>
                       </div>
                       <p className="text-white text-sm font-medium leading-relaxed">{message.content}</p>
@@ -705,7 +705,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-blue-100 text-xs font-semibold">{character.name}</span>
                         <span className="text-blue-200 text-xs">
-                          {new Date(message.timestamp).toLocaleTimeString([], {hour: "-digit"", minute: "-digit""})}
+                          {new Date(message.timestamp).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}
                         </span>
                       </div>
                       <p className="text-white text-sm font-medium leading-relaxed">{message.content}</p>
