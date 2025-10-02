@@ -154,7 +154,28 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       if (!isCallActiveRef.current) return;
       
-      // NUCLEAR BLOCKING: Block ALL speech input when AI is active
+      const lastResult = event.results[event.results.length - 1];
+      const transcript = lastResult[0].transcript.trim();
+      const confidence = lastResult[0].confidence || 0;
+      
+      // INTERRUPTION SUPPORT: If user speaks while AI is speaking, interrupt immediately
+      if (window.aiSpeaking && transcript && transcript.length > 2 && confidence > 0.7) {
+        console.log("🛑 INTERRUPTION: User spoke while AI was speaking, stopping AI");
+        stopAllSpeech();
+        window.aiSpeaking = false;
+        window.aiProcessing = false;
+        setCallState(prev => ({ ...prev, isSpeaking: false }));
+        
+        // Process the interruption immediately
+        if (transcript.length > 3 && confidence > 0.8) {
+          console.log("🎯 Interruption message:", transcript, "(confidence:", confidence, ")");
+          setCallState(prev => ({ ...prev, currentTranscript: transcript }));
+          handleUserMessage(transcript);
+        }
+        return;
+      }
+      
+      // ULTRA-AGGRESSIVE BLOCKING: Block ALL speech input when AI is active
       if (window.aiSpeaking || window.aiProcessing || callState.isSpeaking || callState.isProcessing) {
         console.log("🚫 BLOCKED: AI is speaking/processing, ignoring speech input");
         return;
@@ -162,23 +183,19 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       
       // Additional timestamp-based blocking
       const now = Date.now();
-      if (window.aiJustFinishedSpeaking && (now - window.aiJustFinishedSpeaking < 2000)) {
+      if (window.aiJustFinishedSpeaking && (now - window.aiJustFinishedSpeaking < 1000)) {
         console.log("🚫 BLOCKED: Too soon after AI finished speaking");
         return;
       }
       
       // Block if AI is processing
-      if (window.aiProcessingTimestamp && (now - window.aiProcessingTimestamp < 1000)) {
+      if (window.aiProcessingTimestamp && (now - window.aiProcessingTimestamp < 500)) {
         console.log("🚫 BLOCKED: AI is processing, ignoring speech input");
         return;
       }
       
-      const lastResult = event.results[event.results.length - 1];
-      const transcript = lastResult[0].transcript.trim();
-      const confidence = lastResult[0].confidence || 0;
-      
       // STRICT FILTERING: Only accept clear, intentional speech
-      if (transcript && transcript.length > 3 && confidence > 0.8) {
+      if (transcript && transcript.length > 3 && confidence > 0.9) {
         // Additional check for intentional speech
         const words = transcript.split(" ");
         if (words.length >= 2 && !transcript.match(/^(uh|um|ah|oh|hmm|yeah|ok|okay|hi|hey)$/i)) {
@@ -434,6 +451,35 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
   }, []);
 
+  // ULTRA-FAST Speech Recognition Restart
+  const restartSpeechRecognition = useCallback(() => {
+    if (!isCallActiveRef.current || callState.isSpeaking || callState.isProcessing) return;
+    
+    try {
+      if (recognitionRef.current && !isRecognitionActiveRef.current) {
+        recognitionRef.current.start();
+        isRecognitionActiveRef.current = true;
+        setCallState(prev => ({ ...prev, isListening: true }));
+        console.log("🎤 ULTRA-FAST RESTART - Speech recognition restarted");
+      }
+    } catch (error) {
+      console.log("⚠️ Restart failed:", error);
+      // Retry after a short delay
+      setTimeout(() => {
+        if (recognitionRef.current && !isRecognitionActiveRef.current) {
+          try {
+            recognitionRef.current.start();
+            isRecognitionActiveRef.current = true;
+            setCallState(prev => ({ ...prev, isListening: true }));
+            console.log("🎤 RETRY RESTART - Speech recognition restarted");
+          } catch (retryError) {
+            console.log("⚠️ Retry restart failed:", retryError);
+          }
+        }
+      }, 100);
+    }
+  }, [callState.isSpeaking, callState.isProcessing]);
+
   const endCall = useCallback(() => {
     console.log('📞 Ending voice call...');
     isCallActiveRef.current = false;
@@ -510,6 +556,13 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       }
     };
   }, []); // Run only once on mount
+
+  // Auto-scroll transcript to bottom when new messages arrive
+  useEffect(() => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    }
+  }, [callState.conversationHistory]);
 
   // Format call duration
   const formatDuration = (seconds: number) => {
