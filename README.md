@@ -1,138 +1,86 @@
-# Welcome to your Lovable project
+# AI Companion Platform
 
-## Project info
+A modern AI companion platform built with React, TypeScript, and Vite.
 
-**URL**: https://lovable.dev/projects/7ae00cf5-af91-4325-8967-5e4bf1a117f8
+## Technologies Used
 
-## How can I edit this code?
+- **Frontend**: React 18, TypeScript, Vite
+- **UI**: shadcn/ui, Tailwind CSS
+- **Backend**: Supabase, Netlify Functions
+- **AI**: OpenAI GPT-4, ElevenLabs TTS
+- **Payments**: Stripe, Square integration
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- 🤖 **AI Characters**: Chat with pre-built and custom AI companions
+- 🎤 **Voice Calls**: Real-time voice conversations with AI
+- 🎮 **Interactive Games**: Play games with AI characters
+- 💳 **Payment System**: Multiple payment providers support
+- 🔐 **Authentication**: Secure user management
+- 📱 **Mobile Responsive**: Optimized for all devices
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/7ae00cf5-af91-4325-8967-5e4bf1a117f8) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ 
+- npm 8+
+- Supabase account
+- OpenAI API key
+- ElevenLabs API key
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+1. Clone the repository:
+```bash
 git clone <YOUR_GIT_URL>
+cd my-ai-companion-19
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+2. Install dependencies:
+```bash
+npm install
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+3. Set up environment variables in Netlify:
+   - Go to Site Settings > Environment Variables
+   - Add all required environment variables
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+4. Start development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Deployment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This project is configured for Netlify deployment:
 
-**Use GitHub Codespaces**
+1. Connect your GitHub repository to Netlify
+2. Set up environment variables in Netlify dashboard
+3. Deploy automatically on push to main branch
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Project Structure
 
-## What technologies are used for this project?
+```
+src/
+├── components/     # React components
+├── pages/         # Page components
+├── lib/           # Utility functions
+├── hooks/         # Custom React hooks
+├── contexts/      # React contexts
+└── types/         # TypeScript type definitions
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/7ae00cf5-af91-4325-8967-5e4bf1a117f8) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-
-## Environment variables
-
-Create your local env files and fill in your secrets:
-
-```sh
-cp .env.example .env
+api/               # API endpoints
+netlify/functions/ # Netlify serverless functions
 ```
 
-Then edit `.env` and set values for:
+## Contributing
 
-- `VITE_OPENAI_API_KEY` — OpenAI API key
-- `VITE_OPENAI_MODEL` — default model (e.g., gpt-4o-mini)
-- `VITE_ELEVENLABS_API_KEY` — ElevenLabs API key
-- `VITE_ELEVENLABS_VOICE_ID` — optional default voice ID
-- `VITE_SUPABASE_URL` — your Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` — your Supabase anon public key
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-Notes:
-- Vite only exposes variables prefixed with `VITE_` to the client.
-- `.env` is gitignored; commit only `.env.example`.
-- After changes, restart the dev server: `npm run dev`.
+## License
 
-## Serverless proxies (Vercel)
-
-This project includes serverless functions under `api/` for secure API access:
-
-- `api/openai-chat.js` — proxies OpenAI Chat Completions
-- `api/elevenlabs-tts.js` — proxies ElevenLabs Text-to-Speech
-
-Configure env vars in your hosting provider (Vercel → Settings → Environment Variables):
-- `OPENAI_API_KEY`
-- `ELEVENLABS_API_KEY`
-- Optional: `OPENAI_MODEL` (default `gpt-4o-mini`), `ELEVENLABS_DEFAULT_VOICE_ID`
-
-### Local development
-- Add the same keys to your local `.env` (gitignored). Do NOT prefix server-only secrets with `VITE_`.
-- Run dev server: `npm run dev`
-
-### Client usage examples
-
-POST to your own endpoints instead of calling providers directly:
-
-```ts
-// OpenAI chat
-await fetch('/api/openai-chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ messages: [{ role: 'user', content: 'Hello' }] })
-});
-```
-
-```ts
-// ElevenLabs TTS
-const res = await fetch('/api/elevenlabs-tts', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ text: 'Hello world' })
-});
-const blob = await res.blob();
-const url = URL.createObjectURL(blob);
-new Audio(url).play();
-```
-
-These routes read secrets from server-side env vars and never expose them to the browser.
+This project is private and proprietary.
