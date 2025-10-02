@@ -49,7 +49,17 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const [callState, setCallState] = useState<CallState>({
+  
+  // ULTRA-AGGRESSIVE SPEECH BLOCKING: Initialize global flags
+  if (typeof window !== "undefined") {
+    (window as any).aiSpeaking = (window as any).aiSpeaking || false;
+    (window as any).aiProcessing = (window as any).aiProcessing || false;
+    (window as any).aiJustFinishedSpeaking = (window as any).aiJustFinishedSpeaking || null;
+    (window as any).aiSpeakingTimestamp = (window as any).aiSpeakingTimestamp || null;
+    (window as any).aiProcessingTimestamp = (window as any).aiProcessingTimestamp || null;
+    (window as any).speechDetectionLocked = (window as any).speechDetectionLocked || false;
+    (window as any).lastUserSpeechTime = (window as any).lastUserSpeechTime || 0;
+  }  const [callState, setCallState] = useState<CallState>({
     isConnected: false,
     isListening: false,
     isMuted: false,
