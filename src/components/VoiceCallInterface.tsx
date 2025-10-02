@@ -453,19 +453,45 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   }, []);
 
   const endCall = useCallback(() => {
-    console.log('📞 Ending voice call...');
-    isCallActiveRef.current = false;
+    console.log('📞 ENDING VOICE CALL - Button clicked!');
     
+    // ULTRA-AGGRESSIVE CLEANUP
+    isCallActiveRef.current = false;
+    isRecognitionActiveRef.current = false;
+    
+    // Stop all speech and audio
     stopAllSpeech();
     
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
+    // Clear all global flags
+    if (typeof window !== "undefined") {
+      window.aiSpeaking = false;
+      window.aiProcessing = false;
+      window.aiJustFinishedSpeaking = null;
+      window.aiSpeakingTimestamp = null;
+      window.aiProcessingTimestamp = null;
+      window.speechDetectionLocked = false;
+      window.lastUserSpeechTime = 0;
+      window.isSpeaking = false;
+      window.currentSpeechPromise = null;
     }
     
+    // Stop speech recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      } catch (error) {
+        console.log('⚠️ Error stopping recognition:\, error);
+      }
+    }
+    
+    // Clear all timeouts
     if (processingTimeoutRef.current) {
       clearTimeout(processingTimeoutRef.current);
+      processingTimeoutRef.current = null;
     }
     
+    console.log('✅ Call cleanup completed - calling onEndCall');
     onEndCall();
   }, [onEndCall]);
 
@@ -578,13 +604,19 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
           </Badge>
           {/* Clear chat history button removed to prevent crashes */}
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={endCall}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50 border border-red-200 hover:border-red-300 rounded-full p-2 transition-all duration-200 hover:scale-110"
+            variant="destructive"
+            size="lg"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔴 END CALL BUTTON CLICKED!');
+              endCall();
+            }}
+            className="bg-red-500 hover:bg-red-600 text-white border-2 border-red-600 hover:border-red-700 rounded-full px-4 py-2 transition-all duration-200 hover:scale-110 shadow-lg z-50 relative"
             title="End Call"
           >
-            <PhoneOff className="w-5 h-5" />
+            <PhoneOff className="w-6 h-6 mr-2" />
+            End Call
           </Button>
         </div>
       </div>
