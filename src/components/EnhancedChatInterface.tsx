@@ -26,7 +26,7 @@ import { speakText } from "@/lib/voice";
 import { buildSystemPrompt } from "@/lib/ai";
 import { useToast } from "@/hooks/use-toast";
 import { EmojiPicker } from "@/components/EmojiPicker";
-import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 
 interface Message {
@@ -120,7 +120,7 @@ export const EnhancedChatInterface = ({
     canMakeVoiceCall, 
     remainingMessages, 
     remainingVoiceCalls 
-  } = useUsageTracking();
+  } = useEnhancedUsageTracking();
 
   // FIXED: Save messages to character-specific storage
   useEffect(() => {
