@@ -77,6 +77,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const isCallActiveRef = useRef<boolean>(true);
   const isRecognitionActiveRef = useRef<boolean>(false);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
   // Get character's voice ID (optimized) - Use confirmed female voices
   const getCharacterVoiceId = useCallback(() => {
