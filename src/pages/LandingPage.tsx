@@ -49,10 +49,7 @@ import { emailService } from '@/lib/email-service';
 import { EmailCollection } from '@/components/EmailCollection';
 import { InteractivePreview } from '@/components/InteractivePreview';
 
-export const LandingPage: React.FC = () => {  // Scroll to top when component mounts
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -60,6 +57,11 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const features = [
     {
@@ -208,10 +210,10 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
                 {/* Original LoveAI Logo - Pink circle with white heart border */}
-                <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center mr-2">
+                <div className="w-8 h-8 bg-pink-400 rounded-full flex items-center justify-center mr-2">
                   <Heart className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-2xl font-bold text-black">
+                <span className="text-2xl font-bold font-display text-black">
                   LoveAI
                 </span>
               </div>
@@ -219,16 +221,16 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
             
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-8">
-                <a href="#features" className="text-gray-700 hover:text-pink-600 px-3 py-2 text-sm font-medium transition-colors">
+                <a href="#features" className="text-gray-700 hover:text-pink-400 px-3 py-2 text-sm font-medium transition-colors">
                   Features
                 </a>
-                <a href="#preview" className="text-gray-700 hover:text-pink-600 px-3 py-2 text-sm font-medium transition-colors">
+                <a href="#preview" className="text-gray-700 hover:text-pink-400 px-3 py-2 text-sm font-medium transition-colors">
                   Preview
                 </a>
-                <a href="#pricing" className="text-gray-700 hover:text-pink-600 px-3 py-2 text-sm font-medium transition-colors">
+                <a href="#pricing" className="text-gray-700 hover:text-pink-400 px-3 py-2 text-sm font-medium transition-colors">
                   Pricing
                 </a>
-                <a href="#testimonials" className="text-gray-700 hover:text-pink-600 px-3 py-2 text-sm font-medium transition-colors">
+                <a href="#testimonials" className="text-gray-700 hover:text-pink-400 px-3 py-2 text-sm font-medium transition-colors">
                   Reviews
                 </a>
               </div>
@@ -237,7 +239,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
             <div className="hidden md:block">
               <div className="ml-4 flex items-center space-x-4">
                 {user ? (
-                  <Button onClick={() => navigate('/app')} className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700">
+                  <Button onClick={() => navigate('/app')} className="bg-pink-400 hover:bg-pink-500 text-white">
                     Go to App
                   </Button>
                 ) : (
@@ -245,7 +247,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
                     <Button variant="ghost" onClick={() => navigate('/auth')}>
                       Sign In
                     </Button>
-                    <Button onClick={() => navigate('/auth')} className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700">
+                    <Button onClick={() => navigate('/auth')} className="bg-pink-400 hover:bg-pink-500 text-white">
                       Get Started
                     </Button>
                   </>
@@ -259,7 +261,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-gray-700 hover:text-pink-600"
+                className="text-gray-700 hover:text-pink-400"
               >
                 {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </Button>
@@ -271,21 +273,21 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white/95 backdrop-blur-md border-t border-pink-200/30">
-              <a href="#features" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
+              <a href="#features" className="text-gray-700 hover:text-pink-400 block px-3 py-2 text-base font-medium">
                 Features
               </a>
-              <a href="#preview" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
+              <a href="#preview" className="text-gray-700 hover:text-pink-400 block px-3 py-2 text-base font-medium">
                 Preview
               </a>
-              <a href="#pricing" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
+              <a href="#pricing" className="text-gray-700 hover:text-pink-400 block px-3 py-2 text-base font-medium">
                 Pricing
               </a>
-              <a href="#testimonials" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
+              <a href="#testimonials" className="text-gray-700 hover:text-pink-400 block px-3 py-2 text-base font-medium">
                 Reviews
               </a>
               <div className="pt-4 pb-3 border-t border-pink-200/30">
                 {user ? (
-                  <Button onClick={() => navigate('/app')} className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700">
+                  <Button onClick={() => navigate('/app')} className="w-full bg-pink-400 hover:bg-pink-500 text-white">
                     Go to App
                   </Button>
                 ) : (
@@ -293,7 +295,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
                     <Button variant="ghost" onClick={() => navigate('/auth')} className="w-full">
                       Sign In
                     </Button>
-                    <Button onClick={() => navigate('/auth')} className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700">
+                    <Button onClick={() => navigate('/auth')} className="w-full bg-pink-400 hover:bg-pink-500 text-white">
                       Get Started
                     </Button>
                   </div>
@@ -310,7 +312,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold font-display mb-6">
               Your AI Companion for
-              <span className="bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="text-pink-400">
                 {' '}Meaningful Conversations
               </span>
             </h1>
@@ -323,7 +325,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
               <Button 
                 onClick={handleGetStarted}
                 size="lg"
-                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-8 py-4 text-lg"
+                className="bg-pink-400 hover:bg-pink-500 text-white px-8 py-4 text-lg"
               >
                 Start Your Journey
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -332,31 +334,11 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
                 variant="outline" 
                 size="lg"
                 onClick={() => document.getElementById('preview')?.scrollIntoView({ behavior: 'smooth' })}
-                className="px-8 py-4 text-lg"
+                className="px-8 py-4 text-lg border-pink-400 text-pink-400 hover:bg-pink-400 hover:text-white"
               >
                 <Play className="mr-2 h-5 w-5" />
                 See It In Action
               </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-2">10K+</div>
-              <div className="text-muted-foreground">Happy Users</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-2">1M+</div>
-              <div className="text-muted-foreground">Conversations</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-2">99.9%</div>
-              <div className="text-muted-foreground">Uptime</div>
             </div>
           </div>
         </div>
@@ -384,7 +366,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
             {features.map((feature, index) => (
               <Card key={index} className="p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group">
                 <CardHeader className="p-0 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 bg-pink-400 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <feature.icon className="w-6 h-6 text-white" />
                   </div>
                   <CardTitle className="text-xl">{feature.title}</CardTitle>
@@ -419,7 +401,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
                       <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
                     ))}
                   </div>
-                  <Quote className="w-8 h-8 text-pink-500 mb-4" />
+                  <Quote className="w-8 h-8 text-pink-400 mb-4" />
                   <p className="text-muted-foreground mb-4 italic">"{testimonial.content}"</p>
                   <div>
                     <p className="font-semibold">{testimonial.name}</p>
@@ -446,10 +428,10 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {pricingPlans.map((plan, index) => (
-              <Card key={index} className={`p-8 relative ${plan.popular ? 'ring-2 ring-pink-500 shadow-xl' : ''}`}>
+              <Card key={index} className={`p-8 relative ${plan.popular ? 'ring-2 ring-pink-400 shadow-xl' : ''}`}>
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <Badge className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-1">
+                    <Badge className="bg-pink-400 text-white px-4 py-1">
                       Most Popular
                     </Badge>
                   </div>
@@ -475,8 +457,8 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
                     onClick={() => handleGetStarted(plan.name.toLowerCase())}
                     className={`w-full ${
                       plan.popular 
-                        ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700' 
-                        : 'bg-gray-900 hover:bg-gray-800'
+                        ? 'bg-pink-400 hover:bg-pink-500 text-white' 
+                        : 'bg-gray-900 hover:bg-gray-800 text-white'
                     }`}
                   >
                     {plan.cta}
@@ -488,10 +470,30 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-pink-500 to-purple-600">
+      {/* Stats Section - Moved to bottom */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-pink-400 mb-2">10K+</div>
+              <div className="text-muted-foreground">Happy Users</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-pink-400 mb-2">1M+</div>
+              <div className="text-muted-foreground">Conversations</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-pink-400 mb-2">99.9%</div>
+              <div className="text-muted-foreground">Uptime</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section - Improved design */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-pink-400">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+          <h2 className="text-3xl md:text-4xl font-bold font-display text-white mb-6">
             Ready to Start Your AI Journey?
           </h2>
           <p className="text-xl text-pink-100 mb-8">
@@ -501,7 +503,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
             <Button 
               onClick={handleGetStarted}
               size="lg"
-              className="bg-white text-pink-600 hover:bg-gray-100 px-8 py-4 text-lg"
+              className="bg-white text-pink-400 hover:bg-gray-100 px-8 py-4 text-lg font-semibold"
             >
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
@@ -510,7 +512,7 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
               variant="outline" 
               size="lg"
               onClick={() => document.getElementById('preview')?.scrollIntoView({ behavior: 'smooth' })}
-              className="border-white text-white hover:bg-white hover:text-pink-600 px-8 py-4 text-lg"
+              className="border-white text-white hover:bg-white hover:text-pink-400 px-8 py-4 text-lg font-semibold"
             >
               <Play className="mr-2 h-5 w-5" />
               Try Demo
@@ -518,35 +520,6 @@ export const LandingPage: React.FC = () => {  // Scroll to top when component mo
           </div>
         </div>
       </section>
-
-      {/* Clean White Footer */}
-      <footer className="bg-white border-t border-pink-200/30 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center mb-4 md:mb-0">
-              {/* Original LoveAI Logo - Pink circle with white heart border */}
-              <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center mr-3">
-                <Heart className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-black">
-                LoveAI
-              </span>
-            </div>
-            
-            <div className="flex flex-wrap justify-center md:justify-end gap-6 text-sm text-gray-600">
-              <a href="#features" className="hover:text-pink-600 transition-colors">Features</a>
-              <a href="#pricing" className="hover:text-pink-600 transition-colors">Pricing</a>
-              <a href="#preview" className="hover:text-pink-600 transition-colors">Demo</a>
-              <a href="/privacy" className="hover:text-pink-600 transition-colors">Privacy</a>
-              <a href="/terms" className="hover:text-pink-600 transition-colors">Terms</a>
-            </div>
-          </div>
-          
-          <div className="mt-8 pt-6 border-t border-pink-200/30 text-center text-sm text-gray-500">
-            <p>&copy; 2024 LoveAI. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
