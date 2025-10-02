@@ -151,20 +151,44 @@ export const UserProfile = () => {
   const loadUserProfile = async () => {
     if (!user) return;
 
+    console.log('🔍 Debug: Loading profile for user:', user.id);
+    console.log('🔍 Debug: User email:', user.email);
+
     try {
-      const { data, error } = await supabase
+      // First try to find by user_id
+      let { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
         .single();
+
+      // If not found by user_id, try to find by email
+      if (error && error.code === 'PGRST116') {
+        console.log('🔍 Debug: Not found by user_id, trying email');
+        const emailResult = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('email', user.email)
+          .single();
+        
+        if (emailResult.data) {
+          data = emailResult.data;
+          error = null;
+          console.log('🔍 Debug: Found by email:', data);
+        } else {
+          error = emailResult.error;
+        }
+      }
 
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
       if (data) {
+        console.log('🔍 Debug: Profile data loaded:', data);
         setProfileData(data);
       } else {
+        console.log('🔍 Debug: No profile found, creating new one');
         // Create profile if it doesn't exist
         const { data: newProfile, error: createError } = await supabase
           .from('user_profiles')
@@ -178,10 +202,11 @@ export const UserProfile = () => {
           .single();
 
         if (createError) throw createError;
+        console.log('🔍 Debug: New profile created:', newProfile);
         setProfileData(newProfile);
       }
     } catch (error) {
-      console.error('Error loading profile:', error);
+      console.error('🔍 Debug: Error loading profile:', error);
       toast({
         title: "Error",
         description: "Failed to load profile data",
@@ -329,8 +354,8 @@ export const UserProfile = () => {
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Badge variant={profileData?.plan === 'free' ? 'secondary' : 'default'}>
-            {profileData ? PLANS[profileData.plan as keyof typeof PLANS].name : 'Loading'} Plan
+          <Badge variant={profileData.plan === 'free' ? 'secondary' : 'default'}>
+            {currentPlan.name} Plan
           </Badge>
         </div>
       </div>
@@ -735,4 +760,3 @@ export const UserProfile = () => {
     </div>
   );
 };
-
