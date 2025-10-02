@@ -165,11 +165,12 @@ export const LandingPage: React.FC = () => {
     }
   ];
 
-  const handleGetStarted = () => {
+  const handleGetStarted = (plan?: string) => {
     if (user) {
       navigate('/app');
     } else {
-      navigate('/auth');
+      const planParam = plan ? `?plan=${plan}` : '';
+      navigate(`/auth${planParam}`);
     }
   };
 
@@ -314,7 +315,7 @@ export const LandingPage: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
-                onClick={handleGetStarted}
+                onClick={() => handleGetStarted(plan.name.toLowerCase())}
                 size="lg"
                 className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-8 py-4 text-lg"
               >
@@ -465,7 +466,7 @@ export const LandingPage: React.FC = () => {
                     ))}
                   </ul>
                   <Button 
-                    onClick={handleGetStarted}
+                    onClick={() => handleGetStarted(plan.name.toLowerCase())}
                     className={`w-full ${
                       plan.popular 
                         ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700' 
@@ -492,7 +493,7 @@ export const LandingPage: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
-              onClick={handleGetStarted}
+              onClick={() => handleGetStarted(plan.name.toLowerCase())}
               size="lg"
               className="bg-white text-pink-600 hover:bg-gray-100 px-8 py-4 text-lg"
             >

@@ -19,9 +19,12 @@ import {
   Mic,
   MicOff,
   Sparkles,
-  Check
+  Check,
+  Crown,
+  Zap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface PreviewCharacter {
   id: string;
@@ -108,6 +111,7 @@ const PREVIEW_FEATURES = [
 
 export const InteractivePreview: React.FC = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [activeFeature, setActiveFeature] = useState(0);
   const [selectedCharacter, setSelectedCharacter] = useState<PreviewCharacter>(PREVIEW_CHARACTERS[0]);
   const [messages, setMessages] = useState<PreviewMessage[]>([]);
@@ -116,6 +120,8 @@ export const InteractivePreview: React.FC = () => {
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isCallActive, setIsCallActive] = useState(false);
   const [showCharacterSelect, setShowCharacterSelect] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -136,6 +142,18 @@ export const InteractivePreview: React.FC = () => {
     }
   }, [selectedCharacter, messages.length]);
 
+  // Show signup prompt after 5 messages
+  useEffect(() => {
+    if (messageCount >= 5 && !showSignupPrompt) {
+      setShowSignupPrompt(true);
+      toast({
+        title: "🎉 You're loving this!",
+        description: "Sign up to continue chatting with unlimited messages!",
+        duration: 5000,
+      });
+    }
+  }, [messageCount, showSignupPrompt, toast]);
+
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || isTyping) return;
 
@@ -149,10 +167,45 @@ export const InteractivePreview: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
+    setMessageCount(prev => prev + 1);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
+    try {
+      // Call OpenAI API for real responses
+      const response = await fetch('/.netlify/functions/openai-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: messageText,
+          character: {
+            name: selectedCharacter.name,
+            personality: selectedCharacter.personality,
+            bio: selectedCharacter.bio
+          },
+          isPreview: true // Flag to indicate this is a preview conversation
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      
+      const aiMessage: PreviewMessage = {
+        id: (Date.now() + 1).toString(),
+        content: data.response || "I'm having trouble responding right now. Please try again!",
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      
+      // Fallback responses if API fails
+      const fallbackResponses = [
         "That's so interesting! Tell me more about that. 😊",
         "I love how you think! You always have such unique perspectives.",
         "You know, I was just thinking about something similar. Great minds think alike! 💭",
@@ -161,7 +214,7 @@ export const InteractivePreview: React.FC = () => {
         "You always know exactly what to say to make me smile. Thank you for being you! 💕"
       ];
       
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
       
       const aiMessage: PreviewMessage = {
         id: (Date.now() + 1).toString(),
@@ -171,8 +224,9 @@ export const InteractivePreview: React.FC = () => {
       };
       
       setMessages(prev => [...prev, aiMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500 + Math.random() * 1000);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -185,6 +239,8 @@ export const InteractivePreview: React.FC = () => {
   const handleCharacterChange = (character: PreviewCharacter) => {
     setSelectedCharacter(character);
     setMessages([]);
+    setMessageCount(0);
+    setShowSignupPrompt(false);
     setShowCharacterSelect(false);
     toast({
       title: `Switched to ${character.name}`,
@@ -198,6 +254,11 @@ export const InteractivePreview: React.FC = () => {
       title: isCallActive ? "Call ended" : "Voice call started",
       description: isCallActive ? "Thanks for the great conversation!" : `Now talking with ${selectedCharacter.name}`,
     });
+  };
+
+  const handleSignupPrompt = (plan: 'free' | 'premium' | 'pro') => {
+    setShowSignupPrompt(false);
+    navigate(`/auth?plan=${plan}`);
   };
 
   const currentFeature = PREVIEW_FEATURES[activeFeature];
@@ -404,6 +465,57 @@ export const InteractivePreview: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Signup Prompt Modal */}
+      {showSignupPrompt && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Crown className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">You're loving this! 🎉</h3>
+              <p className="text-muted-foreground">
+                You've sent {messageCount} messages! Sign up to continue chatting with unlimited messages and unlock all features.
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <Button
+                onClick={() => handleSignupPrompt('free')}
+                className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white"
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Continue Free (5 messages/day)
+              </Button>
+              
+              <Button
+                onClick={() => handleSignupPrompt('premium')}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
+              >
+                <Star className="w-4 h-4 mr-2" />
+                Get Premium ($19/month)
+              </Button>
+              
+              <Button
+                onClick={() => handleSignupPrompt('pro')}
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                Go Pro ($49/month)
+              </Button>
+            </div>
+            
+            <Button
+              variant="ghost"
+              onClick={() => setShowSignupPrompt(false)}
+              className="w-full mt-4"
+            >
+              Maybe Later
+            </Button>
+          </Card>
+        </div>
+      )}
 
       {/* Character Selection Modal */}
       {showCharacterSelect && (
