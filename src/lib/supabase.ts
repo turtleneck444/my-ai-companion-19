@@ -19,11 +19,14 @@ export const supabase = createClient(supabaseUrl, anonKey, {
   }
 });
 
+// Export configuration status
+export const isSupabaseConfigured = !!(supabaseUrl && anonKey);
+
 // Debug logging
 console.log('🔧 Supabase Configuration Debug:');
 console.log('URL Present:', !!supabaseUrl);
 console.log('URL Valid:', supabaseUrl?.includes('supabase.co'));
 console.log('Key Present:', !!anonKey);
 console.log('Key Valid:', anonKey?.length > 0);
-console.log('Configured:', !!supabaseUrl && !!anonKey);
+console.log('Configured:', isSupabaseConfigured);
 console.log('Supabase client created:', !!supabase);
