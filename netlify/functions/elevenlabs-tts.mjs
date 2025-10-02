@@ -8,7 +8,7 @@ export async function handler(event) {
     const finalVoiceId = voice_id || voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID;
     // Use the correct API key with 29,000 credits as primary fallback
     const apiKey = process.env.VITE_ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY || '03c1fb7bb39fa7c890c0471cf1a79b93b96c3267b8ce41aa9e41162c7185a876';
-    console.log('🔑 API Key check:\, {
+    console.log('🔑 API Key check:', {
       vite: !!process.env.VITE_ELEVENLABS_API_KEY,
       regular: !!process.env.ELEVENLABS_API_KEY,
       using: apiKey ? 'Found' : 'Missing'
