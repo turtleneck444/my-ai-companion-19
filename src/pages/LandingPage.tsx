@@ -204,8 +204,11 @@ export const LandingPage: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
-                <Heart className="h-8 w-8 text-pink-600 mr-2" />
-                <span className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                {/* Original LoveAI Logo - Pink circle with white heart border */}
+                <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center mr-2">
+                  <Heart className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-2xl font-bold text-black">
                   LoveAI
                 </span>
               </div>
@@ -315,7 +318,7 @@ export const LandingPage: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
-                onClick={() => handleGetStarted(plan.name.toLowerCase())}
+                onClick={handleGetStarted}
                 size="lg"
                 className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-8 py-4 text-lg"
               >
@@ -493,7 +496,7 @@ export const LandingPage: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
-              onClick={() => handleGetStarted(plan.name.toLowerCase())}
+              onClick={handleGetStarted}
               size="lg"
               className="bg-white text-pink-600 hover:bg-gray-100 px-8 py-4 text-lg"
             >
@@ -513,51 +516,30 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16 px-4 sm:px-6 lg:px-8">
+      {/* Clean White Footer */}
+      <footer className="bg-white border-t border-pink-200/30 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center mb-4">
-                <Heart className="h-8 w-8 text-pink-500 mr-2" />
-                <span className="text-2xl font-bold">LoveAI</span>
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center mb-4 md:mb-0">
+              {/* Original LoveAI Logo - Pink circle with white heart border */}
+              <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center mr-3">
+                <Heart className="h-5 w-5 text-white" />
               </div>
-              <p className="text-gray-400 mb-4">
-                Your AI companion for meaningful conversations and emotional connections.
-              </p>
+              <span className="text-2xl font-bold text-black">
+                LoveAI
+              </span>
             </div>
             
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#preview" className="hover:text-white transition-colors">Demo</a></li>
-                <li><a href="/support" className="hover:text-white transition-colors">Support</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="/about" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="/blog" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="/careers" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="/contact" className="hover:text-white transition-colors">Contact</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="/privacy" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="/terms" className="hover:text-white transition-colors">Terms of Service</a></li>
-                <li><a href="/cookies" className="hover:text-white transition-colors">Cookie Policy</a></li>
-              </ul>
+            <div className="flex flex-wrap justify-center md:justify-end gap-6 text-sm text-gray-600">
+              <a href="#features" className="hover:text-pink-600 transition-colors">Features</a>
+              <a href="#pricing" className="hover:text-pink-600 transition-colors">Pricing</a>
+              <a href="#preview" className="hover:text-pink-600 transition-colors">Demo</a>
+              <a href="/privacy" className="hover:text-pink-600 transition-colors">Privacy</a>
+              <a href="/terms" className="hover:text-pink-600 transition-colors">Terms</a>
             </div>
           </div>
           
-          <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
+          <div className="mt-8 pt-6 border-t border-pink-200/30 text-center text-sm text-gray-500">
             <p>&copy; 2024 LoveAI. All rights reserved.</p>
           </div>
         </div>
