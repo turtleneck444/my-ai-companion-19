@@ -1,73 +1,188 @@
-export async function handler(event) {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
+// Enhanced ElevenLabs TTS API with FEMALE VOICES ONLY
+export const handler = async (event, context) => {
+  // CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'audio/mpeg'
+  };
+
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    };
   }
+
+  // Only allow POST requests
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { text, voiceId, voice_id, model_id, voice_settings } = body;
-    const finalVoiceId = voice_id || voiceId || process.env.ELEVENLABS_DEFAULT_VOICE_ID;
-    // Use the correct API key with 29,000 credits as primary fallback
-    const apiKey = process.env.VITE_ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY || '03c1fb7bb39fa7c890c0471cf1a79b93b96c3267b8ce41aa9e41162c7185a876';
-    console.log('🔑 API Key check:', {
-      vite: !!process.env.VITE_ELEVENLABS_API_KEY,
-      regular: !!process.env.ELEVENLABS_API_KEY,
-      using: apiKey ? 'Found' : 'Missing'
+    console.log('🎤 ElevenLabs TTS API called');
+    
+    // Parse request body
+    const body = JSON.parse(event.body);
+    const { text, voice_id, model_id, voice_settings } = body;
+    
+    console.log('📝 Request details:', {
+      text: text?.slice(0, 50) + '...',
+      voice_id,
+      model_id,
+      voice_settings
     });
-    if (!apiKey) {
-      return { statusCode: 500, body: JSON.stringify({ error: 'Missing ELEVENLABS_API_KEY' }) };
-    }
+
     if (!text) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing text' }) };
-    }
-    const vid = finalVoiceId || 'kdmDKE6EkgrWrrykO9Qt'; // Alexandra - female voice
-
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vid}`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': apiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'audio/mpeg'
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: model_id || 'eleven_multilingual_v2',
-        voice_settings: voice_settings || {
-          stability: 0.15,
-          similarity_boost: 0.98,
-          style: 0.85,
-          use_speaker_boost: true
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ElevenLabs API error:', response.status, errorText);
       return {
-        statusCode: response.status,
-        body: JSON.stringify({ 
-          error: 'ElevenLabs API error', 
-          details: errorText,
-          status: response.status 
-        })
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Text is required' })
       };
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    // FEMALE VOICE VALIDATION - Only allow confirmed female voices
+    const FEMALE_VOICES = [
+      'EXAVITQu4vr4xnSDxMaL', // Luna (Sarah) - professional female
+      '21m00Tcm4TlvDq8ikWAM', // Bonquisha (Rachel) - bold female
+      'AZnzlk1XvdvUeBnXmlld', // Bella - seductive female
+      'ErXwobaYiN019PkySvjV', // Elli - soft female
+      'pNInz6obpgDQGcFmaJgB', // Olivia - cheerful female
+      'onwK4e9ZLuTAKqWW03F9', // Domi - bold female
+      'kdmDKE6EkgrWrrykO9Qt', // Emily - sophisticated female
+      'XrExE9yKIg1WjnnlVkGX', // Matilda - sweet female
+      'CYw3kZ02Hs0563khs1Fj', // Nova - modern female
+      'XB0fDUnXU5powFXDhCwa', // Charlotte - calm female
+      'VR6AewLTigWG4xSOukaG', // Lily - sweet female
+      'pqHfZKP75CvOlQylNhV4', // Bella - seductive female
+      'g6xIsTj2HwM6VR4iXFCw', // Jessica Anne Bogart - empathetic
+      'OYTbf65OHHFELVut7v2H', // Hope - bright and uplifting
+      'dj3G1R1ilKoFKhBnWOzG', // Eryn - friendly and relatable
+      'PT4nqlKZfc06VW1BuClj', // Angela - raw and relatable
+      '56AoDkrOh6qfVPDXZ7Pt'  // Cassidy - engaging and energetic
+    ];
+
+    // Validate and ensure female voice only
+    let validatedVoiceId = voice_id;
+    if (!FEMALE_VOICES.includes(voice_id)) {
+      console.log('⚠️ Invalid or male voice detected, using female fallback');
+      validatedVoiceId = 'EXAVITQu4vr4xnSDxMaL'; // Default to Luna (female)
+    }
+
+    // Enhanced voice settings for more natural speech
+    const defaultVoiceSettings = {
+      stability: 0.15,        // Lower for more natural variation
+      similarity_boost: 0.98, // Higher for consistency
+      style: 0.85,           // Higher for expressiveness
+      use_speaker_boost: true
+    };
+
+    // Merge with provided settings
+    const finalVoiceSettings = {
+      ...defaultVoiceSettings,
+      ...voice_settings
+    };
+
+    console.log('🔧 Final voice settings:', finalVoiceSettings);
+    console.log('🎤 Using FEMALE voice ID:', validatedVoiceId);
+
+    // ElevenLabs API configuration
+    const modelId = model_id || 'eleven_multilingual_v2';
+    const apiKey = process.env.ELEVENLABS_API_KEY || process.env.VITE_ELEVENLABS_API_KEY || '03c1fb7bb39fa7c890c0471cf1a79b93b96c3267b8ce41aa9e41162c7185a876';
+
+    if (!apiKey) {
+      console.error('❌ ElevenLabs API key not found');
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'TTS service not configured' })
+      };
+    }
+
+    // Enhanced text processing for better speech
+    const processedText = processTextForSpeech(text);
+    console.log('📝 Processed text:', processedText.slice(0, 100) + '...');
+
+    // Make request to ElevenLabs
+    const audioData = await makeElevenLabsRequest(processedText, validatedVoiceId, modelId, finalVoiceSettings, apiKey);
+    
+    console.log('✅ Audio generated successfully, size:', audioData.length);
+
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'audio/mpeg',
+        ...headers,
+        'Content-Length': audioData.length.toString(),
         'Cache-Control': 'no-cache'
       },
-      body: Buffer.from(audioBuffer).toString('base64'),
+      body: audioData.toString('base64'),
       isBase64Encoded: true
     };
+
   } catch (error) {
-    console.error('ElevenLabs TTS error:', error);
+    console.error('❌ TTS Error:', error);
+    
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error', details: error.message })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        error: 'TTS generation failed',
+        details: error.message 
+      })
     };
   }
+};
+
+// Enhanced text processing for more natural speech
+function processTextForSpeech(text) {
+  let processed = text
+    .replace(/[.]{2,}/g, '.') // Replace multiple periods with single
+    .replace(/[!]{2,}/g, '!') // Replace multiple exclamations with single
+    .replace(/[?]{2,}/g, '?') // Replace multiple questions with single
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+
+  // Add natural pauses for better speech flow
+  processed = processed
+    .replace(/\.\s+/g, '. ') // Ensure space after periods
+    .replace(/,\s+/g, ', ') // Ensure space after commas
+    .replace(/!\s+/g, '! ') // Ensure space after exclamations
+    .replace(/\?\s+/g, '? '); // Ensure space after questions
+
+  return processed;
+}
+
+// Make request to ElevenLabs API
+async function makeElevenLabsRequest(text, voiceId, modelId, voiceSettings, apiKey) {
+  const postData = JSON.stringify({
+    text: text,
+    model_id: modelId,
+    voice_settings: voiceSettings
+  });
+
+  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': apiKey
+    },
+    body: postData
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('❌ ElevenLabs API Error:', response.status, errorText);
+    throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+  }
+
+  const audioBuffer = await response.arrayBuffer();
+  return Buffer.from(audioBuffer);
 }

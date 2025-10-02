@@ -35,30 +35,68 @@ CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (to avoid conflicts)
+DO $$ 
+BEGIN
+  -- Drop conversations policies
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'conversations' AND policyname = 'Users can view their own conversations') THEN
+    DROP POLICY "Users can view their own conversations" ON conversations;
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'conversations' AND policyname = 'Users can create their own conversations') THEN
+    DROP POLICY "Users can create their own conversations" ON conversations;
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'conversations' AND policyname = 'Users can update their own conversations') THEN
+    DROP POLICY "Users can update their own conversations" ON conversations;
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'conversations' AND policyname = 'Users can delete their own conversations') THEN
+    DROP POLICY "Users can delete their own conversations" ON conversations;
+  END IF;
+  
+  -- Drop messages policies
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Users can view their own messages') THEN
+    DROP POLICY "Users can view their own messages" ON messages;
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Users can create their own messages') THEN
+    DROP POLICY "Users can create their own messages" ON messages;
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Users can update their own messages') THEN
+    DROP POLICY "Users can update their own messages" ON messages;
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Users can delete their own messages') THEN
+    DROP POLICY "Users can delete their own messages" ON messages;
+  END IF;
+END $$;
+
 -- Create RLS policies for conversations
-CREATE POLICY IF NOT EXISTS "Users can view their own conversations" ON conversations
+CREATE POLICY "Users can view their own conversations" ON conversations
   FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can create their own conversations" ON conversations
+CREATE POLICY "Users can create their own conversations" ON conversations
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can update their own conversations" ON conversations
+CREATE POLICY "Users can update their own conversations" ON conversations
   FOR UPDATE USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can delete their own conversations" ON conversations
+CREATE POLICY "Users can delete their own conversations" ON conversations
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Create RLS policies for messages
-CREATE POLICY IF NOT EXISTS "Users can view their own messages" ON messages
+CREATE POLICY "Users can view their own messages" ON messages
   FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can create their own messages" ON messages
+CREATE POLICY "Users can create their own messages" ON messages
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can update their own messages" ON messages
+CREATE POLICY "Users can update their own messages" ON messages
   FOR UPDATE USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can delete their own messages" ON messages
+CREATE POLICY "Users can delete their own messages" ON messages
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Create function to update conversation message count

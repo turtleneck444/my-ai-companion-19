@@ -1,4 +1,4 @@
-// Voice utilities for ElevenLabs TTS integration
+// Voice utilities for ElevenLabs TTS integration - FEMALE VOICES ONLY
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ElevenLabsSettings {
@@ -28,7 +28,6 @@ const VOICE_PRESETS: Record<string, ElevenLabsSettings> = {
   'XB0fDUnXU5powFXDhCwa': { stability: 0.80, similarity_boost: 0.85, style: 0.10, use_speaker_boost: true }, // Charlotte - calm female
   'VR6AewLTigWG4xSOukaG': { stability: 0.75, similarity_boost: 0.85, style: 0.15, use_speaker_boost: true }, // Lily - sweet female
   'pqHfZKP75CvOlQylNhV4': { stability: 0.70, similarity_boost: 0.80, style: 0.25, use_speaker_boost: true }, // Bella - seductive female
-  'kdmDKE6EkgrWrrykO9Qt': { stability: 0.60, similarity_boost: 0.90, style: 0.30, use_speaker_boost: true }, // Alexandra - super realistic, young female
   'g6xIsTj2HwM6VR4iXFCw': { stability: 0.65, similarity_boost: 0.85, style: 0.25, use_speaker_boost: true }, // Jessica Anne Bogart - empathetic
   'OYTbf65OHHFELVut7v2H': { stability: 0.70, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true }, // Hope - bright and uplifting
   'dj3G1R1ilKoFKhBnWOzG': { stability: 0.60, similarity_boost: 0.85, style: 0.25, use_speaker_boost: true }, // Eryn - friendly and relatable
@@ -54,32 +53,28 @@ export function getVoiceSettings(voiceId: string): ElevenLabsSettings {
   return VOICE_PRESETS[voiceId] || DEFAULT_VOICE_SETTINGS;
 }
 
-// Process text for better speech synthesis - FIXED VERSION
+// Process text for better speech synthesis
 export function processTextForSpeech(text: string): string {
-  // Handle undefined or null text
   if (!text || typeof text !== 'string') {
     return 'Hello! I am your AI companion.';
   }
   
-  // Skip complex processing for short texts to save credits
   if (text.length < 50) {
     return text;
   }
   
-  // Remove excessive punctuation and normalize spacing
   let processed = text
-    .replace(/[.]{2,}/g, '.') // Replace multiple periods with single
-    .replace(/[!]{2,}/g, '!') // Replace multiple exclamations with single
-    .replace(/[?]{2,}/g, '?') // Replace multiple questions with single
-    .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(/[.]{2,}/g, '.')
+    .replace(/[!]{2,}/g, '!')
+    .replace(/[?]{2,}/g, '?')
+    .replace(/\s+/g, ' ')
     .trim();
 
-  // Add natural pauses for better speech flow
   processed = processed
-    .replace(/\.\s+/g, '. ') // Ensure space after periods
-    .replace(/,\s+/g, ', ') // Ensure space after commas
-    .replace(/!\s+/g, '! ') // Ensure space after exclamations
-    .replace(/\?\s+/g, '? '); // Ensure space after questions
+    .replace(/\.\s+/g, '. ')
+    .replace(/,\s+/g, ', ')
+    .replace(/!\s+/g, '! ')
+    .replace(/\?\s+/g, '? ');
 
   return processed;
 }
@@ -88,23 +83,19 @@ export function processTextForSpeech(text: string): string {
 export function stopAllSpeech(): void {
   console.log('🛑 Stopping all TTS');
   
-  // Stop current audio
   if (currentAudio) {
     currentAudio.pause();
     currentAudio.currentTime = 0;
     currentAudio = null;
   }
   
-  // Stop browser TTS
   if ('speechSynthesis' in window) {
     speechSynthesis.cancel();
   }
   
-  // Reset flags
   isSpeaking = false;
   currentSpeechPromise = null;
   
-  // Set global flags
   if (typeof window !== "undefined") {
     (window as any).isSpeaking = false;
     (window as any).currentSpeechPromise = null;
@@ -113,35 +104,48 @@ export function stopAllSpeech(): void {
   console.log('🔓 SPEECH LOCK RELEASED');
 }
 
-// Main function to speak text using ElevenLabs - ENHANCED VERSION
+// Main function to speak text using ElevenLabs - FEMALE VOICES ONLY
 export async function speakText(
   text: string, 
   voiceId: string = 'EXAVITQu4vr4xnSDxMaL', // Default to Luna (female)
   settings?: ElevenLabsSettings
 ): Promise<void> {
-  // Handle undefined text
   if (!text || typeof text !== 'string') {
     text = 'Hello! I am your AI companion.';
   }
   
   console.log('🎤 Speaking text:', text.substring(0, Math.min(50, text.length)) + '...', 'Voice ID:', voiceId);
   
-  // Stop any current speech to prevent overlapping
+  // FEMALE VOICE VALIDATION
+  const FEMALE_VOICES = [
+    'EXAVITQu4vr4xnSDxMaL', '21m00Tcm4TlvDq8ikWAM', 'AZnzlk1XvdvUeBnXmlld',
+    'ErXwobaYiN019PkySvjV', 'pNInz6obpgDQGcFmaJgB', 'onwK4e9ZLuTAKqWW03F9',
+    'kdmDKE6EkgrWrrykO9Qt', 'XrExE9yKIg1WjnnlVkGX', 'CYw3kZ02Hs0563khs1Fj',
+    'XB0fDUnXU5powFXDhCwa', 'VR6AewLTigWG4xSOukaG', 'pqHfZKP75CvOlQylNhV4',
+    'g6xIsTj2HwM6VR4iXFCw', 'OYTbf65OHHFELVut7v2H', 'dj3G1R1ilKoFKhBnWOzG',
+    'PT4nqlKZfc06VW1BuClj', '56AoDkrOh6qfVPDXZ7Pt'
+  ];
+
+  // Ensure only female voices are used
+  const validatedVoiceId = FEMALE_VOICES.includes(voiceId) ? voiceId : 'EXAVITQu4vr4xnSDxMaL';
+  
+  if (voiceId !== validatedVoiceId) {
+    console.log('⚠️ Invalid voice ID, using female fallback:', validatedVoiceId);
+  }
+  
   stopAllSpeech();
   
-  // Set speaking flag
   isSpeaking = true;
   if (typeof window !== "undefined") {
     (window as any).isSpeaking = true;
   }
   
   const processedText = processTextForSpeech(text);
-  const voiceSettings = settings || getVoiceSettings(voiceId);
+  const voiceSettings = settings || getVoiceSettings(validatedVoiceId);
   
   console.log(' Voice settings:', voiceSettings);
 
   try {
-    // Try local API first, then Netlify function
     const endpoints = [
       '/api/elevenlabs-tts',
       '/.netlify/functions/elevenlabs-tts'
@@ -158,8 +162,8 @@ export async function speakText(
           },
           body: JSON.stringify({
             text: processedText,
-            voiceId: voiceId,
-            voice_id: voiceId,
+            voiceId: validatedVoiceId,
+            voice_id: validatedVoiceId,
             voice_settings: voiceSettings,
             model_id: 'eleven_multilingual_v2'
           })
@@ -170,12 +174,10 @@ export async function speakText(
           const audioBlob = await response.blob();
           console.log('📦 Received audio blob:', audioBlob.size, 'bytes');
           
-          // Create audio element and play
           const audioUrl = URL.createObjectURL(audioBlob);
           const audio = new Audio(audioUrl);
           currentAudio = audio;
           
-          // Set up audio event handlers
           audio.onended = () => {
             URL.revokeObjectURL(audioUrl);
             currentAudio = null;
@@ -197,23 +199,20 @@ export async function speakText(
             }
           };
           
-          // Handle autoplay policy issues
           try {
             console.log('🎵 Attempting to play audio...');
             await audio.play();
             console.log('🎵 Audio playback started successfully');
           } catch (playError) {
             console.warn('⚠️ Autoplay blocked, trying to enable audio:', playError);
-            // Try to enable audio by setting volume and trying again
             audio.volume = 0.1;
             try {
               await audio.play();
               console.log('🎵 Audio playback started after volume adjustment');
             } catch (secondError) {
               console.error('❌ Audio playback failed completely:', secondError);
-              // Fall back to browser TTS
               console.log('🔄 Falling back to browser TTS due to audio playback failure');
-              await fallbackTTS(processedText, voiceId);
+              await fallbackTTS(processedText, validatedVoiceId);
             }
           }
           return;
@@ -227,16 +226,14 @@ export async function speakText(
       }
     }
 
-    // If all endpoints fail, fall back to browser TTS
     console.log('🔄 Falling back to browser TTS');
-    await fallbackTTS(processedText, voiceId);
+    await fallbackTTS(processedText, validatedVoiceId);
     
   } catch (error) {
     console.error('❌ TTS Error:', error);
     console.log('🔄 Falling back to browser TTS');
-    await fallbackTTS(processedText, voiceId);
+    await fallbackTTS(processedText, validatedVoiceId);
   } finally {
-    // Release speech lock
     isSpeaking = false;
     if (typeof window !== "undefined") {
       (window as any).isSpeaking = false;
@@ -252,50 +249,37 @@ async function fallbackTTS(text: string, voiceId: string): Promise<void> {
     return;
   }
 
-  // Map voice IDs to browser voices - FEMALE ONLY
-  const voiceMap: Record<string, string> = {
-    'EXAVITQu4vr4xnSDxMaL': 'Samantha', // Luna (Sarah)
-    '21m00Tcm4TlvDq8ikWAM': 'Samantha', // Bonquisha (Rachel)
-    'AZnzlk1XvdvUeBnXmlld': 'Samantha', // Bella
-    'ErXwobaYiN019PkySvjV': 'Samantha', // Elli
-    'pNInz6obpgDQGcFmaJgB': 'Samantha', // Olivia
-    'onwK4e9ZLuTAKqWW03F9': 'Samantha', // Domi
-    'kdmDKE6EkgrWrrykO9Qt': 'Samantha', // Emily
-    'XrExE9yKIg1WjnnlVkGX': 'Samantha', // Matilda
-    'CYw3kZ02Hs0563khs1Fj': 'Samantha', // Nova
-    'XB0fDUnXU5powFXDhCwa': 'Samantha', // Charlotte
-    'VR6AewLTigWG4xSOukaG': 'Samantha', // Lily
-    'pqHfZKP75CvOlQylNhV4': 'Samantha', // Bella
-    'g6xIsTj2HwM6VR4iXFCw': 'Samantha', // Jessica Anne Bogart
-    'OYTbf65OHHFELVut7v2H': 'Samantha', // Hope
-    'dj3G1R1ilKoFKhBnWOzG': 'Samantha', // Eryn
-    'PT4nqlKZfc06VW1BuClj': 'Samantha', // Angela
-    '56AoDkrOh6qfVPDXZ7Pt': 'Samantha'  // Cassidy
-  };
-
-  const browserVoice = voiceMap[voiceId] || 'Samantha';
-  
   console.log('🔄 Falling back to browser TTS');
   
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Set voice
+    // Get available voices and find female voices
     const voices = speechSynthesis.getVoices();
-    const selectedVoice = voices.find(voice => 
-      voice.name.includes(browserVoice) || 
-      voice.name.includes('Samantha') ||
-      voice.name.includes('Female')
+    const femaleVoices = voices.filter(voice => 
+      voice.name.toLowerCase().includes('female') ||
+      voice.name.toLowerCase().includes('woman') ||
+      voice.name.toLowerCase().includes('samantha') ||
+      voice.name.toLowerCase().includes('karen') ||
+      voice.name.toLowerCase().includes('susan') ||
+      voice.name.toLowerCase().includes('zira') ||
+      voice.name.toLowerCase().includes('hazel') ||
+      voice.name.toLowerCase().includes('susan') ||
+      voice.name.toLowerCase().includes('victoria') ||
+      voice.name.toLowerCase().includes('samantha')
     );
+    
+    // Use first available female voice, or default to Samantha
+    const selectedVoice = femaleVoices.length > 0 ? femaleVoices[0] : 
+      voices.find(voice => voice.name.includes('Samantha')) || voices[0];
     
     if (selectedVoice) {
       utterance.voice = selectedVoice;
-      console.log('🎤 Using voice:', selectedVoice.name);
+      console.log('🎤 Using FEMALE voice:', selectedVoice.name);
     } else {
-      console.log('🎤 Using voice: Samantha');
+      console.log('🎤 Using default voice (should be female)');
     }
     
-    // Set speech parameters
     utterance.rate = 0.9;
     utterance.pitch = 1.0;
     utterance.volume = 0.8;
