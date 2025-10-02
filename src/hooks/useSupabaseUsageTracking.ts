@@ -20,134 +20,121 @@ interface PlanLimits {
   canMakeVoiceCall: boolean;
 }
 
+const PLAN_LIMITS = {
+  free: { messagesPerDay: 10, voiceCallsPerDay: 2, companions: 1 },
+  premium: { messagesPerDay: 1000, voiceCallsPerDay: 100, companions: 10 },
+  pro: { messagesPerDay: 10000, voiceCallsPerDay: 1000, companions: 50 }
+};
+
 export const useSupabaseUsageTracking = () => {
   const { user } = useAuth();
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load plan limits and usage from Supabase
+  // Load plan limits and usage directly from user_profiles table
   const loadPlanLimits = useCallback(async () => {
     if (!user?.id) return;
+
+    console.log('🔍 Debug: Loading plan limits for user:', user.id);
+    console.log('🔍 Debug: User email:', user.email);
 
     try {
       setIsLoading(true);
       setError(null);
 
-      // Call the Supabase function to get plan limits
-      const { data, error: funcError } = await supabase.rpc('check_user_plan_limits', {
-        user_uuid: user.id
-      });
+      // First try to find by user_id
+      let { data: profileData, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-      if (funcError) {
-        console.error('Error checking plan limits:', funcError);
-        setError(funcError.message);
+      // If not found by user_id, try to find by email
+      if (error && error.code === 'PGRST116') {
+        console.log('🔍 Debug: Not found by user_id, trying email');
+        const emailResult = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('email', user.email)
+          .single();
+        
+        if (emailResult.data) {
+          profileData = emailResult.data;
+          error = null;
+          console.log('🔍 Debug: Found by email:', profileData);
+        } else {
+          error = emailResult.error;
+        }
+      }
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading plan limits:', error);
+        setError(error.message);
         return;
       }
 
-      if (data) {
-        setPlanLimits(data);
+      if (profileData) {
+        console.log('🔍 Debug: Profile data loaded for plan limits:', profileData);
+        
+        const plan = profileData.plan || 'free';
+        const limits = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+        const messagesUsed = profileData.usage_messages_today || 0;
+        const voiceCallsUsed = profileData.usage_voice_calls_today || 0;
+        const companionsCreated = profileData.usage_companions_created || 0;
+        
+        const remainingMessages = Math.max(0, limits.messagesPerDay - messagesUsed);
+        const remainingVoiceCalls = Math.max(0, limits.voiceCallsPerDay - voiceCallsUsed);
+        
+        const planLimitsData: PlanLimits = {
+          plan,
+          limits,
+          usage: {
+            messagesUsed,
+            voiceCallsUsed,
+            companionsCreated
+          },
+          canSendMessage: remainingMessages > 0,
+          canMakeVoiceCall: remainingVoiceCalls > 0
+        };
+        
+        setPlanLimits(planLimitsData);
+        
+        console.log('🔍 Debug: Plan limits set:', planLimitsData);
       }
-    } catch (err) {
-      console.error('Error loading plan limits:', err);
-      setError('Failed to load plan limits');
+    } catch (error) {
+      console.error('Error loading plan limits:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, user?.email]);
 
-  // Increment usage in Supabase
-  const incrementUsage = useCallback(async (usageType: 'message' | 'voice_call' | 'companion'): Promise<boolean> => {
-    if (!user?.id) return false;
-
-    try {
-      // Call the Supabase function to increment usage
-      const { data, error: funcError } = await supabase.rpc('increment_user_usage', {
-        user_uuid: user.id,
-        usage_type: usageType
-      });
-
-      if (funcError) {
-        console.error('Error incrementing usage:', funcError);
-        return false;
-      }
-
-      // If successful, reload the plan limits to get updated usage
-      if (data) {
-        await loadPlanLimits();
-        return true;
-      }
-
-      return false;
-    } catch (err) {
-      console.error('Error incrementing usage:', err);
-      return false;
-    }
-  }, [user?.id, loadPlanLimits]);
-
-  // Convenience functions
-  const incrementMessages = useCallback(() => incrementUsage('message'), [incrementUsage]);
-  const incrementVoiceCalls = useCallback(() => incrementUsage('voice_call'), [incrementUsage]);
-  const incrementCompanions = useCallback(() => incrementUsage('companion'), [incrementUsage]);
-
-  // Load plan limits when user changes
   useEffect(() => {
     loadPlanLimits();
   }, [loadPlanLimits]);
 
-  // Auto-refresh every 30 seconds to sync with database
-  useEffect(() => {
-    if (!user?.id) return;
+  // Calculate remaining counts
+  const remainingMessages = planLimits?.limits.messagesPerDay === -1
+    ? -1
+    : Math.max(0, (planLimits?.limits.messagesPerDay || 0) - (planLimits?.usage.messagesUsed || 0));
 
-    const interval = setInterval(() => {
-      loadPlanLimits();
-    }, 30000); // 30 seconds
+  const remainingVoiceCalls = planLimits?.limits.voiceCallsPerDay === -1
+    ? -1
+    : Math.max(0, (planLimits?.limits.voiceCallsPerDay || 0) - (planLimits?.usage.voiceCallsUsed || 0));
 
-    return () => clearInterval(interval);
-  }, [user?.id, loadPlanLimits]);
-
-  // Computed values for backward compatibility
-  const usage: UsageData = planLimits?.usage || {
-    messagesUsed: 0,
-    voiceCallsUsed: 0,
-    companionsCreated: 0
-  };
-
-  const currentPlan = planLimits?.plan || 'free';
-  const canSendMessage = planLimits?.canSendMessage || false;
-  const canMakeVoiceCall = planLimits?.canMakeVoiceCall || false;
-
-  const remainingMessages = planLimits?.limits.messagesPerDay === -1 
-    ? -1 // unlimited
-    : Math.max(0, (planLimits?.limits.messagesPerDay || 0) - usage.messagesUsed);
-
-  const remainingVoiceCalls = planLimits?.limits.voiceCallsPerDay === -1 
-    ? -1 // unlimited  
-    : Math.max(0, (planLimits?.limits.voiceCallsPerDay || 0) - usage.voiceCallsUsed);
+  const remainingCompanions = planLimits?.limits.companions === -1
+    ? -1
+    : Math.max(0, (planLimits?.limits.companions || 0) - (planLimits?.usage.companionsCreated || 0));
 
   return {
-    // Data
-    usage,
-    currentPlan,
+    currentPlan: planLimits?.plan || 'free',
     planLimits,
-    isLoading,
-    error,
-    
-    // Actions
-    incrementMessages,
-    incrementVoiceCalls, 
-    incrementCompanions,
-    refreshLimits: loadPlanLimits,
-    
-    // Computed values (for backward compatibility)
-    canSendMessage,
-    canMakeVoiceCall,
     remainingMessages,
     remainingVoiceCalls,
-    
-    // Convenience getters
-    isUnlimited: currentPlan === 'pro',
-    isPremium: currentPlan === 'premium' || currentPlan === 'pro',
-    isFree: currentPlan === 'free'
+    remainingCompanions,
+    isLoading,
+    error,
+    loadPlanLimits
   };
-}; 
+};
