@@ -55,16 +55,21 @@ const CheckoutForm = ({ selectedPlan, onSuccess, onClose }: {
       return;
     }
 
-    if (selectedPlan === 'free') {
-      // Handle free plan
-      onSuccess({ planId: 'free', status: 'active' });
-      onClose();
-      return;
-    }
-
     setIsLoading(true);
 
     try {
+      if (selectedPlan === 'free') {
+        // Handle free plan
+        onSuccess({
+          id: 'free-plan',
+          status: 'active',
+          planId: 'free',
+          currentPeriodStart: Date.now(),
+          currentPeriodEnd: Date.now() + (365 * 24 * 60 * 60 * 1000) // 1 year
+        });
+        return;
+      }
+
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) {
         throw new Error('Card element not found');
@@ -80,40 +85,28 @@ const CheckoutForm = ({ selectedPlan, onSuccess, onClose }: {
         throw new Error(pmError.message);
       }
 
+      if (!paymentMethod) {
+        throw new Error('Failed to create payment method');
+      }
+
       // Create subscription
       const subscription = await paymentProcessor.createSubscription(
         selectedPlan,
         paymentMethod.id
       );
 
-      // Handle subscription confirmation
-      if (subscription.paymentStatus === 'requires_confirmation' && subscription.clientSecret) {
-        const { error: confirmError } = await stripe.confirmCardPayment(
-          subscription.clientSecret
-        );
-
-        if (confirmError) {
-          throw new Error(confirmError.message);
-        }
-      } else if (subscription.paymentStatus === 'failed') {
-        throw new Error(subscription.error || 'Payment failed');
-      }
-
-      // Only show success if payment actually succeeded
-      if (subscription.success || subscription.paymentStatus === 'succeeded') {
+      if (subscription.success) {
+        onSuccess(subscription.subscription);
         toast({
-          title: "Payment Successful!",
-          description: `Welcome to ${plan.name} plan! Your subscription is now active.`,
+          title: "Success!",
+          description: `Welcome to ${plan.name}! Your subscription is now active.`,
         });
-
-        onSuccess(subscription);
-        onClose();
       } else {
-        throw new Error('Payment was not successful');
+        throw new Error(subscription.error || 'Subscription creation failed');
       }
 
     } catch (error: any) {
-      console.error('Payment failed:', error);
+      console.error('Payment error:', error);
       toast({
         title: "Payment Failed",
         description: error.message || "Something went wrong. Please try again.",
@@ -127,114 +120,130 @@ const CheckoutForm = ({ selectedPlan, onSuccess, onClose }: {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <div className="text-center">
-          <h3 className="text-2xl font-bold">{plan.name} Plan</h3>
-          <p className="text-3xl font-bold text-primary">
-            {formatPrice(plan.price, plan.currency)}
-            <span className="text-lg font-normal text-muted-foreground">/{plan.interval}</span>
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          {plan.features.map((feature, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              <Check className="h-4 w-4 text-green-500" />
-              <span className="text-sm">{feature}</span>
-            </div>
-          ))}
+        <div>
+          <label className="text-sm font-medium text-foreground mb-2 block">
+            Card Information
+          </label>
+          <div className="border rounded-md p-3">
+            <CardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#424770',
+                    '::placeholder': {
+                      color: '#aab7c4',
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      {selectedPlan !== 'free' && (
-        <div className="space-y-4">
-          <Separator />
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Payment Information</label>
-            <div className="p-4 border rounded-lg">
-              <CardElement
-                options={{
-                  style: {
-                    base: {
-                      fontSize: '16px',
-                      color: '#424770',
-                      '::placeholder': {
-                        color: '#aab7c4',
-                      },
-                    },
-                  },
-                }}
-              />
-            </div>
-          </div>
+      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+        <Shield className="h-4 w-4" />
+        <span>Your payment information is secure and encrypted</span>
+      </div>
 
-          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-            <Shield className="h-4 w-4" />
-            <span>Your payment information is secure and encrypted</span>
-          </div>
-        </div>
-      )}
-
-      <Button
-        type="submit"
-        disabled={!stripe || isLoading || (selectedPlan !== 'free' && !clientSecret)}
-        className="w-full"
-        size="lg"
-      >
-        {isLoading ? (
-          <>
-            <Zap className="mr-2 h-4 w-4 animate-spin" />
-            Processing...
-          </>
-        ) : selectedPlan === 'free' ? (
-          'Get Started Free'
-        ) : (
-          <>
-            <CreditCard className="mr-2 h-4 w-4" />
-            Subscribe to {plan.name}
-          </>
-        )}
-      </Button>
+      <div className="flex space-x-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          className="flex-1"
+          disabled={isLoading}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          className="flex-1"
+          disabled={!stripe || isLoading}
+        >
+          {isLoading ? 'Processing...' : `Subscribe to ${plan.name}`}
+        </Button>
+      </div>
     </form>
   );
 };
 
-export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: PaymentModalProps) => {
-  const [stripePromise, setStripePromise] = useState<any>(null);
-  const [paymentProvider, setPaymentProvider] = useState<string>('stripe');
+export const PaymentModal: React.FC<PaymentModalProps> = ({
+  isOpen,
+  onClose,
+  selectedPlan,
+  onSuccess
+}) => {
+  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+  const [paymentProvider, setPaymentProvider] = useState<'stripe' | null>(null);
 
   useEffect(() => {
-    if (paymentProcessor.isConfigured()) {
-      const provider = paymentProcessor.getProvider();
-      setPaymentProvider(provider);
-      
-      if (provider === 'stripe') {
-        const config = paymentProcessor.getConfig();
-        setStripePromise(loadStripe(config.publishableKey));
+    const initializePayment = async () => {
+      try {
+        // Initialize Stripe
+        const stripe = await paymentProcessor.initializePaymentProvider();
+        if (stripe) {
+          setStripePromise(Promise.resolve(stripe));
+          setPaymentProvider('stripe');
+        }
+      } catch (error) {
+        console.error('Payment initialization failed:', error);
       }
-      // Square initialization is handled in paymentProcessor.initializeSquare()
+    };
+
+    if (isOpen) {
+      initializePayment();
     }
-  }, []);
+  }, [isOpen]);
 
   const plan = getPlanById(selectedPlan);
   if (!plan) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md mx-auto">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center">
-            {selectedPlan === 'free' ? 'Get Started' : 'Complete Your Subscription'}
+            Subscribe to {plan.name}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
-          {selectedPlan === 'free' ? (
-            <CheckoutForm 
-              selectedPlan={selectedPlan} 
-              onSuccess={onSuccess} 
-              onClose={onClose} 
-            />
-          ) : paymentProvider === 'stripe' && stripePromise ? (
+          {/* Plan Details */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">{plan.name}</CardTitle>
+                {plan.popular && (
+                  <Badge variant="secondary" className="bg-primary text-primary-foreground">
+                    Most Popular
+                  </Badge>
+                )}
+              </div>
+              <div className="text-3xl font-bold">
+                {formatPrice(plan.price, plan.currency)}
+                <span className="text-sm font-normal text-muted-foreground">
+                  /{plan.interval === 'forever' ? 'forever' : plan.interval}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ul className="space-y-2">
+                {plan.features.map((feature, index) => (
+                  <li key={index} className="flex items-center space-x-2 text-sm">
+                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Separator />
+
+          {/* Payment Form */}
+          {paymentProvider === 'stripe' && stripePromise ? (
             <Elements stripe={stripePromise}>
               <CheckoutForm 
                 selectedPlan={selectedPlan} 
@@ -242,12 +251,6 @@ export const PaymentModal = ({ isOpen, onClose, selectedPlan, onSuccess }: Payme
                 onClose={onClose} 
               />
             </Elements>
-          ) : paymentProvider === 'square' ? (
-            <CheckoutForm 
-              selectedPlan={selectedPlan} 
-              onSuccess={onSuccess} 
-              onClose={onClose} 
-            />
           ) : (
             <div className="text-center py-8">
               <p className="text-muted-foreground">Loading payment form...</p>

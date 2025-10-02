@@ -28,7 +28,7 @@ export default function PrivacyPolicy() {
             <ul>
               <li>Account data: email, preferred name, plan, subscription status.</li>
               <li>Usage data: message counts, voice-call counts, device/browser info for security and fraud prevention.</li>
-              <li>Payment data: handled by our payment processor (e.g., Square). We do not store full card numbers.</li>
+              <li>Payment data: handled by our payment processor (Stripe). We do not store full card numbers.</li>
             </ul>
 
             <h2>4. How we use data</h2>
@@ -41,7 +41,7 @@ export default function PrivacyPolicy() {
             <h2>5. Sharing</h2>
             <ul>
               <li>Service providers: cloud hosting, AI model providers, analytics strictly necessary to run LoveAI.</li>
-              <li>Payments: your card details are processed by Square (or other processor you select); we never store full card PANs.</li>
+              <li>Payments: your card details are processed by Stripe; we never store full card PANs.</li>
               <li>Legal: we may disclose data when required by applicable law or to protect users and the platform.</li>
             </ul>
 

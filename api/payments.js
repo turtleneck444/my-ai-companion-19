@@ -1,14 +1,7 @@
-// Real Payment processing API endpoints with Square and Stripe integration
+// Payment processing API endpoints with Stripe integration
 const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { Client, Environment } = require('squareup');
 const router = express.Router();
-
-// Initialize Square client
-const squareClient = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox
-});
 
 // Payment provider configurations
 const PAYMENT_CONFIG = {
@@ -16,12 +9,6 @@ const PAYMENT_CONFIG = {
     secretKey: process.env.STRIPE_SECRET_KEY,
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
-  },
-  square: {
-    applicationId: process.env.SQUARE_APPLICATION_ID,
-    accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    environment: process.env.SQUARE_ENVIRONMENT || 'sandbox',
-    locationId: process.env.SQUARE_LOCATION_ID
   }
 };
 
@@ -46,64 +33,32 @@ router.post('/create-intent', async (req, res) => {
   try {
     const { planId, userId, amount, currency = 'usd', provider = 'stripe' } = req.body;
     
-    if (provider === 'stripe') {
-      if (!process.env.STRIPE_SECRET_KEY) {
-        return res.status(500).json({ error: 'Stripe not configured' });
-      }
-
-      // Create payment intent
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount * 100, // Convert to cents
-        currency: currency.toLowerCase(),
-        metadata: {
-          planId,
-          userId: userId || 'anonymous'
-        },
-        automatic_payment_methods: {
-          enabled: true,
-        },
-      });
-
-      res.json({
-        id: paymentIntent.id,
-        clientSecret: paymentIntent.client_secret,
-        status: paymentIntent.status
-      });
-    } else if (provider === 'square') {
-      if (!process.env.SQUARE_ACCESS_TOKEN || !process.env.SQUARE_LOCATION_ID) {
-        return res.status(500).json({ error: 'Square not configured' });
-      }
-
-      const { sourceId } = req.body || {};
-      if (!sourceId || typeof sourceId !== 'string') {
-        return res.status(400).json({ error: 'Missing sourceId from Square card tokenization' });
-      }
-
-      // Create Square payment
-      const { paymentsApi } = squareClient;
-      const payment = await paymentsApi.createPayment({
-        sourceId,
-        amountMoney: {
-          amount: Math.round(amount * 100), // cents
-          currency: currency.toUpperCase()
-        },
-        locationId: process.env.SQUARE_LOCATION_ID,
-        referenceId: `${planId}-${userId || 'anonymous'}-${Date.now()}`,
-        note: `Payment for ${planId} plan`
-      });
-
-      if (payment.result && payment.result.payment) {
-        res.json({
-          id: payment.result.payment.id,
-          status: payment.result.payment.status,
-          referenceId: payment.result.payment.referenceId
-        });
-      } else {
-        throw new Error('Failed to create Square payment');
-      }
-    } else {
-      return res.status(400).json({ error: `Payment provider '${provider}' is not supported` });
+    if (provider !== 'stripe') {
+      return res.status(400).json({ error: 'Only Stripe is supported' });
     }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100, // Convert to cents
+      currency: currency.toLowerCase(),
+      metadata: {
+        planId,
+        userId: userId || 'anonymous'
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    res.json({
+      id: paymentIntent.id,
+      clientSecret: paymentIntent.client_secret,
+      status: paymentIntent.status
+    });
   } catch (error) {
     console.error('Payment intent creation failed:', error);
     res.status(500).json({ error: 'Failed to create payment intent', details: error.message });
@@ -116,7 +71,7 @@ router.post('/confirm', async (req, res) => {
     const { paymentIntentId, provider = 'stripe' } = req.body;
     
     if (provider !== 'stripe') {
-      return res.status(400).json({ error: 'Only Stripe is currently supported' });
+      return res.status(400).json({ error: 'Only Stripe is supported' });
     }
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -139,7 +94,7 @@ router.post('/create-subscription', async (req, res) => {
     const { planId, userId, paymentMethodId, customerId, provider = 'stripe' } = req.body;
     
     if (provider !== 'stripe') {
-      return res.status(400).json({ error: 'Only Stripe is currently supported' });
+      return res.status(400).json({ error: 'Only Stripe is supported' });
     }
 
     const plan = SUBSCRIPTION_PLANS[planId];
@@ -209,7 +164,7 @@ router.post('/cancel-subscription', async (req, res) => {
     const { subscriptionId, provider = 'stripe' } = req.body;
     
     if (provider !== 'stripe') {
-      return res.status(400).json({ error: 'Only Stripe is currently supported' });
+      return res.status(400).json({ error: 'Only Stripe is supported' });
     }
 
     const subscription = await stripe.subscriptions.cancel(subscriptionId);
