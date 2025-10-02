@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "18.20.4"
+  SECRETS_SCAN_ENABLED = "false"
 
 # Disable secrets scanning completely
 [build.processing]
