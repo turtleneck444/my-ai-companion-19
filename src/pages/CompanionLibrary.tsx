@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Voice {
   voice_id: string;
@@ -47,11 +48,14 @@ interface Character {
   relationshipLevel?: number;
   createdAt?: string;
   isFavorite?: boolean;
+  is_custom?: boolean;
+  user_id?: string;
 }
 
 const CompanionLibrary = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -90,7 +94,9 @@ const CompanionLibrary = () => {
         unreadCount: 0,
         relationshipLevel: 1.0,
         createdAt: char.created_at,
-        isFavorite: false
+        isFavorite: false,
+        is_custom: char.user_id !== null, // Mark as custom if it has a user_id
+        user_id: char.user_id
       }));
 
       setCharacters(formattedCharacters);
@@ -245,6 +251,7 @@ const CompanionLibrary = () => {
                 }}
                 onFavorite={() => {}}
                 viewMode={viewMode}
+                currentUserId={user?.id} // Pass current user ID
               />
             ))}
           </div>

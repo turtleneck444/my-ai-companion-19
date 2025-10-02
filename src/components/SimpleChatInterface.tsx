@@ -33,6 +33,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { getPlanById, getRemainingMessages } from '@/lib/payments';
+import { ChatStorageService } from "@/lib/chat-storage";
 
 // Using ChatMessage from ai-chat.ts instead of local Message interface
 
@@ -48,6 +49,8 @@ interface Character {
   bio: string;
   personality: string[];
   voice: Voice;
+  is_custom?: boolean;
+  user_id?: string;
 }
 
 interface UserPreferences {
@@ -76,13 +79,14 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
   const [isRecording, setIsRecording] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGames, setShowGames] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<'none' | 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay'>('none'); // FIXED: Use correct GameType
+  const [selectedGame, setSelectedGame] = useState<'none' | 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay'>('none');
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<string | null>(null);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [replies, setReplies] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(propUserPreferences || {
     preferredName: "",
     relationshipLevel: 1.0,
@@ -98,226 +102,104 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
     emotionalSupport: true,
     challengeLevel: "balanced",
     feedbackFrequency: "occasional",
-    learningStyle: "visual",
-    motivationStyle: "encouraging",
-    conflictResolution: "collaborative",
-    celebrationStyle: "enthusiastic",
-    comfortLevel: "open",
-    trustLevel: "building",
-    intimacyLevel: "appropriate",
-    supportType: "emotional",
-    challengeType: "gentle",
-    feedbackType: "constructive",
-    learningType: "experiential",
-    motivationType: "intrinsic",
-    conflictType: "resolution",
-    celebrationType: "achievement",
-    comfortType: "emotional",
-    trustType: "mutual",
-    intimacyType: "emotional"
+    treatmentStyle: "romantic",
+    age: "adult",
+    contentFilter: false
   });
-  const [isRecordingVoiceNote, setIsRecordingVoiceNote] = useState(false);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
-  const [transcript, setTranscript] = useState("");
 
+  const { usage, incrementMessages } = useEnhancedUsageTracking();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    usage,
-    incrementMessages,
-    incrementVoiceCalls,
-    isLoading: usageLoading,
-    showUpgradePrompt: upgradePromptVisible,
-    hideUpgrade,
-    handleUpgrade,
-    isUpgrading: upgradeInProgress
-  } = useEnhancedUsageTracking();
-
-  // Initialize speech recognition
+  // Load conversation and messages on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
-      const speechRecognition = new (window as any).webkitSpeechRecognition();
-      speechRecognition.continuous = false;
-      speechRecognition.interimResults = false;
-      speechRecognition.lang = 'en-US';
-
-      speechRecognition.onstart = () => {
-        console.log('🎤 Voice recognition started');
-        setIsRecordingVoiceNote(true);
-      };
-
-      speechRecognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        console.log('🎤 Voice transcript:', transcript);
-        setTranscript(transcript);
-        setInput(transcript);
-        setIsRecordingVoiceNote(false);
-      };
-
-      speechRecognition.onerror = (event: any) => {
-        console.error('🎤 Voice recognition error:', event.error);
-        setIsRecordingVoiceNote(false);
-        toast({
-          title: "Voice Recognition Error",
-          description: "Could not process voice input. Please try again.",
-          variant: "destructive"
-        });
-      };
-
-      speechRecognition.onend = () => {
-        setIsRecordingVoiceNote(false);
-      };
-
-      setRecognition(speechRecognition);
-    }
-  }, [toast]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Load chat history
-  useEffect(() => {
-    const loadChatHistory = async () => {
-      if (!isSupabaseConfigured || !user) {
-        setIsLoading(false);
-        return;
-      }
+    const loadConversation = async () => {
+      if (!user?.id || !character.id) return;
 
       try {
-        let query = supabase
-          .from('messages')
-          .select('id, sender, content, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true })
-          .limit(500);
+        setIsLoading(true);
+        console.log('📖 Loading conversation for character:', character.name);
 
-        // Only filter by character_id if it looks like a UUID
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (uuidRegex.test(character.id)) {
-          query = query.eq('character_id', character.id);
-        }
+        // Get or create conversation
+        const convId = await ChatStorageService.getOrCreateConversation(user.id, character.id);
+        setConversationId(convId);
 
-        const { data, error } = await query;
+        // Load messages
+        const loadedMessages = await ChatStorageService.loadMessages(convId);
+        setMessages(loadedMessages);
 
-        if (error) {
-          console.warn('Could not load chat history', error);
-        } else if (data) {
-          const chatMessages: ChatMessage[] = data.map(msg => ({
-            id: msg.id,
-            content: msg.content,
-            sender: msg.sender as 'user' | 'ai',
-            timestamp: new Date(msg.created_at)
-          }));
-          setMessages(chatMessages);
-        }
+        console.log('📖 Loaded', loadedMessages.length, 'messages');
       } catch (error) {
-        console.error('Error loading chat history:', error);
+        console.error('❌ Error loading conversation:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load conversation history",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadChatHistory();
-  }, [user, character.id]);
+    loadConversation();
+  }, [user?.id, character.id, toast]);
 
-  const handleEmojiSelect = (emoji: string) => {
-    setInput(prev => prev + emoji);
-    setShowEmojiPicker(false);
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Focus input on mount
+  useEffect(() => {
     inputRef.current?.focus();
-  };
+  }, []);
 
-  const handleVoiceNote = () => {
-    if (!recognition) {
-      toast({
-        title: "Voice Not Supported",
-        description: "Your browser doesn't support voice recognition.",
-        variant: "destructive"
-      });
+  const sendMessage = async (messageText: string) => {
+    if (!messageText.trim() || !user?.id || !conversationId) return;
+
+    // Check usage limits
+    if (!usage.canSendMessage) {
+      setShowUpgradePrompt(true);
       return;
     }
 
-    if (isRecordingVoiceNote) {
-      recognition.stop();
-      setIsRecordingVoiceNote(false);
-    } else {
-      setTranscript("");
-      recognition.start();
-    }
-  };
-
-  const sendMessage = async (messageContent: string) => {
-    if (!messageContent.trim() || isAiTyping) return;
-
-    const currentInput = messageContent.trim();
-    setInput("");
-    setShowEmojiPicker(false);
-
-    // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      content: currentInput,
+      content: messageText,
       sender: 'user',
       timestamp: new Date()
     };
 
+    // Add user message to UI immediately
     setMessages(prev => [...prev, userMessage]);
+    setInput("");
     setIsAiTyping(true);
-
-    // Increment message count and check limits
-    incrementMessages();
 
     try {
       // Save user message to database
-      if (isSupabaseConfigured && user) {
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        await supabase.from('messages').insert({
-          user_id: user.id,
-          character_id: uuidRegex.test(character.id) ? character.id : null,
-          sender: 'user',
-          role: 'user',
-          content: currentInput
-        });
+      await ChatStorageService.saveMessage(conversationId, character.id, user.id, userMessage);
+
+      // Increment usage
+      const usageSuccess = await incrementMessages();
+      if (!usageSuccess) {
+        console.warn('⚠️ Usage increment failed, but continuing with message');
       }
 
       // Generate AI response
-      const context: ChatContext = {
+      const chatContext: ChatContext = {
         character,
-        conversationHistory: [...messages, userMessage],
-        userPreferences,
-        relationshipLevel: 1,
-        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'
+        userPreferences: {
+          ...userPreferences,
+          preferredName: userPreferences.preferredName || userPreferences.petName || 'friend'
+        },
+        conversationHistory: messages,
+        relationshipLevel: 80,
+        timeOfDay: getTimeOfDay(),
+        sessionMemory: {}
       };
 
-      // Temporarily bypass personalityAI for debugging
       console.log('🧪 Bypassing personalityAI, calling API directly');
-      const simpleSystemPrompt = `You are ${character.name}. ${character.bio}. Be ${character.personality.join(', ')}.`;
-      const apiResponse = await fetch('/.netlify/functions/openai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: simpleSystemPrompt },
-            { role: 'user', content: currentInput }
-          ],
-          model: 'gpt-4o-mini',
-          max_tokens: 250,
-          temperature: 0.7
-        }),
-      });
-
-      if (!apiResponse.ok) {
-        const errorText = await apiResponse.text();
-        throw new Error(`Direct API request failed: ${apiResponse.status} - ${errorText}`);
-      }
-      const apiData = await apiResponse.json();
-      const aiResponse = apiData.message;
-      console.log('✅ Direct API response:', aiResponse);
+      const aiResponse = await personalityAI.generateResponse(messageText, chatContext);
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -326,180 +208,222 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
         timestamp: new Date()
       };
 
+      // Add AI message to UI
       setMessages(prev => [...prev, aiMessage]);
 
       // Save AI message to database
-      if (isSupabaseConfigured && user) {
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        await supabase.from('messages').insert({
-          user_id: user.id,
-          character_id: uuidRegex.test(character.id) ? character.id : null,
-          sender: 'ai',
-          role: 'assistant',
-          content: aiResponse
-        });
-      }
+      await ChatStorageService.saveMessage(conversationId, character.id, user.id, aiMessage);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('AI response error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
+      console.error('Error details:', error);
+      
+      toast({
+        title: "Error",
+        description: "Failed to get response from " + character.name,
+        variant: "destructive"
       });
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: "I'm sorry, I'm having trouble thinking right now. Could you try again?",
-        sender: 'ai',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsAiTyping(false);
     }
   };
 
-  const handleVoiceCall = async () => {
-    // Use the proper onStartCall prop to navigate to VoiceCallInterface
-    if (onStartCall) {
-      onStartCall();
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim()) {
+      sendMessage(input);
     }
   };
 
-  const handleUpgradeClick = () => {
-    setShowUpgradePrompt(true);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (input.trim()) {
+        sendMessage(input);
+      }
+    }
   };
 
-  const handleUpgradeSuccess = (planId: string) => {
-    setShowUpgradePrompt(false);
-    toast({
-      title: "Upgrade Successful!",
-      description: "Welcome to your new plan! Enjoy unlimited access.",
-    });
+  const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'morning';
+    if (hour < 18) return 'afternoon';
+    return 'evening';
   };
 
-  const handlePaymentSuccess = (planId: string) => {
-    setShowPaymentForm(false);
-    setSelectedPlanForPayment(null);
-    handleUpgradeSuccess(planId);
+  const handleGameSelect = (game: GameType) => {
+    setSelectedGame(game);
+    setShowGames(false);
+    
+    if (game !== 'none') {
+      // Send game start message
+      const gameMessages = {
+        chess: "Let's play chess! I love strategic games. I'll be white, you be black. Make your first move! ♟️",
+        '20questions': "I'm thinking of something! Ask me yes or no questions to figure out what it is. You have 20 questions! 🤔",
+        wordchain: "Let's play word chain! I'll start: 'Love'. Your word has to start with 'e' (the last letter of 'Love'). What's your word? 🔗",
+        truthordare: "Truth or Dare time! I'm feeling brave today. What do you choose? Truth or Dare? 😈",
+        riddles: "I love riddles! Here's one for you: 'I speak without a mouth and hear without ears. I have no body, but come alive with wind. What am I?' Can you solve it? 🤔",
+        roleplay: "Let's roleplay! I'm a mysterious stranger you met at a coffee shop. How do you approach me? ☕"
+      };
+      
+      sendMessage(gameMessages[game]);
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading chat...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading conversation...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background">
-      {/* FIXED: Header - Always visible and sticky with games button */}
-      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-xl flex-shrink-0 sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="h-8 w-8 p-0 hover:bg-primary/10"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={character.avatar} alt={character.name} />
-            <AvatarFallback>{character.name[0]}</AvatarFallback>
-          </Avatar>
-          
-          <div>
-            <h2 className="font-semibold text-sm">{character.name}</h2>
-            <p className="text-xs text-muted-foreground">Online</p>
+    <div className="flex flex-col h-full bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-pink-200 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={character.avatar} alt={character.name} />
+              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white">
+                {character.name[0]}
+              </AvatarFallback>
+            </Avatar>
+            
+            <div>
+              <h2 className="font-semibold text-lg">{character.name}</h2>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-sm text-muted-foreground">Online</span>
+                {character.is_custom && (
+                  <Badge variant="secondary" className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                    Custom
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs">
-            {usage.plan || 'Free'}
-          </Badge>
           
-          {/* Games Button in Header */}
-          <Tooltip>
-            <TooltipTrigger asChild>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowGames(true)}
+                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Play Games</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            {onStartCall && (
               <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowGames(!showGames)}
-                className={`h-8 w-8 p-0 transition-all duration-200 ${
-                  showGames ? 'bg-purple-500/10 text-purple-600' : 'hover:bg-purple-500/10'
-                }`}
+                onClick={onStartCall}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
               >
-                <Gamepad2 className="w-4 h-4" />
+                <Phone className="w-4 h-4 mr-2" />
+                Call
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>Play Games</TooltipContent>
-          </Tooltip>
-          
-          {/* Voice Call Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleVoiceCall}
-                disabled={isUpgrading}
-                className={`h-8 w-8 p-0 transition-all duration-200 ${
-                  isVoiceCallActive 
-                    ? 'bg-red-500/10 text-red-500 animate-pulse' 
-                    : 'hover:bg-primary/10'
-                }`}
-              >
-                <Phone className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Start voice call</TooltipContent>
-          </Tooltip>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* FIXED: Messages - Expanded to use more space */}
-      <div 
-        className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
-        style={{
-          scrollBehavior: 'smooth',
-          WebkitOverflowScrolling: 'touch',
-          height: 'calc(100vh - 120px)'
-        }}
-      >
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 ${
-                message.sender === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}
-            >
-              <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-              <p className="text-xs opacity-70 mt-1">
-                {message.timestamp.toLocaleTimeString()}
-              </p>
+      {/* Messages Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Heart className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Start your conversation with {character.name}</h3>
+            <p className="text-gray-600 mb-6">Send a message to begin your chat</p>
+            
+            <div className="flex flex-wrap gap-2 justify-center">
+              {[
+                "Hey! How are you? 😊",
+                "What's your favorite hobby?",
+                "Tell me about your day",
+                "I'm so happy to meet you! 💕"
+              ].map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => sendMessage(suggestion)}
+                  className="text-sm"
+                >
+                  {suggestion}
+                </Button>
+              ))}
             </div>
           </div>
-        ))}
+        ) : (
+          messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`flex items-start gap-2 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                {message.sender === 'ai' && (
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarImage src={character.avatar} alt={character.name} />
+                    <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white text-sm">
+                      {character.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                
+                <div
+                  className={`rounded-2xl px-4 py-2 ${
+                    message.sender === 'user'
+                      ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
+                      : 'bg-white border border-gray-200'
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <p className={`text-xs mt-1 ${
+                    message.sender === 'user' ? 'text-pink-100' : 'text-gray-500'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
         
         {isAiTyping && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-3 py-2">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          <div className="flex items-start gap-2">
+            <Avatar className="w-8 h-8 flex-shrink-0">
+              <AvatarImage src={character.avatar} alt={character.name} />
+              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white text-sm">
+                {character.name[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -508,203 +432,110 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Reply Suggestions */}
-      {replies.length > 0 && (
-        <div className="p-4 border-t bg-muted/20 flex-shrink-0">
-          <div className="flex flex-wrap gap-2">
-            {replies.map((reply, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                size="sm"
-                onClick={() => sendMessage(reply)}
-                className="text-xs"
-              >
-                {reply}
-              </Button>
-            ))}
+      {/* Sticky Footer */}
+      <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm border-t border-pink-200 p-4">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <div className="flex-1 relative">
+            <Input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={`Message ${character.name}...`}
+              className="pr-10"
+              disabled={isAiTyping}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            >
+              <Smile className="w-4 h-4" />
+            </Button>
           </div>
-        </div>
-      )}
-
-      {/* FIXED: Clean Input Area - Simplified without action buttons */}
-      <div className="p-4 bg-background/95 backdrop-blur-xl border-t flex-shrink-0 sticky bottom-0 z-10">
-        {/* Emoji Picker */}
+          
+          <Button
+            type="submit"
+            disabled={!input.trim() || isAiTyping}
+            className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </form>
+        
         {showEmojiPicker && (
-          <div className="mb-4">
-            <EmojiPicker 
-              onEmojiSelect={handleEmojiSelect}
+          <div className="absolute bottom-16 left-4 right-4 z-20">
+            <EmojiPicker
+              onEmojiSelect={(emoji) => {
+                setInput(prev => prev + emoji);
+                setShowEmojiPicker(false);
+              }}
               onClose={() => setShowEmojiPicker(false)}
             />
           </div>
         )}
-        
-        <div className="flex items-center gap-2">
-          {/* Emoji Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className={`h-10 w-10 p-0 transition-all duration-200 ${
-              showEmojiPicker ? 'bg-primary/10 text-primary' : 'hover:bg-primary/10'
-            }`}
-          >
-            <Smile className="w-4 h-4" />
-          </Button>
-
-          {/* Voice Note Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleVoiceNote}
-            disabled={!recognition}
-            className={`h-10 w-10 p-0 transition-all duration-200 ${
-              isRecordingVoiceNote ? 'bg-red-500/10 text-red-500 animate-pulse' : 'hover:bg-primary/10'
-            }`}
-          >
-            {isRecordingVoiceNote ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </Button>
-
-          {/* Text Input */}
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(input);
-              }
-            }}
-            placeholder={`Message ${character.name}...`}
-            className="flex-1"
-            disabled={isAiTyping}
-          />
-
-          {/* Send Button */}
-          <Button
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim() || isAiTyping}
-            size="sm"
-            className="h-10 px-4"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
       </div>
 
-      {/* Games Interface - Enhanced with Quick Game Selection */}
+      {/* Games Modal */}
       {showGames && (
-        <div className="absolute bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50 max-h-[70vh] overflow-y-auto">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg">🎮 Games & Activities with {character.name}</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowGames(false);
-                  setSelectedGame('none');
-                }}
-                className="h-8 w-8 p-0"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 p-6">
+            <h3 className="text-lg font-semibold mb-4">Choose a Game</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { id: 'chess', name: 'Chess', icon: '♟️' },
+                { id: '20questions', name: '20 Questions', icon: '🤔' },
+                { id: 'wordchain', name: 'Word Chain', icon: '🔗' },
+                { id: 'truthordare', name: 'Truth or Dare', icon: '��' },
+                { id: 'riddles', name: 'Riddles', icon: '🤔' },
+                { id: 'roleplay', name: 'Roleplay', icon: '🎭' }
+              ].map((game) => (
+                <Button
+                  key={game.id}
+                  variant="outline"
+                  onClick={() => handleGameSelect(game.id as GameType)}
+                  className="h-16 flex flex-col items-center gap-2"
+                >
+                  <span className="text-2xl">{game.icon}</span>
+                  <span className="text-sm">{game.name}</span>
+                </Button>
+              ))}
             </div>
-            
-            {/* Quick Game Selection */}
-            {selectedGame === 'none' && (
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <Button
-                  onClick={() => setSelectedGame('chess')}
-                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
-                >
-                  <div className="text-2xl">♔</div>
-                  <span className="text-sm font-medium">Chess</span>
-                </Button>
-                
-                <Button
-                  onClick={() => setSelectedGame('20questions')}
-                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-                >
-                  <div className="text-2xl">❓</div>
-                  <span className="text-sm font-medium">20 Questions</span>
-                </Button>
-                
-                <Button
-                  onClick={() => setSelectedGame('riddles')}
-                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
-                >
-                  <div className="text-2xl">🧩</div>
-                  <span className="text-sm font-medium">Riddles</span>
-                </Button>
-                
-                <Button
-                  onClick={() => setSelectedGame('wordchain')}
-                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                >
-                  <div className="text-2xl">🔗</div>
-                  <span className="text-sm font-medium">Word Chain</span>
-                </Button>
-                
-                <Button
-                  onClick={() => setSelectedGame('truthordare')}
-                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white"
-                >
-                  <div className="text-2xl">💕</div>
-                  <span className="text-sm font-medium">Truth or Dare</span>
-                </Button>
-                
-                <Button
-                  onClick={() => setSelectedGame('roleplay')}
-                  className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
-                >
-                  <div className="text-2xl">🎭</div>
-                  <span className="text-sm font-medium">Roleplay</span>
-                </Button>
-              </div>
-            )}
-            
-            {/* Game Interface */}
-            {selectedGame !== 'none' && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedGame('none')}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
-                  <h4 className="font-semibold capitalize">{selectedGame.replace(/([A-Z])/g, ' $1').trim()}</h4>
-                </div>
-                <InteractiveGames 
-                  characterName={character.name}
-                  onBack={() => {
-                    setShowGames(false);
-                    setSelectedGame('none');
-                  }}
-                  onSendMessage={(message: string) => {
-                    sendMessage(message);
-                    setShowGames(false);
-                    setSelectedGame('none');
-                  }}
-                  selectedGame={selectedGame}
-                />
-              </div>
-            )}
-          </div>
+            <Button
+              variant="ghost"
+              onClick={() => setShowGames(false)}
+              className="w-full mt-4"
+            >
+              Cancel
+            </Button>
+          </Card>
         </div>
       )}
 
+      {/* Interactive Games */}
+      {selectedGame !== 'none' && (
+        <InteractiveGames
+          selectedGame={selectedGame}
+          onClose={() => setSelectedGame('none')}
+          character={character}
+        />
+      )}
+
       {/* Upgrade Prompt */}
-      <UpgradePrompt
-        isOpen={showUpgradePrompt}
-        onClose={() => setShowUpgradePrompt(false)}
-        limitType="message"
-        currentPlan={usage.plan}
-      />
+      {showUpgradePrompt && (
+        <UpgradePrompt
+          onClose={() => setShowUpgradePrompt(false)}
+          onUpgrade={() => {
+            setShowUpgradePrompt(false);
+            setShowPaymentForm(true);
+          }}
+          currentPlan={usage.plan}
+          remainingMessages={usage.remainingMessages}
+          remainingCalls={usage.remainingVoiceCalls}
+        />
+      )}
     </div>
   );
 };
