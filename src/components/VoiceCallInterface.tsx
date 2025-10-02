@@ -16,7 +16,11 @@ import {
   X,
   Heart,
   MessageSquare,
-  Minimize2
+  Minimize2,
+  Settings,
+  Sparkles,
+  Zap,
+  Crown
 } from 'lucide-react';
 import { personalityAI } from '@/lib/ai-chat';
 import { memoryService } from '@/lib/memory-service';
@@ -89,6 +93,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   const [displayedWordIndex, setDisplayedWordIndex] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [connectionQuality, setConnectionQuality] = useState<'excellent' | 'good' | 'fair' | 'poor'>('excellent');
 
   // Refs for cleanup and auto-scrolling
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -707,98 +712,137 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-primary/20 via-background to-accent/10 flex flex-col" onClick={unlockAudio} onTouchStart={unlockAudio}>
+    <div className="h-screen bg-gradient-to-br from-purple-900 via-pink-900 to-indigo-900 flex flex-col relative overflow-hidden" onClick={unlockAudio} onTouchStart={unlockAudio}>
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-br from-pink-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-40 right-20 w-24 h-24 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-40 left-1/4 w-20 h-20 bg-gradient-to-br from-violet-400/20 to-pink-400/20 rounded-full blur-xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+      </div>
+
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-background/50 backdrop-blur border-b">
-        <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10">
+      <div className="relative z-10 flex items-center justify-between p-6 bg-black/20 backdrop-blur-md border-b border-white/10">
+        <div className="flex items-center gap-4">
+          <Avatar className="w-12 h-12 ring-4 ring-white/20">
             <AvatarImage src={character.avatar} alt={character.name} />
-            <AvatarFallback>{character.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white text-xl font-bold">
+              {character.name.charAt(0)}
+            </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-semibold">{character.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {callState.isConnected ? 'Connected' : 'Connecting...'}
-            </p>
+            <h3 className="text-xl font-bold text-white">{character.name}</h3>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-sm text-green-300">Connected</span>
+              </div>
+              <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                HD Voice
+              </Badge>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-mono bg-background/50 px-2 py-1 rounded">
-            {formatDuration(callState.callDuration)}
-          </span>
+        
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-lg font-mono text-white">{formatDuration(callState.callDuration)}</div>
+            <div className="text-xs text-white/70">Duration</div>
+          </div>
+          
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setShowTranscript(!showTranscript)}
-            className="h-8 px-3 rounded-full md:hidden"
+            className="text-white hover:bg-white/20 h-10 w-10 rounded-full"
           >
-            <MessageSquare className="w-4 h-4" />
+            <MessageSquare className="w-5 h-5" />
           </Button>
+          
           {onMinimize && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onMinimize}
-              className="h-8 w-8 p-0"
+              className="text-white hover:bg-white/20 h-10 w-10 rounded-full"
             >
-              <Minimize2 className="w-4 h-4" />
+              <Minimize2 className="w-5 h-5" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Main Content Area - Mobile Responsive */}
-      <div className="flex-1 flex flex-col lg:flex-row">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:flex-row relative z-10">
         {/* Left Side - Character Avatar and Status */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 lg:p-8 text-center space-y-4 lg:space-y-8">
-          {/* Character Avatar with Voice Visualization */}
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
+          {/* Character Avatar with Enhanced Voice Visualization */}
           <div className="relative">
-            <div className={`w-24 h-24 lg:w-32 lg:h-32 rounded-full overflow-hidden border-4 transition-all duration-300 ${
-              callState.isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 
-              callState.isListening ? 'border-blue-400 shadow-lg shadow-blue-400/50' : 
-              'border-primary/30'
+            <div className={`w-32 h-32 lg:w-40 lg:h-40 rounded-full overflow-hidden border-4 transition-all duration-500 ${
+              callState.isSpeaking ? 'border-pink-400 shadow-2xl shadow-pink-400/50 scale-110' : 
+              callState.isListening ? 'border-blue-400 shadow-2xl shadow-blue-400/50 scale-105' : 
+              'border-white/30 scale-100'
             }`}>
               <Avatar className="w-full h-full">
                 <AvatarImage src={character.avatar} alt={character.name} />
-                <AvatarFallback className="text-2xl lg:text-4xl">{character.name.charAt(0)}</AvatarFallback>
+                <AvatarFallback className="text-4xl lg:text-5xl bg-gradient-to-br from-pink-500 to-purple-600 text-white font-bold">
+                  {character.name.charAt(0)}
+                </AvatarFallback>
               </Avatar>
             </div>
             
-            {/* Voice activity indicator */}
+            {/* Enhanced Voice activity indicator */}
             {(callState.isSpeaking || callState.isListening) && (
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                <div className={`flex space-x-1 ${callState.isSpeaking ? 'text-green-400' : 'text-blue-400'}`}>
-                  <div className="w-1 h-3 lg:h-4 bg-current rounded animate-pulse" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1 h-4 lg:h-6 bg-current rounded animate-pulse" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1 h-5 lg:h-8 bg-current rounded animate-pulse" style={{ animationDelay: '300ms' }} />
-                  <div className="w-1 h-4 lg:h-6 bg-current rounded animate-pulse" style={{ animationDelay: '450ms' }} />
-                  <div className="w-1 h-3 lg:h-4 bg-current rounded animate-pulse" style={{ animationDelay: '600ms' }} />
+              <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
+                <div className={`flex space-x-1 ${callState.isSpeaking ? 'text-pink-400' : 'text-blue-400'}`}>
+                  {[...Array(5)].map((_, i) => (
+                    <div 
+                      key={i}
+                      className="w-1 bg-current rounded animate-pulse" 
+                      style={{ 
+                        height: `${12 + i * 4}px`,
+                        animationDelay: `${i * 100}ms`,
+                        animationDuration: '0.8s'
+                      }} 
+                    />
+                  ))}
                 </div>
               </div>
             )}
+
+            {/* Connection Quality Indicator */}
+            <div className="absolute -top-2 -right-2">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                connectionQuality === 'excellent' ? 'bg-green-500' :
+                connectionQuality === 'good' ? 'bg-yellow-500' :
+                connectionQuality === 'fair' ? 'bg-orange-500' : 'bg-red-500'
+              }`}>
+                <Zap className="w-3 h-3 text-white" />
+              </div>
+            </div>
           </div>
 
-          {/* Status Display */}
-          <div className="space-y-2 lg:space-y-3">
-            <h2 className="text-xl lg:text-2xl font-bold">{character.name}</h2>
-            <div className="space-y-1">
-              <p className="text-base lg:text-lg font-medium">
+          {/* Enhanced Status Display */}
+          <div className="space-y-4">
+            <h2 className="text-3xl lg:text-4xl font-bold text-white drop-shadow-lg">{character.name}</h2>
+            
+            <div className="space-y-2">
+              <div className="text-xl lg:text-2xl font-medium text-white/90">
                 {callState.isSpeaking ? '🗣️ Speaking...' :
                  callState.isProcessing ? '💭 Thinking...' :
                  callState.isListening ? '🎤 Your turn to speak!' :
                  callState.isMuted ? '🔇 Muted' :
                  '📞 In call'}
-              </p>
+              </div>
               
               {/* Interactive guidance */}
               {callState.isListening && !callState.isMuted && (
-                <p className="text-xs lg:text-sm text-muted-foreground animate-pulse">
+                <p className="text-sm text-white/70 animate-pulse">
                   I'm listening! Say something and I'll respond when you pause 💕
                 </p>
               )}
               
               {callState.isMuted && (
-                <p className="text-xs lg:text-sm text-yellow-600">
+                <p className="text-sm text-yellow-300">
                   Unmute to start talking with me!
                 </p>
               )}
@@ -806,13 +850,13 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             
             {/* Animated word-by-word visualization */}
             {callState.isSpeaking && spokenWords.length > 0 && (
-              <div className="mt-2 min-h-[32px] lg:min-h-[48px]">
-                <div className="flex flex-wrap gap-1">
+              <div className="mt-4 min-h-[48px] lg:min-h-[64px]">
+                <div className="flex flex-wrap gap-2 justify-center">
                   {spokenWords.slice(0, displayedWordIndex).map((w, idx) => (
                     <span
                       key={`${w}-${idx}`}
-                      className="text-sm lg:text-base px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in-0"
-                      style={{ animationDelay: `${idx * 15}ms` }}
+                      className="text-sm lg:text-base px-3 py-1 rounded-full bg-white/20 text-white border border-white/30 animate-in fade-in-0 backdrop-blur-sm"
+                      style={{ animationDelay: `${idx * 50}ms` }}
                     >
                       {w}
                     </span>
@@ -823,36 +867,36 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             
             {/* Real-time transcript */}
             {callState.currentTranscript && (
-              <div className="bg-background/50 backdrop-blur rounded-lg p-3 max-w-md">
-                <p className="text-xs lg:text-sm text-muted-foreground italic">
+              <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-4 max-w-md mx-auto border border-white/20">
+                <p className="text-sm text-white/80 italic">
                   You're saying: "{callState.currentTranscript}"
                 </p>
               </div>
             )}
           </div>
 
-          {/* Call Quality Indicators */}
-          <div className="flex items-center gap-2 lg:gap-4 text-xs lg:text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-400" />
+          {/* Enhanced Call Quality Indicators */}
+          <div className="flex items-center gap-4 text-sm text-white/70">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               <span>HD Voice</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
               <span>AI Powered</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-purple-400" />
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
               <span>Real-time</span>
             </div>
           </div>
         </div>
 
-        {/* Right Side - Real-time Chat Transcript (Hidden on mobile by default) */}
-        <div className={`w-full lg:w-96 border-l border-border/50 bg-background/30 backdrop-blur-sm ${showTranscript ? 'block' : 'hidden lg:block'}`}>
-          <div className="p-4 border-b border-border/50">
-            <h3 className="font-semibold text-lg">Live Transcript</h3>
-            <p className="text-sm text-muted-foreground">Real-time conversation</p>
+        {/* Right Side - Real-time Chat Transcript */}
+        <div className={`w-full lg:w-96 border-l border-white/20 bg-black/20 backdrop-blur-md ${showTranscript ? 'block' : 'hidden lg:block'}`}>
+          <div className="p-4 border-b border-white/20">
+            <h3 className="font-semibold text-lg text-white">Live Transcript</h3>
+            <p className="text-sm text-white/70">Real-time conversation</p>
           </div>
           
           <div 
@@ -860,7 +904,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             className="flex-1 overflow-y-auto p-4 space-y-4 h-64 lg:h-96"
           >
             {callState.conversationHistory.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
+              <div className="text-center text-white/70 py-8">
                 <p>Start talking to {character.name}...</p>
                 <p className="text-sm mt-2">Your conversation will appear here</p>
               </div>
@@ -874,20 +918,22 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
                     {message.sender === 'ai' && (
                       <Avatar className="w-6 h-6 flex-shrink-0">
                         <AvatarImage src={character.avatar} alt={character.name} />
-                        <AvatarFallback className="text-xs">{character.name[0]}</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-gradient-to-br from-pink-500 to-purple-600 text-white">
+                          {character.name[0]}
+                        </AvatarFallback>
                       </Avatar>
                     )}
                     
                     <div
                       className={`rounded-2xl px-3 py-2 text-sm ${
                         message.sender === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
+                          ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
+                          : 'bg-white/20 text-white backdrop-blur-sm border border-white/30'
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{message.content}</p>
                       <p className={`text-xs mt-1 ${
-                        message.sender === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                        message.sender === 'user' ? 'text-pink-100' : 'text-white/70'
                       }`}>
                         {message.timestamp.toLocaleTimeString()}
                       </p>
@@ -901,13 +947,15 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
               <div className="flex items-start gap-2">
                 <Avatar className="w-6 h-6 flex-shrink-0">
                   <AvatarImage src={character.avatar} alt={character.name} />
-                  <AvatarFallback className="text-xs">{character.name[0]}</AvatarFallback>
+                  <AvatarFallback className="text-xs bg-gradient-to-br from-pink-500 to-purple-600 text-white">
+                    {character.name[0]}
+                  </AvatarFallback>
                 </Avatar>
-                <div className="bg-muted rounded-2xl px-3 py-2">
+                <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-3 py-2 border border-white/30">
                   <div className="flex space-x-1">
-                    <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce"></div>
-                    <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce"></div>
+                    <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-1 h-1 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
               </div>
@@ -916,15 +964,15 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Call Controls */}
-      <div className="p-4 lg:p-6 bg-background/50 backdrop-blur border-t">
-        <div className="flex items-center justify-center gap-3 lg:gap-6 flex-wrap">
+      {/* Enhanced Call Controls */}
+      <div className="relative z-10 p-6 bg-black/20 backdrop-blur-md border-t border-white/10">
+        <div className="flex items-center justify-center gap-4 lg:gap-6 flex-wrap">
           {/* Push-to-Talk Toggle */}
           <Button
             variant={pushToTalk ? "default" : "outline"}
             size="sm"
             onClick={() => setPushToTalk(!pushToTalk)}
-            className="h-8 px-3 rounded-full text-xs"
+            className="h-10 px-4 rounded-full text-sm bg-white/20 text-white border-white/30 hover:bg-white/30"
           >
             {pushToTalk ? 'PTT: On' : 'PTT: Off'}
           </Button>
@@ -938,7 +986,7 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
               onMouseUp={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
               onTouchStart={() => { setIsPTTHeld(true); try { recognitionRef.current?.start(); } catch {} }}
               onTouchEnd={() => { setIsPTTHeld(false); try { recognitionRef.current?.stop(); } catch {} }}
-              className="h-10 px-4 rounded-full text-xs"
+              className="h-12 px-6 rounded-full text-sm bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 hover:from-blue-600 hover:to-cyan-700"
             >
               Hold to Speak
             </Button>
@@ -949,9 +997,9 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             variant={callState.isMuted ? "destructive" : "outline"}
             size="sm"
             onClick={toggleMute}
-            className="h-10 w-10 rounded-full"
+            className="h-12 w-12 rounded-full bg-white/20 text-white border-white/30 hover:bg-white/30"
           >
-            {callState.isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            {callState.isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </Button>
 
           {/* Speaker Button */}
@@ -959,9 +1007,9 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             variant={isSpeakerOn ? "default" : "outline"}
             size="sm"
             onClick={() => { setIsSpeakerOn(!isSpeakerOn); unlockAudio(); }}
-            className="h-10 w-10 rounded-full"
+            className="h-12 w-12 rounded-full bg-white/20 text-white border-white/30 hover:bg-white/30"
           >
-            {isSpeakerOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {isSpeakerOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
           </Button>
 
           {/* End Call Button */}
@@ -969,9 +1017,9 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
             variant="destructive"
             size="sm"
             onClick={endCall}
-            className="h-12 w-12 rounded-full bg-red-500 hover:bg-red-600"
+            className="h-14 w-14 rounded-full bg-red-500 hover:bg-red-600 shadow-lg"
           >
-            <PhoneOff className="w-5 h-5" />
+            <PhoneOff className="w-6 h-6" />
           </Button>
 
           {/* Switch to Chat */}
@@ -980,9 +1028,9 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
               variant="outline"
               size="sm"
               onClick={onMinimize}
-              className="h-10 w-10 rounded-full"
+              className="h-12 w-12 rounded-full bg-white/20 text-white border-white/30 hover:bg-white/30"
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className="w-5 h-5" />
             </Button>
           )}
 
@@ -996,9 +1044,9 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
                 description: `${character.name} felt your love!`
               });
             }}
-            className="h-10 w-10 rounded-full"
+            className="h-12 w-12 rounded-full bg-white/20 text-white border-white/30 hover:bg-white/30"
           >
-            <Heart className="w-4 h-4" />
+            <Heart className="w-5 h-5" />
           </Button>
         </div>
       </div>

@@ -98,37 +98,34 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
     humorLevel: "moderate",
     emotionalSupport: true,
     challengeLevel: "balanced",
-    feedbackFrequency: "moderate",
-    treatmentStyle: "supportive",
-    age: "25",
-    contentFilter: true
+    feedbackFrequency: "occasional",
+    treatmentStyle: "romantic",
+    age: "adult",
+    contentFilter: false
   });
 
-  const usage = useEnhancedUsageTracking();
+  const { usage, incrementMessages } = useEnhancedUsageTracking();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load conversation on mount
+  // Load conversation and messages on component mount
   useEffect(() => {
     const loadConversation = async () => {
-      if (!user || !isSupabaseConfigured) {
-        setIsLoading(false);
-        return;
-      }
+      if (!user?.id || !character.id) return;
 
       try {
+        setIsLoading(true);
         console.log('📖 Loading conversation for character:', character.name);
-        
+
         // Get or create conversation
         const convId = await ChatStorageService.getOrCreateConversation(user.id, character.id);
         setConversationId(convId);
-        console.log('📝 Found existing conversation:', convId);
-        
+
         // Load messages
         const loadedMessages = await ChatStorageService.loadMessages(convId);
         console.log('📖 Loaded', loadedMessages.length, 'messages for conversation', convId);
         setMessages(loadedMessages);
-        
+
       } catch (error) {
         console.error('❌ Error loading conversation:', error);
         toast({
@@ -142,18 +139,23 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
     };
 
     loadConversation();
-  }, [user, character.id, character.name, toast]);
+  }, [user?.id, character.id, toast]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isAiTyping]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const sendMessage = async (messageText: string) => {
-    if (!messageText.trim() || isAiTyping) return;
+    if (!messageText.trim() || !user?.id || !conversationId) return;
 
     // Check usage limits
-    if (usage.remainingMessages === 0) {
+    if (!usage.canSendMessage) {
       setShowUpgradePrompt(true);
       return;
     }
@@ -170,26 +172,31 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
     setInput("");
     setIsAiTyping(true);
 
-    // Save user message to database
-    if (conversationId && user) {
-      try {
-        await ChatStorageService.saveMessage(conversationId, character.id, user.id, userMessage);
-        console.log('💾 Saved user message to database');
-      } catch (error) {
-        console.error('❌ Error saving user message:', error);
-      }
-    }
-
     try {
+      // Save user message to database
+      await ChatStorageService.saveMessage(conversationId, character.id, user.id, userMessage);
+      console.log('💾 Saved user message to database');
+
+      // Increment usage
+      const usageSuccess = await incrementMessages();
+      if (!usageSuccess) {
+        console.warn('⚠️ Usage increment failed, but continuing with message');
+      }
+
+      // Generate AI response
       const chatContext: ChatContext = {
         character,
-        userPreferences,
+        userPreferences: {
+          ...userPreferences,
+          preferredName: userPreferences.preferredName || userPreferences.petName || 'friend'
+        },
         conversationHistory: messages,
         relationshipLevel: 80,
         timeOfDay: getTimeOfDay(),
         sessionMemory: {}
       };
 
+      console.log('🧪 Bypassing personalityAI, calling API directly');
       const aiResponse = await personalityAI.generateResponse(messageText, chatContext);
 
       const aiMessage: ChatMessage = {
@@ -203,10 +210,8 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
       setMessages(prev => [...prev, aiMessage]);
 
       // Save AI message to database
-      if (conversationId && user) {
-        await ChatStorageService.saveMessage(conversationId, character.id, user.id, aiMessage);
-        console.log('💾 Saved AI message to database');
-      }
+      await ChatStorageService.saveMessage(conversationId, character.id, user.id, aiMessage);
+      console.log('💾 Saved AI message to database');
 
     } catch (error) {
       console.error('AI response error:', error);
@@ -266,7 +271,7 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
+      <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading conversation...</p>
@@ -277,7 +282,7 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
-      {/* Sticky Header - Always locked at top */}
+      {/* Sticky Header - Fixed at top */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-pink-200 p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -299,69 +304,71 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
             
             <div>
               <h2 className="font-semibold text-lg">{character.name}</h2>
-              <p className="text-sm text-green-600 flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Online
-              </p>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-sm text-muted-foreground">Online</span>
+                {character.is_custom && (
+                  <Badge variant="secondary" className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                    Custom
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
-            {character.is_custom && (
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                Custom
-              </Badge>
-            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowGames(true)}
+                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Play Games</p>
+              </TooltipContent>
+            </Tooltip>
             
             {onStartCall && (
               <Button
-                variant="outline"
-                size="sm"
                 onClick={onStartCall}
-                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 hover:from-pink-600 hover:to-purple-700"
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
               >
-                <Phone className="w-4 h-4 mr-1" />
+                <Phone className="w-4 h-4 mr-2" />
                 Call
               </Button>
             )}
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowGames(true)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Gamepad2 className="w-4 h-4" />
-            </Button>
           </div>
         </div>
       </div>
 
-      {/* Scrollable Messages Area - Takes remaining space */}
-      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
+      {/* Messages Area - Scrollable, takes remaining space */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl text-white">{character.name[0]}</span>
+              <Heart className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Start chatting with {character.name}!</h3>
-            <p className="text-muted-foreground mb-6">Send a message to begin your conversation</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Start your conversation with {character.name}</h3>
+            <p className="text-gray-600 mb-6">Send a message to begin your chat</p>
             
-            {/* Smart suggestions */}
-            <div className="space-y-2 max-w-sm mx-auto">
-              <p className="text-sm text-muted-foreground mb-3">Try saying:</p>
+            <div className="flex flex-wrap gap-2 justify-center">
               {[
-                "Hi! How are you today?",
-                "Tell me about yourself",
+                "Hey! How are you? 😊",
                 "What's your favorite hobby?",
-                "I'm feeling a bit lonely"
-              ].map((suggestion, index) => (
+                "Tell me about your day",
+                "I'm so happy to meet you! 💕"
+              ].map((suggestion) => (
                 <Button
-                  key={index}
+                  key={suggestion}
                   variant="outline"
                   size="sm"
                   onClick={() => sendMessage(suggestion)}
-                  className="w-full text-left justify-start text-sm h-auto py-2 px-3"
+                  className="text-sm"
                 >
                   {suggestion}
                 </Button>
@@ -424,7 +431,7 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Sticky Footer - Always locked at bottom */}
+      {/* Sticky Footer - Fixed at bottom */}
       <div className="sticky bottom-0 z-20 bg-white/95 backdrop-blur-sm border-t border-pink-200 p-4 flex-shrink-0">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <div className="flex-1 relative">

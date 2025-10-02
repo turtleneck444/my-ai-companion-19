@@ -48,7 +48,6 @@ import { SocialShare } from '@/components/SocialShare';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { emailService } from '@/lib/email-service';
 import { EmailCollection } from '@/components/EmailCollection';
-import { InteractivePreview } from '@/components/InteractivePreview';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
@@ -57,6 +56,7 @@ export const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activePreview, setActivePreview] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
 
   // Check if user is already logged in and redirect accordingly
@@ -133,6 +133,32 @@ export const LandingPage = () => {
     }
   ];
 
+  const appPreviews = [
+    {
+      title: "Chat Interface",
+      description: "Beautiful, intuitive chat with your AI companions",
+      image: "/chat.png",
+      features: ["Real-time messaging", "Voice input", "Emoji reactions", "Typing indicators"]
+    },
+    {
+      title: "Character Creation",
+      description: "Design your perfect AI companion",
+      image: "/api/placeholder/600/400", 
+      features: ["Custom personalities", "Voice selection", "Appearance design", "Trait sliders"]
+    },
+    {
+      title: "Voice Calls",
+      description: "Natural voice conversations",
+      image: "/api/placeholder/600/400",
+      features: ["High-quality audio", "Real-time processing", "Voice customization", "Call history"]
+    },
+    {
+      title: "Companion Library",
+      description: "Manage all your AI companions",
+      image: "/api/placeholder/600/400",
+      features: ["Multiple companions", "Quick access", "Status indicators", "Easy switching"]
+    }
+  ];
 
   const pricingPlans = [
     {
