@@ -451,35 +451,6 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
     setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
   }, []);
 
-  // ULTRA-FAST Speech Recognition Restart
-  const restartSpeechRecognition = useCallback(() => {
-    if (!isCallActiveRef.current || callState.isSpeaking || callState.isProcessing) return;
-    
-    try {
-      if (recognitionRef.current && !isRecognitionActiveRef.current) {
-        recognitionRef.current.start();
-        isRecognitionActiveRef.current = true;
-        setCallState(prev => ({ ...prev, isListening: true }));
-        console.log("🎤 ULTRA-FAST RESTART - Speech recognition restarted");
-      }
-    } catch (error) {
-      console.log("⚠️ Restart failed:", error);
-      // Retry after a short delay
-      setTimeout(() => {
-        if (recognitionRef.current && !isRecognitionActiveRef.current) {
-          try {
-            recognitionRef.current.start();
-            isRecognitionActiveRef.current = true;
-            setCallState(prev => ({ ...prev, isListening: true }));
-            console.log("🎤 RETRY RESTART - Speech recognition restarted");
-          } catch (retryError) {
-            console.log("⚠️ Retry restart failed:", retryError);
-          }
-        }
-      }, 100);
-    }
-  }, [callState.isSpeaking, callState.isProcessing]);
-
   const endCall = useCallback(() => {
     console.log('📞 Ending voice call...');
     isCallActiveRef.current = false;
