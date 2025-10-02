@@ -9,6 +9,9 @@
 [build.processing]
   skip_processing = false
 
+[build.processing.secrets]
+  enabled = false
+
 [build.processing.css]
   bundle = true
   minify = true
@@ -22,10 +25,6 @@
 
 [build.processing.images]
   compress = true
-
-# Completely disable secrets scanning
-[build.processing.secrets]
-  enabled = false
 
 [[headers]]
   for = "/*"

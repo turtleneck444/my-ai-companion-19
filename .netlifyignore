@@ -1,0 +1,6 @@
+package-lock.json
+.netlify/
+node_modules/
+dist/
+*.backup
+*.log
