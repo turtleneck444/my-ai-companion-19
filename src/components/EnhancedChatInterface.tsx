@@ -1,33 +1,39 @@
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { 
   Send, 
-  Phone, 
-  MoreVertical, 
-  ArrowLeft, 
   Mic, 
-  MicOff,
-  Heart,
-  Smile,
-  Image as ImageIcon,
-  Gift,
-  Star,
-  Zap,
-  Loader2,
+  MicOff, 
+  Phone, 
+  PhoneOff, 
+  Heart, 
+  Smile, 
+  Camera, 
+  Gamepad2, 
+  Gift, 
+  MoreHorizontal,
   Lock,
+  Loader2,
+  X,
+  Check,
+  Star,
   Crown,
-  MessageSquare
-} from "lucide-react";
-import { speakText } from "@/lib/voice";
-import { buildSystemPrompt } from "@/lib/ai";
-import { useToast } from "@/hooks/use-toast";
-import { EmojiPicker } from "@/components/EmojiPicker";
-import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
-import { UpgradePrompt } from "@/components/UpgradePrompt";
+  Zap
+} from 'lucide-react';
+import { Character } from '@/types/character';
+import { personalityAI } from '@/lib/ai-chat';
+import { useEnhancedUsageTracking } from '@/hooks/useEnhancedUsageTracking';
+import { useToast } from '@/hooks/use-toast';
+import { EmojiPicker } from '@/components/EmojiPicker';
+import { InteractiveGames } from '@/components/InteractiveGames';
+import { VoiceCallInterface } from '@/components/VoiceCallInterface';
+import { ChatStorageService } from '@/lib/chat-storage';
 
 interface Message {
   id: string;
@@ -35,220 +41,136 @@ interface Message {
   sender: 'user' | 'ai';
   timestamp: Date;
   isTyping?: boolean;
-  type?: 'text' | 'voice' | 'image';
-  mood?: 'happy' | 'excited' | 'loving' | 'playful';
-}
-
-interface Voice {
-  voice_id: string;
-  name: string;
-}
-
-interface Character {
-  id: string;
-  name: string;
-  avatar: string;
-  bio: string;
-  personality: string[];
-  voice: Voice;
-  isOnline: boolean;
-  mood?: string;
-  relationshipLevel?: number;
 }
 
 interface EnhancedChatInterfaceProps {
   character: Character;
   onBack: () => void;
-  onStartCall?: () => void;
-  userPreferences?: {
-    preferredName: string;
-    treatmentStyle: string;
-    age: string;
-    contentFilter: boolean;
-  };
+  onStartCall: () => void;
 }
 
 export const EnhancedChatInterface = ({ 
   character, 
   onBack,
-  onStartCall,
-  userPreferences 
+  onStartCall
 }: EnhancedChatInterfaceProps) => {
-  // FIXED: Character-specific message storage using character ID
-  const getCharacterMessages = () => {
-    const stored = localStorage.getItem(`chat_messages_${character.id}`);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        return parsed.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }));
-      } catch (error) {
-        console.error('Error parsing stored messages:', error);
-      }
-    }
-    return [{
-      id: '1',
-      content: `Hey there! I'm ${character.name}. ${character.bio} I'm so excited to chat with you! What's on your mind? 💕`,
-      sender: 'ai' as const,
-      timestamp: new Date(),
-      mood: 'happy' as const
-    }];
-  };
-
-  const [messages, setMessages] = useState<Message[]>(getCharacterMessages());
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-  const [upgradePromptType, setUpgradePromptType] = useState<'messages' | 'voiceCalls'>('messages');
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
   const { toast } = useToast();
   const { 
-    currentPlan, 
-    incrementMessages, 
-    incrementVoiceCalls, 
-    canSendMessage, 
-    canMakeVoiceCall, 
-    remainingMessages, 
-    remainingVoiceCalls 
+    usageData, 
+    planLimits, 
+    isLoading: usageLoading,
+    refreshUsage 
   } = useEnhancedUsageTracking();
+  
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGames, setShowGames] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  
+  const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // FIXED: Save messages to character-specific storage
+  // Check if user can send messages
+  const canSendMessage = !usageLoading && usageData && planLimits && 
+    usageData.messages_today < planLimits.messages_per_day;
+  
+  // Check if user can make voice calls
+  const canMakeVoiceCall = !usageLoading && usageData && planLimits && 
+    usageData.voice_calls_today < planLimits.voice_calls_per_day;
+
+  // Load messages when component mounts
   useEffect(() => {
-    localStorage.setItem(`chat_messages_${character.id}`, JSON.stringify(messages));
-  }, [messages, character.id]);
+    loadMessages();
+  }, [character.id]);
 
-  // Initialize speech recognition
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputValue(transcript);
-        setIsTranscribing(false);
-        setIsRecording(false);
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsTranscribing(false);
-        setIsRecording(false);
-        toast({
-          title: "Voice input failed",
-          description: "Could not process your voice. Please try again.",
-          variant: "destructive"
-        });
-      };
-    }
-  }, [toast]);
-
-  const scrollToBottom = () => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
-  };
-
-  useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleVoiceInput = () => {
-    if (!canMakeVoiceCall) {
-      setUpgradePromptType('voiceCalls');
-      setShowUpgradePrompt(true);
-      return;
-    }
-
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-      setIsTranscribing(true);
-    } else {
-      recognitionRef.current?.start();
-      setIsRecording(true);
+  const loadMessages = async () => {
+    try {
+      const conversation = await ChatStorageService.getOrCreateConversation(
+        character.id, // Using character ID as user ID for now
+        character.id
+      );
+      setConversationId(conversation);
+      
+      const loadedMessages = await ChatStorageService.loadMessages(conversation);
+      setMessages(loadedMessages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender as 'user' | 'ai',
+        timestamp: new Date(msg.timestamp)
+      })));
+    } catch (error) {
+      console.error('Error loading messages:', error);
     }
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-    setShowEmojiPicker(false);
+  const saveMessage = async (content: string, sender: 'user' | 'ai') => {
+    if (!conversationId) return;
+    
+    try {
+      await ChatStorageService.saveMessage(
+        conversationId,
+        character.id,
+        character.id, // Using character ID as user ID for now
+        content,
+        sender
+      );
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
-
-    // Check message limit
-    if (!canSendMessage) {
-      setUpgradePromptType('messages');
-      setShowUpgradePrompt(true);
-      return;
-    }
+    if (!inputValue.trim() || isLoading || !canSendMessage) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue.trim(),
+      content: inputValue,
       sender: 'user',
-      timestamp: new Date(),
-      type: 'text'
+      timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
+    await saveMessage(inputValue, 'user');
+    
+    const currentInput = inputValue;
     setInputValue('');
     setIsLoading(true);
 
-    // Increment message usage
-    incrementMessages();
-
     try {
-      const systemPrompt = buildSystemPrompt({ character, userPreferences: userPreferences || { preferredName: 'friend', treatmentStyle: 'casual', age: '25', contentFilter: true } });
-      
-      const response = await fetch('/api/openai-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages.map(msg => ({
-              role: msg.sender === 'user' ? 'user' : 'assistant',
-              content: msg.content
-            })),
-            { role: 'user', content: userMessage.content }
-          ],
-          character: character.name
-        }),
-      });
+      const response = await personalityAI.sendMessage(
+        currentInput,
+        character,
+        messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        }))
+      );
 
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
-
-      const data = await response.json();
-      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.message,
+        content: response,
         sender: 'ai',
-        timestamp: new Date(),
-        mood: 'happy'
+        timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      await saveMessage(response, 'ai');
+      
+      // Refresh usage data after sending message
+      refreshUsage();
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -266,167 +188,217 @@ export const EnhancedChatInterface = ({
       e.preventDefault();
       handleSendMessage();
     }
+    if (e.key === 'Escape') {
+      setShowEmojiPicker(false);
+      setShowGames(false);
+    }
   };
 
-  const handleCall = () => {
-    if (!canMakeVoiceCall) {
-      setUpgradePromptType('voiceCalls');
-      setShowUpgradePrompt(true);
+  const handleVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Voice input not supported",
+        description: "Your browser doesn't support speech recognition.",
+        variant: "destructive"
+      });
       return;
     }
 
-    incrementVoiceCalls();
-    onStartCall?.();
-  };
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
 
-  const getMoodEmoji = (mood?: string) => {
-    switch (mood) {
-      case 'happy': return '😊';
-      case 'excited': return '🤩';
-      case 'loving': return '🥰';
-      case 'playful': return '😜';
-      default: return '😊';
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onstart = () => {
+      setIsRecording(true);
+      setIsTranscribing(false);
+    };
+
+    recognitionRef.current.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInputValue(transcript);
+      setIsTranscribing(false);
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+      setIsTranscribing(false);
+    };
+
+    recognitionRef.current.onend = () => {
+      setIsRecording(false);
+      setIsTranscribing(false);
+    };
+
+    try {
+      recognitionRef.current.start();
+      setIsTranscribing(true);
+    } catch (error) {
+      console.error('Error starting speech recognition:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start voice input.",
+        variant: "destructive"
+      });
     }
   };
 
-  const getMoodColor = (mood?: string) => {
-    switch (mood) {
-      case 'happy': return 'text-green-500';
-      case 'excited': return 'text-yellow-500';
-      case 'loving': return 'text-pink-500';
-      case 'playful': return 'text-blue-500';
-      default: return 'text-green-500';
-    }
+  const handleEmojiSelect = (emoji: string) => {
+    setInputValue(prev => prev + emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
   };
+
+  const handleGameSelect = (gameType: string) => {
+    setSelectedGame(gameType);
+    setShowGames(false);
+  };
+
+  if (showVoiceCall) {
+    return (
+      <VoiceCallInterface
+        character={character}
+        userPreferences={{
+          voice_preference: 'default',
+          response_length: 'medium',
+          emotional_tone: 'warm'
+        }}
+        onEndCall={() => setShowVoiceCall(false)}
+        onMinimize={() => setShowVoiceCall(false)}
+        className="h-full"
+      />
+    );
+  }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-background via-primary/5 to-accent/10">
-      {/* FIXED: Header - Always visible and sticky */}
-      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur-sm flex-shrink-0 sticky top-0 z-10">
+    <div className="flex flex-col h-full bg-gradient-to-br from-pink-50 via-purple-50 to-white">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-white/80 backdrop-blur-sm sticky top-0 z-20 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="p-2"
+          >
+            <X className="w-5 h-5" />
           </Button>
+          
           <Avatar className="w-10 h-10">
-            <AvatarImage src={character.avatar} alt={character.name} />
-            <AvatarFallback>{character.name[0]}</AvatarFallback>
+            <AvatarImage src={character.avatar_url} alt={character.name} />
+            <AvatarFallback className="bg-pink-400 text-white font-bold">
+              {character.name[0]}
+            </AvatarFallback>
           </Avatar>
+          
           <div>
+            <h2 className="font-semibold text-lg">{character.name}</h2>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold">{character.name}</h2>
-              <div className={`text-lg ${getMoodColor(character.mood)}`}>
-                {getMoodEmoji(character.mood)}
-              </div>
-              {character.isOnline && (
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              )}
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-sm text-muted-foreground">Online</span>
             </div>
-            <p className="text-sm text-muted-foreground">{character.bio}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Usage indicators */}
-          {currentPlan !== 'pro' && (
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              {remainingMessages !== -1 && (
-                <div className="flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3" />
-                  <span>{remainingMessages} left</span>
-                </div>
-              )}
-              {remainingVoiceCalls !== -1 && (
-                <div className="flex items-center gap-1">
-                  <Phone className="w-3 h-3" />
-                  <span>{remainingVoiceCalls} left</span>
-                </div>
-              )}
-            </div>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowGames(true)}
+            className="p-2"
+          >
+            <Gamepad2 className="w-5 h-5" />
+          </Button>
           
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleCall}
+            onClick={() => setShowVoiceCall(true)}
             disabled={!canMakeVoiceCall}
-            className="flex items-center gap-2"
+            className="p-2"
           >
-            {!canMakeVoiceCall ? (
-              <>
-                <Lock className="w-4 h-4" />
-                <Phone className="w-4 h-4" />
-              </>
-            ) : (
-              <Phone className="w-4 h-4" />
-            )}
+            <Phone className="w-5 h-5" />
           </Button>
           
-          <Button variant="ghost" size="sm">
-            <MoreVertical className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2"
+          >
+            <Heart className="w-5 h-5" />
           </Button>
         </div>
       </div>
 
-      {/* FIXED: Messages - Only this section scrolls with proper height */}
-      <div 
-        ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
-        style={{
-          scrollBehavior: 'smooth',
-          WebkitOverflowScrolling: 'touch',
-          height: 'calc(100vh - 140px)' // FIXED: Set explicit height to prevent scrolling issues
-        }}
-      >
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+            <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center">
+              <Heart className="w-10 h-10 text-pink-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold mb-2">Start a conversation with {character.name}</h3>
+              <p className="text-muted-foreground">
+                {character.name} is excited to chat with you! Send a message to begin.
+              </p>
+            </div>
+          </div>
+        ) : (
+          messages.map((message) => (
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                message.sender === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}
+              key={message.id}
+              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className="flex items-start gap-2">
+              <div className={`flex items-start gap-2 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 {message.sender === 'ai' && (
-                  <div className={`text-lg ${getMoodColor(message.mood)}`}>
-                    {getMoodEmoji(message.mood)}
-                  </div>
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarImage src={character.avatar_url} alt={character.name} />
+                    <AvatarFallback className="bg-pink-400 text-white text-xs">
+                      {character.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
                 )}
-                <div className="flex-1">
-                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </span>
-                    {message.type === 'voice' && (
-                      <Badge variant="secondary" className="text-xs">
-                        Voice
-                      </Badge>
-                    )}
-                  </div>
+                
+                <div
+                  className={`rounded-2xl px-4 py-3 ${
+                    message.sender === 'user'
+                      ? 'bg-pink-400 text-white'
+                      : 'bg-white border border-pink-100'
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <p className={`text-xs mt-1 ${
+                    message.sender === 'user' ? 'text-pink-100' : 'text-muted-foreground'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString()}
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
         
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-2xl px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className={`text-lg ${getMoodColor(character.mood)}`}>
-                  {getMoodEmoji(character.mood)}
-                </div>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm text-muted-foreground">
-                  {character.name} is typing...
-                </span>
+          <div className="flex items-start gap-2">
+            <Avatar className="w-8 h-8 flex-shrink-0">
+              <AvatarImage src={character.avatar_url} alt={character.name} />
+              <AvatarFallback className="bg-pink-400 text-white text-xs">
+                {character.name[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div className="bg-white border border-pink-100 rounded-2xl rounded-tl-sm px-4 py-3">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -435,7 +407,7 @@ export const EnhancedChatInterface = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* FIXED: Input Area - Always visible at bottom and sticky */}
+      {/* Input Area */}
       <div className="p-4 border-t bg-background/95 backdrop-blur-sm flex-shrink-0 sticky bottom-0 z-10">
         <div className="flex items-center gap-2">
           <div className="flex-1 relative">
@@ -480,7 +452,7 @@ export const EnhancedChatInterface = ({
           <Button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading || !canSendMessage}
-            className="bg-gradient-to-r from-primary to-primary-glow"
+            className="bg-pink-400 hover:bg-pink-500 text-white"
           >
             {!canSendMessage ? (
               <>
@@ -495,27 +467,45 @@ export const EnhancedChatInterface = ({
         
         {/* Usage warning */}
         {!canSendMessage && (
-          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2 text-sm text-yellow-800">
-            <Crown className="w-4 h-4" />
-            <span>You've reached your daily message limit. Upgrade to continue chatting!</span>
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-sm text-yellow-800">
+              You've reached your daily message limit. Upgrade to continue chatting!
+            </p>
           </div>
         )}
         
         {/* Emoji Picker */}
         {showEmojiPicker && (
-          <div className="absolute bottom-20 left-4 z-10">
-            <EmojiPicker onEmojiSelect={handleEmojiSelect} onClose={() => setShowEmojiPicker(false)} />
+          <div className="absolute bottom-16 left-4 right-4 z-20">
+            <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+          </div>
+        )}
+        
+        {/* Games Modal */}
+        {showGames && (
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-30">
+            <Card className="w-full max-w-md mx-4">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Choose a Game</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowGames(false)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <InteractiveGames
+                  character={character}
+                  onGameSelect={handleGameSelect}
+                  selectedGame={selectedGame}
+                />
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
-
-      {/* Upgrade Prompt */}
-      <UpgradePrompt
-        isOpen={showUpgradePrompt}
-        onClose={() => setShowUpgradePrompt(false)}
-        limitType={upgradePromptType === 'messages' ? 'message' : 'voice_call'}
-        currentPlan={currentPlan}
-      />
     </div>
   );
 };

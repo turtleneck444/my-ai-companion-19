@@ -1,371 +1,357 @@
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { 
   Send, 
-  Phone, 
-  ArrowLeft, 
   Mic, 
-  MicOff,
-  Heart,
-  Smile,
-  Plus,
-  Image,
-  Camera,
-  Gift,
-  Gamepad2,
-  Sparkles,
-  Reply,
+  MicOff, 
+  Phone, 
+  PhoneOff, 
+  Heart, 
+  Smile, 
+  Camera, 
+  Gamepad2, 
+  Gift, 
   MoreHorizontal,
-  Square
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
-import { personalityAI, type ChatMessage, type ChatContext } from "@/lib/ai-chat";
-import { voiceCallManager } from "@/lib/voice-call";
-import { EmojiPicker } from "@/components/EmojiPicker";
-import { InteractiveGames } from "@/components/InteractiveGames";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { useAuth } from "@/contexts/AuthContext";
-import { UpgradePrompt } from "@/components/UpgradePrompt";
-import { getPlanById, getRemainingMessages } from '@/lib/payments';
-import { ChatStorageService } from "@/lib/chat-storage";
+  Lock,
+  Loader2,
+  X,
+  Check,
+  Star,
+  Crown,
+  Zap,
+  ArrowLeft
+} from 'lucide-react';
+import { Character } from '@/types/character';
+import { personalityAI } from '@/lib/ai-chat';
+import { useEnhancedUsageTracking } from '@/hooks/useEnhancedUsageTracking';
+import { useToast } from '@/hooks/use-toast';
+import { EmojiPicker } from '@/components/EmojiPicker';
+import { InteractiveGames } from '@/components/InteractiveGames';
+import { VoiceCallInterface } from '@/components/VoiceCallInterface';
+import { ChatStorageService } from '@/lib/chat-storage';
 
-// Using ChatMessage from ai-chat.ts instead of local Message interface
-
-interface Voice {
-  voice_id: string;
-  name: string;
-}
-
-interface Character {
+interface Message {
   id: string;
-  name: string;
-  avatar: string;
-  bio: string;
-  personality: string[];
-  voice?: Voice;
-  is_custom?: boolean;
+  content: string;
+  sender: 'user' | 'ai';
+  timestamp: Date;
+  isTyping?: boolean;
 }
-
-interface UserPreferences {
-  preferredName: string;
-  petName: string;
-  formalityLevel: string;
-  humorLevel: string;
-  emotionalSupport: boolean;
-  challengeLevel: string;
-  feedbackFrequency: string;
-  treatmentStyle: string;
-  age: string;
-  contentFilter: boolean;
-}
-
-type GameType = 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay' | 'none';
 
 interface SimpleChatInterfaceProps {
   character: Character;
   onBack: () => void;
-  onStartCall?: () => void;
+  onStartCall: () => void;
 }
 
-export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
-  character,
+export const SimpleChatInterface = ({ 
+  character, 
   onBack,
   onStartCall
-}) => {
+}: SimpleChatInterfaceProps) => {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isAiTyping, setIsAiTyping] = useState(false);
+  const { 
+    usageData, 
+    planLimits, 
+    isLoading: usageLoading,
+    refreshUsage 
+  } = useEnhancedUsageTracking();
+  
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGames, setShowGames] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<GameType>('none');
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-
-  const [userPreferences] = useState<UserPreferences>({
-    preferredName: "friend",
-    petName: "sweetie",
-    formalityLevel: "casual",
-    humorLevel: "moderate",
-    emotionalSupport: true,
-    challengeLevel: "balanced",
-    feedbackFrequency: "moderate",
-    treatmentStyle: "supportive",
-    age: "25",
-    contentFilter: true
-  });
-
-  const usage = useEnhancedUsageTracking();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Load conversation on mount
+  // Check if user can send messages
+  const canSendMessage = !usageLoading && usageData && planLimits && 
+    usageData.messages_today < planLimits.messages_per_day;
+  
+  // Check if user can make voice calls
+  const canMakeVoiceCall = !usageLoading && usageData && planLimits && 
+    usageData.voice_calls_today < planLimits.voice_calls_per_day;
+
+  // Load messages when component mounts
   useEffect(() => {
-    const loadConversation = async () => {
-      if (!user || !isSupabaseConfigured) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        console.log('📖 Loading conversation for character:', character.name);
-        
-        // Get or create conversation
-        const convId = await ChatStorageService.getOrCreateConversation(user.id, character.id);
-        setConversationId(convId);
-        console.log('📝 Found existing conversation:', convId);
-        
-        // Load messages
-        const loadedMessages = await ChatStorageService.loadMessages(convId);
-        console.log('📖 Loaded', loadedMessages.length, 'messages for conversation', convId);
-        setMessages(loadedMessages);
-        
-      } catch (error) {
-        console.error('❌ Error loading conversation:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load conversation history",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadConversation();
-  }, [user, character.id, character.name, toast]);
+    loadMessages();
+  }, [character.id]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isAiTyping]);
+  }, [messages]);
 
-  const sendMessage = async (messageText: string) => {
-    if (!messageText.trim() || isAiTyping) return;
-
-    // Check usage limits
-    if (usage.remainingMessages === 0) {
-      setShowUpgradePrompt(true);
-      return;
+  const loadMessages = async () => {
+    try {
+      const conversation = await ChatStorageService.getOrCreateConversation(
+        character.id, // Using character ID as user ID for now
+        character.id
+      );
+      setConversationId(conversation);
+      
+      const loadedMessages = await ChatStorageService.loadMessages(conversation);
+      setMessages(loadedMessages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender as 'user' | 'ai',
+        timestamp: new Date(msg.timestamp)
+      })));
+    } catch (error) {
+      console.error('Error loading messages:', error);
     }
+  };
 
-    const userMessage: ChatMessage = {
+  const saveMessage = async (content: string, sender: 'user' | 'ai') => {
+    if (!conversationId) return;
+    
+    try {
+      await ChatStorageService.saveMessage(
+        conversationId,
+        character.id,
+        character.id, // Using character ID as user ID for now
+        content,
+        sender
+      );
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isLoading || !canSendMessage) return;
+
+    const userMessage: Message = {
       id: Date.now().toString(),
-      content: messageText,
+      content: inputValue,
       sender: 'user',
       timestamp: new Date()
     };
 
-    // Add user message to UI immediately
     setMessages(prev => [...prev, userMessage]);
-    setInput("");
-    setIsAiTyping(true);
-
-    // Save user message to database
-    if (conversationId && user) {
-      try {
-        await ChatStorageService.saveMessage(conversationId, character.id, user.id, userMessage);
-        console.log('💾 Saved user message to database');
-      } catch (error) {
-        console.error('❌ Error saving user message:', error);
-      }
-    }
+    await saveMessage(inputValue, 'user');
+    
+    const currentInput = inputValue;
+    setInputValue('');
+    setIsLoading(true);
 
     try {
-      const chatContext: ChatContext = {
+      const response = await personalityAI.sendMessage(
+        currentInput,
         character,
-        userPreferences,
-        conversationHistory: messages,
-        relationshipLevel: 80,
-        timeOfDay: getTimeOfDay(),
-        sessionMemory: {}
-      };
+        messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        }))
+      );
 
-      const aiResponse = await personalityAI.generateResponse(messageText, chatContext);
-
-      const aiMessage: ChatMessage = {
+      const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: aiResponse,
+        content: response,
         sender: 'ai',
         timestamp: new Date()
       };
 
-      // Add AI message to UI
       setMessages(prev => [...prev, aiMessage]);
-
-      // Save AI message to database
-      if (conversationId && user) {
-        await ChatStorageService.saveMessage(conversationId, character.id, user.id, aiMessage);
-        console.log('💾 Saved AI message to database');
-      }
-
-    } catch (error) {
-      console.error('AI response error:', error);
-      console.error('Error details:', error);
+      await saveMessage(response, 'ai');
       
+      // Refresh usage data after sending message
+      refreshUsage();
+    } catch (error) {
+      console.error('Error sending message:', error);
       toast({
         title: "Error",
-        description: "Failed to get response from " + character.name,
+        description: "Failed to send message. Please try again.",
         variant: "destructive"
       });
     } finally {
-      setIsAiTyping(false);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (input.trim()) {
-      sendMessage(input);
+      setIsLoading(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim()) {
-        sendMessage(input);
-      }
+      handleSendMessage();
+    }
+    if (e.key === 'Escape') {
+      setShowEmojiPicker(false);
+      setShowGames(false);
     }
   };
 
-  const getTimeOfDay = (): 'morning' | 'afternoon' | 'evening' => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'morning';
-    if (hour < 18) return 'afternoon';
-    return 'evening';
+  const handleVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Voice input not supported",
+        description: "Your browser doesn't support speech recognition.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onstart = () => {
+      setIsRecording(true);
+      setIsTranscribing(false);
+    };
+
+    recognitionRef.current.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInputValue(transcript);
+      setIsTranscribing(false);
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+      setIsTranscribing(false);
+    };
+
+    recognitionRef.current.onend = () => {
+      setIsRecording(false);
+      setIsTranscribing(false);
+    };
+
+    try {
+      recognitionRef.current.start();
+      setIsTranscribing(true);
+    } catch (error) {
+      console.error('Error starting speech recognition:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start voice input.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleGameSelect = (game: GameType) => {
-    setSelectedGame(game);
+  const handleEmojiSelect = (emoji: string) => {
+    setInputValue(prev => prev + emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
+
+  const handleGameSelect = (gameType: string) => {
+    setSelectedGame(gameType);
     setShowGames(false);
-    
-    if (game !== 'none') {
-      // Send game start message
-      const gameMessages = {
-        chess: "Let's play chess! I love strategic games. I'll be white, you be black. Make your first move! ♟️",
-        '20questions': "I'm thinking of something! Ask me yes or no questions to figure out what it is. You have 20 questions! 🤔",
-        wordchain: "Let's play word chain! I'll start: 'Love'. Your word has to start with 'e' (the last letter of 'Love'). What's your word? 🔗",
-        truthordare: "Truth or Dare time! I'm feeling brave today. What do you choose? Truth or Dare? 😈",
-        riddles: "I love riddles! Here's one for you: 'I speak without a mouth and hear without ears. I have no body, but come alive with wind. What am I?' Can you solve it? 🤔",
-        roleplay: "Let's roleplay! I'm a mysterious stranger you met at a coffee shop. How do you approach me? ☕"
-      };
-      
-      sendMessage(gameMessages[game]);
-    }
   };
 
-  if (isLoading) {
+  if (showVoiceCall) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading conversation...</p>
-        </div>
-      </div>
+      <VoiceCallInterface
+        character={character}
+        userPreferences={{
+          voice_preference: 'default',
+          response_length: 'medium',
+          emotional_tone: 'warm'
+        }}
+        onEndCall={() => setShowVoiceCall(false)}
+        onMinimize={() => setShowVoiceCall(false)}
+        className="h-full"
+      />
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
-      {/* Sticky Header - Always locked at top */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-pink-200 p-4 flex-shrink-0">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-white">
+      {/* Header - Sticky */}
+      <div className="sticky top-0 z-20 flex-shrink-0 bg-white/80 backdrop-blur-md border-b border-pink-200/30 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={onBack}
-              className="text-muted-foreground hover:text-foreground"
+              className="p-2"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-5 h-5" />
             </Button>
             
             <Avatar className="w-10 h-10">
-              <AvatarImage src={character.avatar} alt={character.name} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white">
+              <AvatarImage src={character.avatar_url} alt={character.name} />
+              <AvatarFallback className="bg-pink-400 text-white font-bold">
                 {character.name[0]}
               </AvatarFallback>
             </Avatar>
             
             <div>
               <h2 className="font-semibold text-lg">{character.name}</h2>
-              <p className="text-sm text-green-600 flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Online
-              </p>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-muted-foreground">Online</span>
+              </div>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
-            {character.is_custom && (
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-                Custom
-              </Badge>
-            )}
-            
-            {onStartCall && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onStartCall}
-                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 hover:from-pink-600 hover:to-purple-700"
-              >
-                <Phone className="w-4 h-4 mr-1" />
-                Call
-              </Button>
-            )}
-            
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowGames(true)}
-              className="text-muted-foreground hover:text-foreground"
+              className="p-2"
             >
-              <Gamepad2 className="w-4 h-4" />
+              <Gamepad2 className="w-5 h-5" />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowVoiceCall(true)}
+              disabled={!canMakeVoiceCall}
+              className="p-2"
+            >
+              <Phone className="w-5 h-5" />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2"
+            >
+              <Heart className="w-5 h-5" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Scrollable Messages Area - Takes remaining space */}
+      {/* Messages Area - Scrollable */}
       <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl text-white">{character.name[0]}</span>
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+            <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center">
+              <Heart className="w-10 h-10 text-pink-400" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Start chatting with {character.name}!</h3>
-            <p className="text-muted-foreground mb-6">Send a message to begin your conversation</p>
-            
-            {/* Smart suggestions */}
-            <div className="space-y-2 max-w-sm mx-auto">
-              <p className="text-sm text-muted-foreground mb-3">Try saying:</p>
-              {[
-                "Hi! How are you today?",
-                "Tell me about yourself",
-                "What's your favorite hobby?",
-                "I'm feeling a bit lonely"
-              ].map((suggestion, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => sendMessage(suggestion)}
-                  className="w-full text-left justify-start text-sm h-auto py-2 px-3"
-                >
-                  {suggestion}
-                </Button>
-              ))}
+            <div>
+              <h3 className="text-xl font-semibold mb-2">Start a conversation with {character.name}</h3>
+              <p className="text-muted-foreground">
+                {character.name} is excited to chat with you! Send a message to begin.
+              </p>
             </div>
           </div>
         ) : (
@@ -377,23 +363,23 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
               <div className={`flex items-start gap-2 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 {message.sender === 'ai' && (
                   <Avatar className="w-8 h-8 flex-shrink-0">
-                    <AvatarImage src={character.avatar} alt={character.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white text-sm">
+                    <AvatarImage src={character.avatar_url} alt={character.name} />
+                    <AvatarFallback className="bg-pink-400 text-white text-xs">
                       {character.name[0]}
                     </AvatarFallback>
                   </Avatar>
                 )}
                 
                 <div
-                  className={`rounded-2xl px-4 py-2 ${
+                  className={`rounded-2xl px-4 py-3 ${
                     message.sender === 'user'
-                      ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
-                      : 'bg-white border border-gray-200'
+                      ? 'bg-pink-400 text-white'
+                      : 'bg-white border border-pink-100'
                   }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                   <p className={`text-xs mt-1 ${
-                    message.sender === 'user' ? 'text-pink-100' : 'text-gray-500'
+                    message.sender === 'user' ? 'text-pink-100' : 'text-muted-foreground'
                   }`}>
                     {message.timestamp.toLocaleTimeString()}
                   </p>
@@ -403,19 +389,19 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
           ))
         )}
         
-        {isAiTyping && (
+        {isLoading && (
           <div className="flex items-start gap-2">
             <Avatar className="w-8 h-8 flex-shrink-0">
-              <AvatarImage src={character.avatar} alt={character.name} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white text-sm">
+              <AvatarImage src={character.avatar_url} alt={character.name} />
+              <AvatarFallback className="bg-pink-400 text-white text-xs">
                 {character.name[0]}
               </AvatarFallback>
             </Avatar>
-            <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="bg-white border border-pink-100 rounded-2xl rounded-tl-sm px-4 py-3">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -424,110 +410,105 @@ export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Sticky Footer - Always locked at bottom */}
-      <div className="sticky bottom-0 z-20 bg-white/95 backdrop-blur-sm border-t border-pink-200 p-4 flex-shrink-0">
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      {/* Input Area - Sticky */}
+      <div className="sticky bottom-0 z-20 flex-shrink-0 bg-white/80 backdrop-blur-md border-t border-pink-200/30 p-4">
+        <div className="flex items-center gap-2">
           <div className="flex-1 relative">
             <Input
               ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={`Message ${character.name}...`}
-              className="pr-10"
-              disabled={isAiTyping}
+              disabled={isLoading || !canSendMessage}
+              className="pr-20"
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            >
-              <Smile className="w-4 h-4" />
-            </Button>
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="h-8 w-8 p-0"
+              >
+                <Smile className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleVoiceInput}
+                disabled={!canMakeVoiceCall}
+                className={`h-8 w-8 p-0 ${
+                  isRecording ? 'text-red-500' : ''
+                }`}
+              >
+                {isRecording ? (
+                  <MicOff className="w-4 h-4" />
+                ) : isTranscribing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
           </div>
           
           <Button
-            type="submit"
-            disabled={!input.trim() || isAiTyping}
-            className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
+            onClick={handleSendMessage}
+            disabled={!inputValue.trim() || isLoading || !canSendMessage}
+            className="bg-pink-400 hover:bg-pink-500 text-white"
           >
-            <Send className="w-4 h-4" />
+            {!canSendMessage ? (
+              <>
+                <Lock className="w-4 h-4 mr-2" />
+                Upgrade
+              </>
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
-        </form>
+        </div>
         
+        {/* Usage warning */}
+        {!canSendMessage && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-sm text-yellow-800">
+              You've reached your daily message limit. Upgrade to continue chatting!
+            </p>
+          </div>
+        )}
+        
+        {/* Emoji Picker */}
         {showEmojiPicker && (
           <div className="absolute bottom-16 left-4 right-4 z-30">
-            <EmojiPicker
-              onEmojiSelect={(emoji) => {
-                setInput(prev => prev + emoji);
-                setShowEmojiPicker(false);
-              }}
-              onClose={() => setShowEmojiPicker(false)}
-            />
+            <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+          </div>
+        )}
+        
+        {/* Games Modal */}
+        {showGames && (
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-30">
+            <Card className="w-full max-w-md mx-4">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Choose a Game</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowGames(false)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <InteractiveGames
+                  character={character}
+                  onGameSelect={handleGameSelect}
+                  selectedGame={selectedGame}
+                />
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
-
-      {/* Games Modal */}
-      {showGames && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-semibold mb-4">Choose a Game</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: 'chess', name: 'Chess', icon: '♟️' },
-                { id: '20questions', name: '20 Questions', icon: '🤔' },
-                { id: 'wordchain', name: 'Word Chain', icon: '🔗' },
-                { id: 'truthordare', name: 'Truth or Dare', icon: '😈' },
-                { id: 'riddles', name: 'Riddles', icon: '🤔' },
-                { id: 'roleplay', name: 'Roleplay', icon: '🎭' }
-              ].map((game) => (
-                <Button
-                  key={game.id}
-                  variant="outline"
-                  onClick={() => handleGameSelect(game.id as GameType)}
-                  className="h-16 flex flex-col items-center gap-2"
-                >
-                  <span className="text-2xl">{game.icon}</span>
-                  <span className="text-sm">{game.name}</span>
-                </Button>
-              ))}
-            </div>
-            <Button
-              variant="ghost"
-              onClick={() => setShowGames(false)}
-              className="w-full mt-4"
-            >
-              Cancel
-            </Button>
-          </Card>
-        </div>
-      )}
-
-      {/* Interactive Games */}
-      {selectedGame !== 'none' && (
-        <InteractiveGames
-          selectedGame={selectedGame}
-          onClose={() => setSelectedGame('none')}
-          character={character}
-        />
-      )}
-
-      {/* Upgrade Prompt */}
-      {showUpgradePrompt && (
-        <UpgradePrompt
-          onClose={() => setShowUpgradePrompt(false)}
-          onUpgrade={() => {
-            setShowUpgradePrompt(false);
-            setShowPaymentForm(true);
-          }}
-          currentPlan={usage.plan}
-          remainingMessages={usage.remainingMessages}
-          remainingCalls={usage.remainingVoiceCalls}
-        />
-      )}
     </div>
   );
 };
