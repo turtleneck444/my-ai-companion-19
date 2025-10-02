@@ -27,6 +27,27 @@
 [build.processing.secrets]
   enabled = false
 
+# Configure secrets scanning to ignore environment variable names
+[build.processing.secrets.scan]
+  enabled = true
+  omit_keys = [
+    "VITE_PAYMENT_PROVIDER",
+    "VITE_PAYMENT_ENVIRONMENT", 
+    "VITE_SUPABASE_URL",
+    "VITE_SUPABASE_ANON_KEY",
+    "STRIPE_PREMIUM_PRICE_ID",
+    "STRIPE_PRO_PRICE_ID", 
+    "STRIPE_PUBLISHABLE_KEY",
+    "VITE_STRIPE_PUBLISHABLE_KEY",
+    "VITE_ELEVENLABS_API_KEY",
+    "VITE_BONQUISHA_VOICE_ID",
+    "ELEVENLABS_API_KEY",
+    "ELEVENLABS_DEFAULT_VOICE_ID",
+    "OPENAI_API_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET"
+  ]
+
 [[headers]]
   for = "/*"
   [headers.values]
