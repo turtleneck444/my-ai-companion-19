@@ -48,55 +48,52 @@ interface Character {
   avatar: string;
   bio: string;
   personality: string[];
-  voice: Voice;
+  voice?: Voice;
   is_custom?: boolean;
-  user_id?: string;
 }
 
 interface UserPreferences {
   preferredName: string;
+  petName: string;
+  formalityLevel: string;
+  humorLevel: string;
+  emotionalSupport: boolean;
+  challengeLevel: string;
+  feedbackFrequency: string;
   treatmentStyle: string;
   age: string;
   contentFilter: boolean;
 }
 
+type GameType = 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay' | 'none';
+
 interface SimpleChatInterfaceProps {
   character: Character;
   onBack: () => void;
   onStartCall?: () => void;
-  userPreferences?: UserPreferences;
 }
 
-type GameType = 'none' | 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay';
-
-export const SimpleChatInterface = ({ character, onBack, onStartCall, userPreferences: propUserPreferences }: SimpleChatInterfaceProps) => {
-  const { user } = useAuth();
+export const SimpleChatInterface: React.FC<SimpleChatInterfaceProps> = ({
+  character,
+  onBack,
+  onStartCall
+}) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [isVoiceCallActive, setIsVoiceCallActive] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGames, setShowGames] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<'none' | 'chess' | '20questions' | 'wordchain' | 'truthordare' | 'riddles' | 'roleplay'>('none');
+  const [selectedGame, setSelectedGame] = useState<GameType>('none');
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<string | null>(null);
-  const [isUpgrading, setIsUpgrading] = useState(false);
-  const [replies, setReplies] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [userPreferences, setUserPreferences] = useState<UserPreferences>(propUserPreferences || {
-    preferredName: "",
-    relationshipLevel: 1.0,
-    communicationStyle: "friendly",
-    interests: [],
-    goals: [],
-    boundaries: [],
-    preferredTopics: [],
-    avoidTopics: [],
-    responseLength: "medium",
+
+  const [userPreferences] = useState<UserPreferences>({
+    preferredName: "friend",
+    petName: "sweetie",
     formalityLevel: "casual",
     humorLevel: "moderate",
     emotionalSupport: true,
@@ -126,9 +123,9 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
 
         // Load messages
         const loadedMessages = await ChatStorageService.loadMessages(convId);
+        console.log('📖 Loaded', loadedMessages.length, 'messages for conversation', convId);
         setMessages(loadedMessages);
 
-        console.log('📖 Loaded', loadedMessages.length, 'messages');
       } catch (error) {
         console.error('❌ Error loading conversation:', error);
         toast({
@@ -178,6 +175,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
     try {
       // Save user message to database
       await ChatStorageService.saveMessage(conversationId, character.id, user.id, userMessage);
+      console.log('💾 Saved user message to database');
 
       // Increment usage
       const usageSuccess = await incrementMessages();
@@ -213,6 +211,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
 
       // Save AI message to database
       await ChatStorageService.saveMessage(conversationId, character.id, user.id, aiMessage);
+      console.log('💾 Saved AI message to database');
 
     } catch (error) {
       console.error('AI response error:', error);
@@ -282,9 +281,9 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-pink-200 p-4">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
+      {/* Sticky Header - Fixed at top */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-pink-200 p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -347,8 +346,8 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
         </div>
       </div>
 
-      {/* Messages Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages Area - Scrollable, takes remaining space */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -432,8 +431,8 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Sticky Footer */}
-      <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm border-t border-pink-200 p-4">
+      {/* Sticky Footer - Fixed at bottom */}
+      <div className="sticky bottom-0 z-20 bg-white/95 backdrop-blur-sm border-t border-pink-200 p-4 flex-shrink-0">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <div className="flex-1 relative">
             <Input
@@ -466,7 +465,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
         </form>
         
         {showEmojiPicker && (
-          <div className="absolute bottom-16 left-4 right-4 z-20">
+          <div className="absolute bottom-16 left-4 right-4 z-30">
             <EmojiPicker
               onEmojiSelect={(emoji) => {
                 setInput(prev => prev + emoji);
@@ -488,7 +487,7 @@ export const SimpleChatInterface = ({ character, onBack, onStartCall, userPrefer
                 { id: 'chess', name: 'Chess', icon: '♟️' },
                 { id: '20questions', name: '20 Questions', icon: '🤔' },
                 { id: 'wordchain', name: 'Word Chain', icon: '🔗' },
-                { id: 'truthordare', name: 'Truth or Dare', icon: '��' },
+                { id: 'truthordare', name: 'Truth or Dare', icon: '😈' },
                 { id: 'riddles', name: 'Riddles', icon: '🤔' },
                 { id: 'roleplay', name: 'Roleplay', icon: '🎭' }
               ].map((game) => (
