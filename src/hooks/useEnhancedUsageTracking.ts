@@ -225,6 +225,7 @@ export const useEnhancedUsageTracking = () => {
     loading,
     error,
     refresh: loadUsageData,
+    refreshUsage: loadUsageData,
     incrementUsage,
     resetUsage
   };

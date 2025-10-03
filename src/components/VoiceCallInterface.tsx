@@ -391,6 +391,14 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       }));
 
       console.log("🔊 About to call speakAIResponse with:", aiResponse.substring(0, 50) + "...");
+      console.log("🔊 Call active status:", isCallActiveRef.current);
+      console.log("🔊 Call state:", callState);
+      
+      if (!isCallActiveRef.current) {
+        console.log("❌ Call is not active, skipping speakAIResponse");
+        return;
+      }
+      
       await speakAIResponse(aiResponse);
       console.log("🔊 speakAIResponse call completed");
 
