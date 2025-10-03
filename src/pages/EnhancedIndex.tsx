@@ -23,7 +23,7 @@ import {
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useSupabaseUsageTracking } from "@/hooks/useSupabaseUsageTracking";
+import { useEnhancedUsageTracking } from "@/hooks/useEnhancedUsageTracking";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "react-router-dom";
