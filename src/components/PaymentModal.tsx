@@ -1,268 +1,358 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, CreditCard, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { paymentProcessor, SUBSCRIPTION_PLANS, formatPrice, getPlanById } from '@/lib/payments';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Check, CreditCard, Shield, Zap } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedPlan: string;
-  onSuccess: (subscription: any) => void;
+  onSuccess: (plan: string) => void;
+  plan: string;
 }
 
-// Stripe Elements component
-const CheckoutForm = ({ selectedPlan, onSuccess, onClose }: { 
-  selectedPlan: string; 
-  onSuccess: (subscription: any) => void;
-  onClose: () => void;
-}) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string>('');
-
-  const plan = getPlanById(selectedPlan);
-  if (!plan) return null;
-
-  useEffect(() => {
-    if (selectedPlan !== 'free') {
-      // Create payment intent for subscription
-      paymentProcessor.createPaymentIntent(selectedPlan)
-        .then(intent => setClientSecret(intent.clientSecret))
-        .catch(error => {
-          console.error('Failed to create payment intent:', error);
-          toast({
-            title: "Payment Error",
-            description: "Failed to initialize payment. Please try again.",
-            variant: "destructive"
-          });
-        });
-    }
-  }, [selectedPlan, toast]);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      if (selectedPlan === 'free') {
-        // Handle free plan
-        onSuccess({
-          id: 'free-plan',
-          status: 'active',
-          planId: 'free',
-          currentPeriodStart: Date.now(),
-          currentPeriodEnd: Date.now() + (365 * 24 * 60 * 60 * 1000) // 1 year
-        });
-        return;
-      }
-
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Card element not found');
-      }
-
-      // Create payment method
-      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-      });
-
-      if (pmError) {
-        throw new Error(pmError.message);
-      }
-
-      if (!paymentMethod) {
-        throw new Error('Failed to create payment method');
-      }
-
-      // Create subscription
-      const subscription = await paymentProcessor.createSubscription(
-        selectedPlan,
-        paymentMethod.id
-      );
-
-      if (subscription.success) {
-        onSuccess(subscription.subscription);
-        toast({
-          title: "Success!",
-          description: `Welcome to ${plan.name}! Your subscription is now active.`,
-        });
-      } else {
-        throw new Error(subscription.error || 'Subscription creation failed');
-      }
-
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      toast({
-        title: "Payment Failed",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <label className="text-sm font-medium text-foreground mb-2 block">
-            Card Information
-          </label>
-          <div className="border rounded-md p-3">
-            <CardElement
-              options={{
-                style: {
-                  base: {
-                    fontSize: '16px',
-                    color: '#424770',
-                    '::placeholder': {
-                      color: '#aab7c4',
-                    },
-                  },
-                },
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-        <Shield className="h-4 w-4" />
-        <span>Your payment information is secure and encrypted</span>
-      </div>
-
-      <div className="flex space-x-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          className="flex-1"
-          disabled={isLoading}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          className="flex-1"
-          disabled={!stripe || isLoading}
-        >
-          {isLoading ? 'Processing...' : `Subscribe to ${plan.name}`}
-        </Button>
-      </div>
-    </form>
-  );
+const SUBSCRIPTION_PLANS = {
+  free: {
+    name: 'Free',
+    price: '$0',
+    features: ['5 messages per day', '1 voice call per day', 'Basic features'],
+    limits: { messages: 5, voice_calls: 1 }
+  },
+  premium: {
+    name: 'Premium',
+    price: '$19/month',
+    features: ['50 messages per day', '5 voice calls per day', 'Advanced features', 'Priority support'],
+    limits: { messages: 50, voice_calls: 5 }
+  },
+  pro: {
+    name: 'Pro',
+    price: '$49/month',
+    features: ['Unlimited messages', 'Unlimited voice calls', 'All features', 'API access'],
+    limits: { messages: -1, voice_calls: -1 }
+  }
 };
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
-  selectedPlan,
-  onSuccess
+  onSuccess,
+  plan
 }) => {
-  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
-  const [paymentProvider, setPaymentProvider] = useState<'stripe' | null>(null);
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [cardDetails, setCardDetails] = useState({
+    number: '',
+    expiry: '',
+    cvc: '',
+    name: ''
+  });
+
+  const planData = SUBSCRIPTION_PLANS[plan as keyof typeof SUBSCRIPTION_PLANS] || SUBSCRIPTION_PLANS.free;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (plan === 'free') {
+      // Handle free plan
+      setLoading(true);
+      try {
+        const response = await fetch('/.netlify/functions/payments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            method: 'createPaymentIntent',
+            plan: 'free'
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to activate free plan');
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+          setSuccess(true);
+          setTimeout(() => {
+            onSuccess('free');
+            onClose();
+          }, 2000);
+        } else {
+          throw new Error(data.error || 'Failed to activate plan');
+        }
+      } catch (err) {
+        console.error('Payment error:', err);
+        setError(err instanceof Error ? err.message : 'Payment failed');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Handle paid plans
+    if (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvc || !cardDetails.name) {
+      setError('Please fill in all card details');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/.netlify/functions/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          method: 'createPaymentIntent',
+          plan: plan
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Payment processing failed');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSuccess(true);
+        toast({
+          title: "Payment Successful!",
+          description: `Welcome to ${planData.name}!`,
+        });
+        
+        setTimeout(() => {
+          onSuccess(plan);
+          onClose();
+        }, 2000);
+      } else {
+        throw new Error(data.error || 'Payment failed');
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+      setError(err instanceof Error ? err.message : 'Payment failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setCardDetails(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const formatCardNumber = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const matches = v.match(/\d{4,16}/g);
+    const match = matches && matches[0] || '';
+    const parts = [];
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+    if (parts.length) {
+      return parts.join(' ');
+    } else {
+      return v;
+    }
+  };
+
+  const formatExpiry = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    if (v.length >= 2) {
+      return v.substring(0, 2) + '/' + v.substring(2, 4);
+    }
+    return v;
+  };
 
   useEffect(() => {
-    const initializePayment = async () => {
-      try {
-        // Initialize Stripe
-        const stripe = await paymentProcessor.initializePaymentProvider();
-        if (stripe) {
-          setStripePromise(Promise.resolve(stripe));
-          setPaymentProvider('stripe');
-        }
-      } catch (error) {
-        console.error('Payment initialization failed:', error);
-      }
-    };
-
     if (isOpen) {
-      initializePayment();
+      setError(null);
+      setSuccess(false);
+      setCardDetails({
+        number: '',
+        expiry: '',
+        cvc: '',
+        name: ''
+      });
     }
   }, [isOpen]);
 
-  const plan = getPlanById(selectedPlan);
-  if (!plan) return null;
+  if (success) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <div className="text-center py-8">
+            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-green-600 mb-2">Payment Successful!</h3>
+            <p className="text-muted-foreground mb-4">
+              Welcome to {planData.name}! Your plan has been activated.
+            </p>
+            <div className="animate-spin">
+              <Loader2 className="w-6 h-6 mx-auto" />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center">
-            Subscribe to {plan.name}
+          <DialogTitle className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5" />
+            {plan === 'free' ? 'Activate Free Plan' : 'Complete Payment'}
           </DialogTitle>
+          <DialogDescription>
+            {plan === 'free' 
+              ? 'Activate your free plan to get started'
+              : 'Enter your payment details to upgrade to ' + planData.name
+            }
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Plan Details */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{plan.name}</CardTitle>
-                {plan.popular && (
-                  <Badge variant="secondary" className="bg-primary text-primary-foreground">
-                    Most Popular
-                  </Badge>
-                )}
-              </div>
-              <div className="text-3xl font-bold">
-                {formatPrice(plan.price, plan.currency)}
-                <span className="text-sm font-normal text-muted-foreground">
-                  /{plan.interval === 'forever' ? 'forever' : plan.interval}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ul className="space-y-2">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-center space-x-2 text-sm">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">{planData.name}</CardTitle>
+            <CardDescription>{planData.price}</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ul className="space-y-2 text-sm">
+              {planData.features.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
 
-          <Separator />
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-          {/* Payment Form */}
-          {paymentProvider === 'stripe' && stripePromise ? (
-            <Elements stripe={stripePromise}>
-              <CheckoutForm 
-                selectedPlan={selectedPlan} 
-                onSuccess={onSuccess} 
-                onClose={onClose} 
+        {plan !== 'free' && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cardName">Cardholder Name</Label>
+              <Input
+                id="cardName"
+                value={cardDetails.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                placeholder="John Doe"
+                required
               />
-            </Elements>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Loading payment form...</p>
             </div>
-          )}
 
-          {selectedPlan !== 'free' && (
-            <div className="text-xs text-center text-muted-foreground">
-              <p>You can cancel your subscription at any time from your account settings.</p>
+            <div className="space-y-2">
+              <Label htmlFor="cardNumber">Card Number</Label>
+              <Input
+                id="cardNumber"
+                value={cardDetails.number}
+                onChange={(e) => handleInputChange('number', formatCardNumber(e.target.value))}
+                placeholder="1234 5678 9012 3456"
+                maxLength={19}
+                required
+              />
             </div>
-          )}
-        </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="expiry">Expiry Date</Label>
+                <Input
+                  id="expiry"
+                  value={cardDetails.expiry}
+                  onChange={(e) => handleInputChange('expiry', formatExpiry(e.target.value))}
+                  placeholder="MM/YY"
+                  maxLength={5}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cvc">CVC</Label>
+                <Input
+                  id="cvc"
+                  value={cardDetails.cvc}
+                  onChange={(e) => handleInputChange('cvc', e.target.value.replace(/\D/g, ''))}
+                  placeholder="123"
+                  maxLength={4}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-pink-400 hover:bg-pink-500 text-white"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  `Pay ${planData.price}`
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {plan === 'free' && (
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1"
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              className="flex-1 bg-pink-400 hover:bg-pink-500 text-white"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Activating...
+                </>
+              ) : (
+                'Activate Free Plan'
+              )}
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
