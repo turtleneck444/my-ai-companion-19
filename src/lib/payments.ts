@@ -79,6 +79,11 @@ export interface Subscription {
   plan: string;
 }
 
+// Helper function to get plan by ID
+export const getPlanById = (planId: string) => {
+  return SUBSCRIPTION_PLANS[planId as keyof typeof SUBSCRIPTION_PLANS] || SUBSCRIPTION_PLANS.free;
+};
+
 export const createPaymentIntent = async (planId: string): Promise<PaymentIntent> => {
   const response = await fetch('/.netlify/functions/payments', {
     method: 'POST',
