@@ -220,6 +220,7 @@ export const useEnhancedUsageTracking = () => {
 
   return {
     ...usageData,
+    usageData,
     planLimits,
     loading,
     error,
