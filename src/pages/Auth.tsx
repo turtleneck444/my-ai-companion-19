@@ -75,11 +75,25 @@ export default function Auth() {
               LoveAI Companion
             </CardTitle>
             <CardDescription className="text-base md:text-lg text-muted-foreground">
-              Sign in or create your account to start meaningful AI connections.
+              {preselectedPlan ? (
+                <>
+                  Complete your signup to get started with the <span className="font-semibold text-pink-600 capitalize">{preselectedPlan}</span> plan.
+                </>
+              ) : (
+                "Sign in or create your account to start meaningful AI connections."
+              )}
             </CardDescription>
+            {preselectedPlan && (
+              <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 mt-4">
+                <div className="flex items-center justify-center gap-2 text-pink-700">
+                  <Crown className="w-5 h-5" />
+                  <span className="font-semibold">Selected Plan: {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
+            <Tabs defaultValue={preselectedPlan ? "signup" : "signin"} className="w-full">
               <div className="flex justify-center">
                 <TabsList className="grid grid-cols-2 w-full max-w-sm rounded-full">
                   <TabsTrigger className="rounded-full" value="signin">Sign In</TabsTrigger>
