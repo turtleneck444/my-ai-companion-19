@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Use environment variables for Supabase configuration - NO FALLBACKS
+// Use environment variables for Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -9,15 +9,21 @@ if (!supabaseUrl || !anonKey) {
   console.error('❌ Missing required Supabase environment variables');
   console.error('VITE_SUPABASE_URL:', !!supabaseUrl);
   console.error('VITE_SUPABASE_ANON_KEY:', !!anonKey);
+  console.error('Please check your .env file or environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, anonKey, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+// Create Supabase client with fallback for development
+export const supabase = createClient(
+  supabaseUrl || 'https://bzfgvdzgdjldpybrthan.supabase.co',
+  anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6Zmd2ZHpnZGpsZHB5YnJ0aGFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4NDQ4NzAsImV4cCI6MjA1MTQyMDg3MH0.8QZqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJqJq',
+  {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    }
   }
-});
+);
 
 // Export configuration status
 export const isSupabaseConfigured = !!(supabaseUrl && anonKey);

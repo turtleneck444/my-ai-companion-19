@@ -14,7 +14,8 @@ export const SUBSCRIPTION_PLANS = {
     ],
     limits: {
       messages: 5,
-      voiceCalls: 1
+      voiceCalls: 1,
+      companions: 1
     }
   },
   premium: {
@@ -33,7 +34,8 @@ export const SUBSCRIPTION_PLANS = {
     ],
     limits: {
       messages: 50,
-      voiceCalls: 5
+      voiceCalls: 5,
+      companions: 3
     }
   },
   pro: {
@@ -52,7 +54,8 @@ export const SUBSCRIPTION_PLANS = {
     ],
     limits: {
       messages: -1, // -1 means unlimited
-      voiceCalls: -1
+      voiceCalls: -1,
+      companions: 10
     }
   }
 };
@@ -88,6 +91,20 @@ export const getPlanById = (planId: string) => {
 export const formatPrice = (priceInCents: number) => {
   if (priceInCents === 0) return 'Free';
   return `$${(priceInCents / 100).toFixed(2)}`;
+};
+
+// Helper function to get remaining companions for a plan
+export const getRemainingCompanions = (planId: string, currentCount: number = 0) => {
+  const plan = getPlanById(planId);
+  const limit = plan.limits.companions;
+  if (limit === -1) return -1; // Unlimited
+  return Math.max(0, limit - currentCount);
+};
+
+// Helper function to check if user can create more companions
+export const checkCompanionLimit = (planId: string, currentCount: number = 0) => {
+  const remaining = getRemainingCompanions(planId, currentCount);
+  return remaining === -1 || remaining > 0;
 };
 
 export const createPaymentIntent = async (planId: string): Promise<PaymentIntent> => {

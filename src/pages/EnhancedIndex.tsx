@@ -527,3 +527,6 @@ export const EnhancedIndex = () => {
     </div>
   );
 };
+
+// Add default export for App.tsx compatibility
+export default EnhancedIndex;
