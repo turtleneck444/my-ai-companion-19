@@ -58,7 +58,7 @@ export const EnhancedChatInterface = ({
   const { 
     usageData, 
     planLimits, 
-    isLoading: usageLoading,
+    loading: usageLoading,
     refreshUsage 
   } = useEnhancedUsageTracking();
   

@@ -60,7 +60,7 @@ export const SimpleChatInterface = ({
   const { 
     usageData, 
     planLimits, 
-    isLoading: usageLoading,
+    loading: usageLoading,
     refreshUsage 
   } = useEnhancedUsageTracking();
   
