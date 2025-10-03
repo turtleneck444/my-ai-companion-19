@@ -147,6 +147,7 @@ export async function speakText(
 
   try {
     const endpoints = [
+      'http://localhost:3000/api/elevenlabs-tts',
       '/api/elevenlabs-tts',
       '/.netlify/functions/elevenlabs-tts'
     ];

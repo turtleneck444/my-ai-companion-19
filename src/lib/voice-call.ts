@@ -20,7 +20,7 @@ export interface VoiceCallSession {
 
 export class VoiceCallManager {
   private sessions: Map<string, VoiceCallSession> = new Map();
-  private elevenlabsEndpoint = '/api/elevenlabs-tts';
+  private elevenlabsEndpoint = 'http://localhost:3000/api/elevenlabs-tts';
 
   async startVoiceCall(character: any, userPreferences: UserPreferences): Promise<string> {
     const sessionId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

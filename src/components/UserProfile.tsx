@@ -69,7 +69,7 @@ interface UserProfile {
   profile_visibility?: string;
   data_sharing?: boolean;
   analytics_tracking?: boolean;
-  subscription_plan?: string;
+  plan?: string;
   subscription_status?: string;
   messages_used?: number;
   voice_calls_used?: number;
@@ -147,7 +147,7 @@ export const UserProfile: React.FC = () => {
           user_id: user.id,
           email: user.email || '',
           preferred_name: user.user_metadata?.full_name || '',
-          subscription_plan: 'free',
+          plan: 'free', // Use 'plan' instead of 'subscription_plan' to match AuthContext
           subscription_status: 'active',
           messages_used: 0,
           voice_calls_used: 0,
@@ -159,7 +159,9 @@ export const UserProfile: React.FC = () => {
           message_notifications: true,
           profile_visibility: 'private',
           data_sharing: false,
-          analytics_tracking: true
+          analytics_tracking: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
 
         const { data: insertData, error: insertError } = await supabase
@@ -243,7 +245,7 @@ export const UserProfile: React.FC = () => {
     if (newPlan === 'free') {
       // Downgrade to free
       await saveProfile({
-        subscription_plan: 'free',
+        plan: 'free',
         subscription_status: 'active',
         messages_limit: 5,
         voice_calls_limit: 1
@@ -265,7 +267,7 @@ export const UserProfile: React.FC = () => {
     const limits = SUBSCRIPTION_PLANS[plan as keyof typeof SUBSCRIPTION_PLANS]?.limits;
     
     await saveProfile({
-      subscription_plan: plan,
+      plan: plan,
       subscription_status: 'active',
       messages_limit: limits?.messages || 5,
       voice_calls_limit: limits?.voice_calls || 1
@@ -334,11 +336,14 @@ export const UserProfile: React.FC = () => {
     );
   }
 
-  const currentPlan = SUBSCRIPTION_PLANS[profile.subscription_plan as keyof typeof SUBSCRIPTION_PLANS] || SUBSCRIPTION_PLANS.free;
+  const currentPlan = SUBSCRIPTION_PLANS[profile.plan as keyof typeof SUBSCRIPTION_PLANS] || SUBSCRIPTION_PLANS.free;
   const usagePercentage = {
     messages: profile.messages_limit > 0 ? (profile.messages_used || 0) / profile.messages_limit * 100 : 0,
     voiceCalls: profile.voice_calls_limit > 0 ? (profile.voice_calls_used || 0) / profile.voice_calls_limit * 100 : 0
   };
+
+  // Check if user has unlimited plan
+  const isUnlimited = profile.plan === 'pro';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
@@ -672,27 +677,43 @@ export const UserProfile: React.FC = () => {
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Messages</span>
-                          <span>{profile.messages_used || 0} / {profile.messages_limit === -1 ? '∞' : profile.messages_limit || 0}</span>
+                          <span>
+                            {isUnlimited ? (
+                              <span className="text-green-600 font-semibold">Unlimited</span>
+                            ) : (
+                              `${profile.messages_used || 0} / ${profile.messages_limit || 0}`
+                            )}
+                          </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-pink-400 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(usagePercentage.messages, 100)}%` }}
-                          ></div>
-                        </div>
+                        {!isUnlimited && (
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-pink-400 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${Math.min(usagePercentage.messages, 100)}%` }}
+                            ></div>
+                          </div>
+                        )}
                       </div>
                       
                       <div>
                         <div className="flex justify-between text-sm mb-1">
                           <span>Voice Calls</span>
-                          <span>{profile.voice_calls_used || 0} / {profile.voice_calls_limit === -1 ? '∞' : profile.voice_calls_limit || 0}</span>
+                          <span>
+                            {isUnlimited ? (
+                              <span className="text-green-600 font-semibold">Unlimited</span>
+                            ) : (
+                              `${profile.voice_calls_used || 0} / ${profile.voice_calls_limit || 0}`
+                            )}
+                          </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-purple-400 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(usagePercentage.voiceCalls, 100)}%` }}
-                          ></div>
-                        </div>
+                        {!isUnlimited && (
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-purple-400 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${Math.min(usagePercentage.voiceCalls, 100)}%` }}
+                            ></div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -724,7 +745,7 @@ export const UserProfile: React.FC = () => {
                   <div
                     key={key}
                     className={`p-4 rounded-lg border ${
-                      profile.subscription_plan === key
+                      profile.plan === key
                         ? 'border-pink-400 bg-pink-50'
                         : 'border-gray-200 hover:border-pink-200'
                     }`}
@@ -735,10 +756,10 @@ export const UserProfile: React.FC = () => {
                         <p className="text-sm text-muted-foreground">{plan.price}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {profile.subscription_plan === key && (
+                        {profile.plan === key && (
                           <Badge className="bg-pink-400 text-white">Current</Badge>
                         )}
-                        {profile.subscription_plan !== key && (
+                        {profile.plan !== key && (
                           <Button
                             size="sm"
                             onClick={() => handlePlanChange(key)}

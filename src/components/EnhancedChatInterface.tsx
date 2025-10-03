@@ -79,12 +79,12 @@ export const EnhancedChatInterface = ({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Check if user can send messages
-  const canSendMessage = !usageLoading && usageData && planLimits && 
-    usageData.messages_today < planLimits.messages_per_day;
+  const canSendMessage = !usageLoading && usageData && 
+    (usageData.plan === 'pro' || (planLimits && usageData.messages_today < planLimits.messages_per_day));
   
   // Check if user can make voice calls
-  const canMakeVoiceCall = !usageLoading && usageData && planLimits && 
-    usageData.voice_calls_today < planLimits.voice_calls_per_day;
+  const canMakeVoiceCall = !usageLoading && usageData && 
+    (usageData.plan === 'pro' || (planLimits && usageData.voice_calls_today < planLimits.voice_calls_per_day));
 
   // Load messages when component mounts
   useEffect(() => {

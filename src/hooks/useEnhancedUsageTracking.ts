@@ -10,6 +10,8 @@ interface UsageData {
   remainingVoiceCalls: number;
   canSendMessage: boolean;
   canMakeVoiceCall: boolean;
+  messages_today: number;
+  voice_calls_today: number;
 }
 
 const PLAN_LIMITS = {
@@ -27,7 +29,9 @@ export const useEnhancedUsageTracking = () => {
     remainingMessages: 5,
     remainingVoiceCalls: 1,
     canSendMessage: true,
-    canMakeVoiceCall: true
+    canMakeVoiceCall: true,
+    messages_today: 0,
+    voice_calls_today: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +63,7 @@ export const useEnhancedUsageTracking = () => {
 
       console.log('🔍 Debug: Profile data loaded for usage:', profile);
 
-      const plan = profile.subscription_plan || 'free';
+      const plan = profile.plan || profile.subscription_plan || 'free';
       const limits = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
       
       const messagesUsed = profile.messages_used || 0;
@@ -78,7 +82,9 @@ export const useEnhancedUsageTracking = () => {
         remainingMessages,
         remainingVoiceCalls,
         canSendMessage,
-        canMakeVoiceCall
+        canMakeVoiceCall,
+        messages_today: messagesUsed,
+        voice_calls_today: voiceCallsUsed
       };
 
       console.log('🔍 Debug: Usage data set:', newUsageData);
@@ -158,8 +164,15 @@ export const useEnhancedUsageTracking = () => {
     return () => clearInterval(interval);
   }, [user]);
 
+  // Create planLimits object for compatibility with chat components
+  const planLimits = {
+    messages_per_day: PLAN_LIMITS[usageData.plan as keyof typeof PLAN_LIMITS]?.messages || 5,
+    voice_calls_per_day: PLAN_LIMITS[usageData.plan as keyof typeof PLAN_LIMITS]?.voiceCalls || 1
+  };
+
   return {
     ...usageData,
+    planLimits,
     loading,
     error,
     refresh: loadUsageData,

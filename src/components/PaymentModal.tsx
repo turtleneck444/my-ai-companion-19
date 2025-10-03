@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CreditCard, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle, AlertCircle, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -36,70 +36,27 @@ const SUBSCRIPTION_PLANS = {
   }
 };
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({
-  isOpen,
-  onClose,
-  onSuccess,
-  plan
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
+// Payment Form Component
+const PaymentForm: React.FC<{ plan: string; onSuccess: (plan: string) => void; onClose: () => void }> = ({ 
+  plan, 
+  onSuccess, 
+  onClose 
 }) => {
+  const stripe = useStripe();
+  const elements = useElements();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [cardDetails, setCardDetails] = useState({
-    number: '',
-    expiry: '',
-    cvc: '',
-    name: ''
-  });
 
   const planData = SUBSCRIPTION_PLANS[plan as keyof typeof SUBSCRIPTION_PLANS] || SUBSCRIPTION_PLANS.free;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (plan === 'free') {
-      // Handle free plan
-      setLoading(true);
-      try {
-        const response = await fetch('/.netlify/functions/payments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            method: 'createPaymentIntent',
-            plan: 'free'
-          }),
-        });
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
-        if (!response.ok) {
-          throw new Error('Failed to activate free plan');
-        }
-
-        const data = await response.json();
-        
-        if (data.success) {
-          setSuccess(true);
-          setTimeout(() => {
-            onSuccess('free');
-            onClose();
-          }, 2000);
-        } else {
-          throw new Error(data.error || 'Failed to activate plan');
-        }
-      } catch (err) {
-        console.error('Payment error:', err);
-        setError(err instanceof Error ? err.message : 'Payment failed');
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Handle paid plans
-    if (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvc || !cardDetails.name) {
-      setError('Please fill in all card details');
+    if (!stripe || !elements) {
       return;
     }
 
@@ -107,6 +64,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setError(null);
 
     try {
+      // Create payment intent
       const response = await fetch('/.netlify/functions/payments', {
         method: 'POST',
         headers: {
@@ -118,25 +76,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Payment processing failed');
-      }
+      const { clientSecret } = await response.json();
 
-      const data = await response.json();
-      
-      if (data.success) {
-        setSuccess(true);
+      // Confirm payment
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement)!,
+        }
+      });
+
+      if (error) {
+        setError(error.message || 'Payment failed');
+      } else if (paymentIntent.status === 'succeeded') {
         toast({
           title: "Payment Successful!",
           description: `Welcome to ${planData.name}!`,
         });
-        
-        setTimeout(() => {
-          onSuccess(plan);
-          onClose();
-        }, 2000);
-      } else {
-        throw new Error(data.error || 'Payment failed');
+        onSuccess(plan);
+        onClose();
       }
     } catch (err) {
       console.error('Payment error:', err);
@@ -146,62 +103,96 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setCardDetails(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Card Details
+          </label>
+          <div className="p-4 border border-gray-300 rounded-lg">
+            <CardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#424770',
+                    '::placeholder': {
+                      color: '#aab7c4',
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+      </div>
 
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return v;
-    }
-  };
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-  const formatExpiry = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    if (v.length >= 2) {
-      return v.substring(0, 2) + '/' + v.substring(2, 4);
-    }
-    return v;
-  };
+      <Button
+        type="submit"
+        disabled={!stripe || loading}
+        className="w-full bg-pink-500 hover:bg-pink-600 text-white"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <CreditCard className="w-4 h-4 mr-2" />
+            Pay {planData.price}
+          </>
+        )}
+      </Button>
+    </form>
+  );
+};
 
-  useEffect(() => {
-    if (isOpen) {
-      setError(null);
-      setSuccess(false);
-      setCardDetails({
-        number: '',
-        expiry: '',
-        cvc: '',
-        name: ''
-      });
-    }
-  }, [isOpen]);
+export const PaymentModal: React.FC<PaymentModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  plan
+}) => {
+  const { toast } = useToast();
+  const [success, setSuccess] = useState(false);
+
+  const planData = SUBSCRIPTION_PLANS[plan as keyof typeof SUBSCRIPTION_PLANS] || SUBSCRIPTION_PLANS.free;
+
+  const handleFreePlan = () => {
+    setSuccess(true);
+    toast({
+      title: "Free Plan Activated!",
+      description: "Welcome to LoveAI!",
+    });
+    
+    setTimeout(() => {
+      onSuccess(plan);
+      onClose();
+    }, 2000);
+  };
 
   if (success) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-[425px]">
           <div className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-green-600 mb-2">Payment Successful!</h3>
-            <p className="text-muted-foreground mb-4">
-              Welcome to {planData.name}! Your plan has been activated.
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Success!</h3>
+            <p className="text-gray-600 mb-6">
+              Your {planData.name} plan has been activated successfully.
             </p>
-            <div className="animate-spin">
-              <Loader2 className="w-6 h-6 mx-auto" />
-            </div>
+            <Button onClick={onClose} className="bg-pink-500 hover:bg-pink-600 text-white">
+              Continue to App
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -210,149 +201,60 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5" />
-            {plan === 'free' ? 'Activate Free Plan' : 'Complete Payment'}
+          <DialogTitle className="text-2xl font-bold text-center">
+            Complete Your Subscription
           </DialogTitle>
-          <DialogDescription>
-            {plan === 'free' 
-              ? 'Activate your free plan to get started'
-              : 'Enter your payment details to upgrade to ' + planData.name
-            }
+          <DialogDescription className="text-center">
+            Choose your plan and complete the payment to get started
           </DialogDescription>
         </DialogHeader>
 
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">{planData.name}</CardTitle>
-            <CardDescription>{planData.price}</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <ul className="space-y-2 text-sm">
-              {planData.features.map((feature, index) => (
-                <li key={index} className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          {/* Plan Selection */}
+          <Card className="border-2 border-pink-200 bg-pink-50">
+            <CardHeader className="text-center">
+              <CardTitle className="text-xl text-pink-700">{planData.name} Plan</CardTitle>
+              <CardDescription className="text-2xl font-bold text-pink-600">
+                {planData.price}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm text-gray-700">
+                {planData.features.map((feature, index) => (
+                  <li key={index} className="flex items-center">
+                    <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
 
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {plan !== 'free' && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cardName">Cardholder Name</Label>
-              <Input
-                id="cardName"
-                value={cardDetails.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="John Doe"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cardNumber">Card Number</Label>
-              <Input
-                id="cardNumber"
-                value={cardDetails.number}
-                onChange={(e) => handleInputChange('number', formatCardNumber(e.target.value))}
-                placeholder="1234 5678 9012 3456"
-                maxLength={19}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="expiry">Expiry Date</Label>
-                <Input
-                  id="expiry"
-                  value={cardDetails.expiry}
-                  onChange={(e) => handleInputChange('expiry', formatExpiry(e.target.value))}
-                  placeholder="MM/YY"
-                  maxLength={5}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cvc">CVC</Label>
-                <Input
-                  id="cvc"
-                  value={cardDetails.cvc}
-                  onChange={(e) => handleInputChange('cvc', e.target.value.replace(/\D/g, ''))}
-                  placeholder="123"
-                  maxLength={4}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
+          {/* Payment Form */}
+          {plan === 'free' ? (
+            <div className="text-center">
               <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                className="flex-1"
-                disabled={loading}
+                onClick={handleFreePlan}
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white"
               >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-pink-400 hover:bg-pink-500 text-white"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  `Pay ${planData.price}`
-                )}
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Activate Free Plan
               </Button>
             </div>
-          </form>
-        )}
+          ) : (
+            <Elements stripe={stripePromise}>
+              <PaymentForm plan={plan} onSuccess={onSuccess} onClose={onClose} />
+            </Elements>
+          )}
 
-        {plan === 'free' && (
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              className="flex-1 bg-pink-400 hover:bg-pink-500 text-white"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Activating...
-                </>
-              ) : (
-                'Activate Free Plan'
-              )}
-            </Button>
+          {/* Security Notice */}
+          <div className="text-center text-xs text-gray-500">
+            <Shield className="w-4 h-4 inline mr-1" />
+            Your payment information is secure and encrypted
           </div>
-        )}
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -58,6 +58,7 @@ export const LandingPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showPlanSelection, setShowPlanSelection] = useState(false);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -175,9 +176,19 @@ export const LandingPage: React.FC = () => {
     if (user) {
       navigate('/app');
     } else {
-      const planParam = plan ? `?plan=${plan}` : '';
-      navigate(`/auth${planParam}`);
+      if (plan) {
+        const planParam = `?plan=${plan}`;
+        navigate(`/auth${planParam}`);
+      } else {
+        setShowPlanSelection(true);
+      }
     }
+  };
+
+  const handlePlanSelect = (plan: string) => {
+    setShowPlanSelection(false);
+    const planParam = `?plan=${plan}`;
+    navigate(`/auth${planParam}`);
   };
 
   const handleSignOut = async () => {
@@ -360,11 +371,11 @@ export const LandingPage: React.FC = () => {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
               <Button 
-                onClick={handleGetStarted}
+                onClick={() => handleGetStarted()}
                 size="lg"
                 className="bg-pink-400 hover:bg-pink-500 text-white px-10 py-6 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               >
-                Start Your Journey
+                Choose Your Plan
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button 
@@ -560,11 +571,11 @@ export const LandingPage: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
-              onClick={handleGetStarted}
+              onClick={() => handleGetStarted()}
               size="lg"
               className="bg-white text-pink-400 hover:bg-gray-100 px-10 py-6 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
             >
-              Get Started Free
+              Choose Your Plan
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Button 
@@ -579,6 +590,79 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Plan Selection Modal */}
+      {showPlanSelection && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">Choose Your Plan</h2>
+                <p className="text-gray-600">Select the perfect plan to start your AI journey</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {pricingPlans.map((plan, index) => (
+                  <Card
+                    key={index}
+                    className={`cursor-pointer transition-all duration-300 hover:scale-105 ${
+                      plan.popular 
+                        ? 'ring-2 ring-pink-400 bg-pink-50' 
+                        : 'hover:shadow-lg'
+                    }`}
+                    onClick={() => handlePlanSelect(plan.name.toLowerCase())}
+                  >
+                    <CardHeader className="text-center pb-4">
+                      {plan.popular && (
+                        <Badge className="bg-pink-400 text-white mb-4 w-fit mx-auto">
+                          Most Popular
+                        </Badge>
+                      )}
+                      <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                      <div className="text-4xl font-bold text-pink-400">
+                        {plan.price}
+                        <span className="text-lg text-gray-500 font-normal">/{plan.period}</span>
+                      </div>
+                      <CardDescription className="text-sm">{plan.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <ul className="space-y-3 mb-6">
+                        {plan.features.map((feature, featureIndex) => (
+                          <li key={featureIndex} className="flex items-center text-sm">
+                            <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <Button 
+                        className={`w-full ${
+                          plan.popular 
+                            ? 'bg-pink-400 hover:bg-pink-500 text-white' 
+                            : 'bg-gray-900 hover:bg-gray-800 text-white'
+                        }`}
+                      >
+                        {plan.cta}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              <div className="text-center mt-8">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setShowPlanSelection(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

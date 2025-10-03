@@ -308,57 +308,71 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 flex items-center justify-center p-4">
 
       <div className="w-full max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           
           {/* Left Side - Branding and Info */}
           <div className="text-center lg:text-left space-y-8">
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center justify-center lg:justify-start gap-3">
-                <div className="w-12 h-12 bg-pink-500 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-r from-pink-400 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
                   <Heart className="w-6 h-6 text-white" />
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900">LoveAI</h1>
               </div>
-              <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+              <h2 className="text-4xl lg:text-6xl font-bold text-gray-900 leading-tight">
                 Your AI Companion
-                <span className="block text-pink-500">Awaits</span>
+                <span className="block bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent">Awaits</span>
               </h2>
-              <p className="text-xl text-gray-600 max-w-md mx-auto lg:mx-0">
+              <p className="text-xl text-gray-600 max-w-md mx-auto lg:mx-0 leading-relaxed">
                 Connect with intelligent AI companions designed to understand, support, and engage with you in meaningful conversations.
               </p>
             </div>
 
             {/* Features List */}
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-gray-700">
-                <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
-                  <Heart className="w-4 h-4 text-pink-500" />
+              <div className="flex items-center gap-3 text-gray-700 p-3 rounded-lg hover:bg-pink-50 transition-colors">
+                <div className="w-10 h-10 bg-gradient-to-r from-pink-100 to-pink-200 rounded-lg flex items-center justify-center">
+                  <Heart className="w-5 h-5 text-pink-500" />
                 </div>
-                <span className="font-medium">Emotional Intelligence</span>
+                <div>
+                  <span className="font-semibold text-gray-900">Emotional Intelligence</span>
+                  <p className="text-sm text-gray-600">AI that understands your feelings</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-gray-700">
-                <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-pink-500" />
+              <div className="flex items-center gap-3 text-gray-700 p-3 rounded-lg hover:bg-pink-50 transition-colors">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-100 to-purple-200 rounded-lg flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-purple-500" />
                 </div>
-                <span className="font-medium">Real-time Conversations</span>
+                <div>
+                  <span className="font-semibold text-gray-900">Real-time Conversations</span>
+                  <p className="text-sm text-gray-600">Instant, natural responses</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-gray-700">
-                <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
-                  <Shield className="w-4 h-4 text-pink-500" />
+              <div className="flex items-center gap-3 text-gray-700 p-3 rounded-lg hover:bg-pink-50 transition-colors">
+                <div className="w-10 h-10 bg-gradient-to-r from-indigo-100 to-indigo-200 rounded-lg flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-indigo-500" />
                 </div>
-                <span className="font-medium">Privacy & Security</span>
+                <div>
+                  <span className="font-semibold text-gray-900">Privacy & Security</span>
+                  <p className="text-sm text-gray-600">Your data is always protected</p>
+                </div>
               </div>
             </div>
 
             {/* Preselected Plan Indicator */}
             {preselectedPlan && (
-              <div className="bg-pink-50 border border-pink-200 rounded-xl p-4">
-                <div className="flex items-center justify-center lg:justify-start gap-2 text-pink-700">
-                  <Crown className="w-5 h-5" />
-                  <span className="font-semibold">Selected Plan: {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span>
+              <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-xl p-6 shadow-lg">
+                <div className="flex items-center justify-center lg:justify-start gap-3 text-pink-700">
+                  <div className="w-10 h-10 bg-gradient-to-r from-pink-400 to-purple-500 rounded-lg flex items-center justify-center">
+                    <Crown className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-lg">Selected Plan: {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span>
+                    <p className="text-sm text-pink-600">You'll be charged after completing signup</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -366,7 +380,7 @@ export default function Auth() {
 
           {/* Right Side - Auth Form */}
           <div className="w-full max-w-md mx-auto">
-            <Card className="shadow-xl border-0 bg-white">
+            <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
               <CardHeader className="text-center pb-6 relative">
                 <Button
                   variant="ghost"
