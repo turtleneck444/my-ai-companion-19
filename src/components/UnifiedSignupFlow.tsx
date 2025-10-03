@@ -1,723 +1,317 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Eye, EyeOff, Check, Star, Crown, Zap } from 'lucide-react';
+import { 
+  Mail, 
+  Lock, 
+  User, 
+  Eye, 
+  EyeOff, 
+  CheckCircle, 
+  AlertCircle,
+  Loader2,
+  Crown,
+  Star,
+  Zap
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import { PaymentProcessor, SUBSCRIPTION_PLANS } from '@/lib/payments';
-import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
+import { SUBSCRIPTION_PLANS } from '@/lib/payments';
 
 interface UnifiedSignupFlowProps {
   preselectedPlan?: string;
-  onClose?: () => void;
 }
 
-// Load Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
-
-// Payment form component that uses Stripe Elements
-const PaymentForm = ({ 
-  selectedPlan, 
-  selectedPlanDetails, 
-  formData, 
-  handleInputChange, 
-  showPassword, 
-  setShowPassword, 
-  isLoading, 
-  setIsLoading, 
-  setStep, 
-  createAccount, 
-  toast, 
-  navigate 
-}: any) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [cardElementReady, setCardElementReady] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [cardElementError, setCardElementError] = useState<string | null>(null);
-  const [cardDataComplete, setCardDataComplete] = useState(false);
-
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedPlanDetails) return;
-
-    // Require email to proceed (used for receipts/customer association)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast({ title: 'Email required', description: 'Enter a valid email to continue', variant: 'destructive' });
-      return;
-    }
-
-    // Require password for account creation
-    if (!formData.password || formData.password.length < 6) {
-      toast({ title: 'Password required', description: 'Enter a password (min 6 characters) to create your account', variant: 'destructive' });
-      return;
-    }
-
-    // Require name for customer information
-    if (!formData.preferredName || formData.preferredName.trim().length < 2) {
-      toast({ title: 'Name required', description: 'Enter your full name to continue', variant: 'destructive' });
-      return;
-    }
-
-    // Require age for customer information
-    if (!formData.age || parseInt(formData.age) < 18) {
-      toast({ title: 'Age required', description: 'You must be 18 or older to continue', variant: 'destructive' });
-      return;
-    }
-
-    if (!stripe || !elements) {
-      toast({ title: 'Payment Error', description: 'Payment system not ready. Please try again.', variant: 'destructive' });
-      return;
-    }
-
-    if (!cardElementReady || cardElementError || !cardDataComplete) {
-      toast({ title: 'Payment Error', description: 'Please complete all card details before proceeding.', variant: 'destructive' });
-      return;
-    }
-
-    setIsProcessing(true);
-    // DON'T call setStep('processing') here - it will unmount the CardElement!
-
-    try {
-      console.log('Starting payment process...');
-      console.log('Stripe:', !!stripe);
-      console.log('Elements:', !!elements);
-      console.log('Card element ready:', cardElementReady);
-      console.log('Card data complete:', cardDataComplete);
-
-      // Get the card element - use the stable reference
-      const cardElement = elements.getElement(CardElement);
-      
-      if (!cardElement) {
-        throw new Error('Card element not found. Please refresh the page and try again.');
-      }
-
-      console.log('Card element found, creating payment method...');
-
-      // Create payment method directly - no complex retry logic
-      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-          email: formData.email,
-          name: formData.preferredName,
-        },
-      });
-
-      if (pmError) {
-        throw new Error(pmError.message);
-      }
-
-      if (!paymentMethod) {
-        throw new Error('Payment method could not be created. Please try again.');
-      }
-
-      console.log('Payment method created successfully:', paymentMethod.id);
-
-      // NOW it's safe to switch to processing step since we have the payment method
-      setStep('processing');
-
-      // Process payment with backend (create subscription)
-      const paymentProcessor = new PaymentProcessor();
-      const subscriptionResult = await paymentProcessor.createSubscription(
-        selectedPlan,
-        paymentMethod.id,
-        formData.email,
-        formData.preferredName,
-        formData.age
-      );
-
-      if (subscriptionResult && subscriptionResult.success) {
-        // Payment successful - create account with paid plan
-        await createAccount(selectedPlan);
-
-        toast({
-          title: "Payment Successful! 🎉",
-          description: `Welcome to LoveAI ${selectedPlanDetails.name}! Your account is ready.`,
-        });
-
-        navigate('/app', { replace: true, state: { startChatDefault: true } });
-        return;
-      } else {
-        console.error('Payment failed:', subscriptionResult);
-        console.error('Payment details:', {
-          success: subscriptionResult.success,
-          paymentStatus: subscriptionResult.paymentStatus,
-          subscriptionStatus: subscriptionResult.subscription?.status
-        });
-        toast({
-          title: "Payment Failed",
-          description: "Payment could not be processed. Please try again.",
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      console.error('Payment processing error:', error);
-      toast({
-        title: "Payment Failed",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-      setStep('payment');
-    }
-  };
-
-  return (
-    <form onSubmit={handlePayment} className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold">Complete Your Purchase</h2>
-        <p className="text-muted-foreground">
-          {selectedPlanDetails?.name} - ${selectedPlanDetails?.price}/{selectedPlanDetails?.interval}
-        </p>
-      </div>
-
-      {/* Customer Information */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Customer Information</h3>
-        
-        {/* Email field */}
-        <div className="space-y-2">
-          <Label htmlFor="emailForPayment">Email Address *</Label>
-          <Input
-            id="emailForPayment"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="your@email.com"
-            autoComplete="email"
-            required
-          />
-        </div>
-
-        {/* Name field */}
-        <div className="space-y-2">
-          <Label htmlFor="nameForPayment">Full Name *</Label>
-          <Input
-            id="nameForPayment"
-            type="text"
-            value={formData.preferredName}
-            onChange={(e) => handleInputChange('preferredName', e.target.value)}
-            placeholder="Enter your full name"
-            autoComplete="name"
-            required
-          />
-        </div>
-
-        {/* Age field */}
-        <div className="space-y-2">
-          <Label htmlFor="ageForPayment">Age *</Label>
-          <Input
-            id="ageForPayment"
-            type="number"
-            value={formData.age}
-            onChange={(e) => handleInputChange('age', e.target.value)}
-            placeholder="18+"
-            min="18"
-            max="120"
-            required
-          />
-          <p className="text-sm text-muted-foreground">Must be 18 or older</p>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Payment Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-between">
-            <span>{selectedPlanDetails?.name} Plan</span>
-            <span>${selectedPlanDetails?.price}</span>
-          </div>
-          <Separator />
-          <div className="flex justify-between font-semibold">
-            <span>Total</span>
-            <span>${selectedPlanDetails?.price}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Stripe Card Element */}
-      <div className="space-y-2">
-        <Label>Payment Information *</Label>
-        <div className="p-4 border rounded-lg" data-testid="card-element">
-          <CardElement 
-            options={{ 
-              style: { 
-                base: { 
-                  fontSize: '16px',
-                  color: '#424770',
-                  '::placeholder': {
-                    color: '#aab7c4',
-                  },
-                },
-              },
-              hidePostalCode: true,
-            }}
-            onReady={(element) => {
-              console.log('Card element is ready');
-              setCardElementReady(true);
-              setCardElementError(null);
-            }}
-            onChange={(event) => {
-              if (event.error) {
-                console.log('Card element error:', event.error);
-                setCardElementError(event.error.message);
-                setCardElementReady(false);
-                setCardDataComplete(false);
-              } else {
-                setCardElementError(null);
-                setCardElementReady(true);
-                // Check if card data is complete
-                if (event.complete) {
-                  setCardDataComplete(true);
-                  console.log('Card data is complete');
-                } else {
-                  setCardDataComplete(false);
-                }
-              }
-            }}
-          />
-          {!cardElementReady && (
-            <p className="text-sm text-muted-foreground mt-2">Loading secure card form...</p>
-          )}
-          {cardElementError && (
-            <p className="text-sm text-red-500 mt-2">{cardElementError}</p>
-          )}
-          {cardElementReady && !cardDataComplete && (
-            <p className="text-sm text-amber-500 mt-2">Please complete your card details</p>
-          )}
-        </div>
-      </div>
-
-      {/* Password field */}
-      <div className="space-y-2">
-        <Label htmlFor="passwordForPayment">Password *</Label>
-        <div className="relative">
-          <Input
-            id="passwordForPayment"
-            type={showPassword ? 'text' : 'password'}
-            value={formData.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            placeholder="Enter your password"
-            required
-            minLength={6}
-            autoComplete="new-password"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword((prev) => !prev)}
-            disabled={isProcessing}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground">Minimum 6 characters</p>
-      </div>
-
-      <div className="flex gap-3">
-        <Button 
-          type="button"
-          variant="outline" 
-          onClick={() => setStep('details')}
-          className="flex-1"
-        >
-          Back
-        </Button>
-        <Button 
-          type="submit"
-          disabled={isProcessing || !stripe || !elements || !cardElementReady || !!cardElementError || !cardDataComplete}
-          className="flex-1"
-        >
-          {isProcessing ? 'Processing...' : 'Complete Purchase'}
-        </Button>
-      </div>
-    </form>
-  );
-};
-
-export const UnifiedSignupFlow = ({ preselectedPlan = 'free', onClose }: UnifiedSignupFlowProps) => {
-  const { signUp } = useAuth();
+export const UnifiedSignupFlow: React.FC<UnifiedSignupFlowProps> = ({ 
+  preselectedPlan 
+}) => {
+  const { signUp, signIn } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   
-  const [step, setStep] = useState<'plan' | 'details' | 'payment' | 'processing'>('plan');
-  const [selectedPlan, setSelectedPlan] = useState(preselectedPlan);
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState(preselectedPlan || 'free');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    preferredName: '',
-    age: '',
-    agreeTerms: false
+    confirmPassword: '',
+    fullName: ''
   });
 
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const selectedPlanDetails = SUBSCRIPTION_PLANS.find(plan => plan.id === selectedPlan);
-
-  const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setError(null);
   };
 
-  const handlePlanSelection = (planId: string) => {
-    setSelectedPlan(planId);
-    if (planId === 'free') {
-      setStep('details');
-    } else {
-      setStep('payment');
-      // Keep focus centered on the signup flow to avoid footer distractions
-      setTimeout(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
-        } else {
-          window.scrollTo({ top: 0, left: 0 });
-        }
-      }, 0);
-    }
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  const handleAccountCreation = async () => {
-    // Validate required fields
-    if (!formData.email || !formData.password || !formData.preferredName) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate password length
-    if (formData.password.length < 6) {
-      toast({
-        title: "Password Too Short",
-        description: "Password must be at least 6 characters long.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check terms agreement
-    if (!formData.agreeTerms) {
-      toast({
-        title: "Terms Required",
-        description: "Please agree to the terms and conditions.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (selectedPlan === 'free') {
-      // Free plan - create account directly
-      await createAccount();
-    } else {
-      // Paid plan - go to payment step
-      setStep('payment');
-    }
-  };
-
-  const createAccount = async (planOverride?: string) => {
-    setIsLoading(true);
     try {
-      const finalPlan = planOverride || selectedPlan;
-      
-      const { error } = await signUp(
-        formData.email,
-        formData.password,
-        {
-          preferred_name: formData.preferredName,
-          plan: finalPlan,
-          age: formData.age
+      if (isSignUp) {
+        if (formData.password !== formData.confirmPassword) {
+          throw new Error('Passwords do not match');
         }
-      );
+        
+        if (formData.password.length < 6) {
+          throw new Error('Password must be at least 6 characters');
+        }
 
-      if (error) {
-        toast({
-          title: "Signup Failed",
-          description: error.message,
-          variant: "destructive"
+        await signUp(formData.email, formData.password, {
+          full_name: formData.fullName,
+          selected_plan: selectedPlan
         });
-        return;
-      }
-
-      toast({
-        title: "Account Created! 🎉",
-        description: `Welcome to LoveAI! Check your email to verify your account.`,
-      });
-
-      // Navigate based on plan
-      if (finalPlan === 'free') {
-        navigate('/app');
+        
+        toast({
+          title: "Account Created!",
+          description: "Welcome to LoveAI! Please check your email to verify your account.",
+        });
       } else {
-        // For paid plans, the payment was already processed
-        navigate('/app');
+        await signIn(formData.email, formData.password);
+        
+        toast({
+          title: "Welcome Back!",
+          description: "You've been signed in successfully.",
+        });
       }
-      
-      onClose?.();
-    } catch (error: any) {
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setError(errorMessage);
       toast({
         title: "Error",
-        description: error.message,
-        variant: "destructive"
+        description: errorMessage,
+        variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const renderPlanSelection = () => (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold">Choose Your Perfect Plan</h2>
-        <p className="text-lg text-muted-foreground mt-2">Select the plan that fits your AI companion needs</p>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-        {SUBSCRIPTION_PLANS.map((plan) => (
-          <Card 
-            key={plan.id}
-            className={`relative cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-105 ${
-              selectedPlan === plan.id ? 'ring-2 ring-purple-500 shadow-xl' : 'hover:shadow-lg'
-            } ${plan.popular ? 'border-2 border-purple-500 shadow-lg' : 'border'}`}
-            onClick={() => handlePlanSelection(plan.id)}
-          >
-            {plan.popular && (
-              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-500 text-white px-4 py-1 text-sm">
-                <Star className="h-4 w-4 mr-1" />
-                Most Popular
-              </Badge>
-            )}
-            
-            <CardHeader className="text-center pb-4 pt-8">
-              <CardTitle className="text-2xl font-bold mb-2">{plan.name}</CardTitle>
-              <div className="mb-4">
-                <span className="text-4xl font-bold">
-                  ${plan.price}
-                </span>
-                <span className="text-lg text-muted-foreground ml-1">
-                  /{plan.interval === 'forever' ? 'forever' : 'per month'}
-                </span>
-              </div>
-              <p className="text-muted-foreground">
-                {plan.id === 'free' && 'Perfect for trying out AI companions'}
-                {plan.id === 'premium' && 'Most popular for regular users'}
-                {plan.id === 'pro' && 'For power users and creators'}
-              </p>
-            </CardHeader>
-            
-            <CardContent className="px-6 pb-8">
-              <ul className="space-y-3 mb-6">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-start text-sm">
-                    <Check className="h-4 w-4 text-purple-500 mr-3 mt-0.5 flex-shrink-0" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              
-              <Button 
-                type="button"
-                className={`w-full py-3 text-base font-semibold ${
-                  plan.id === 'free' ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' :
-                  plan.id === 'premium' ? 'bg-purple-500 hover:bg-purple-600 text-white' :
-                  'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
-                }`}
-                variant={plan.id === 'free' ? 'outline' : 'default'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handlePlanSelection(plan.id);
-                }}
-              >
-                {plan.id === 'free' ? 'Get Started Free' : 
-                 plan.id === 'premium' ? 'Start Premium Plan' : 'Go Pro'}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      
-      <div className="text-center text-sm text-muted-foreground">
-        <p>🔒 Secure payment • ⚡ Instant activation • 💫 Cancel anytime</p>
-      </div>
-    </div>
-  );
+  const getPlanIcon = (planId: string) => {
+    switch (planId) {
+      case 'free':
+        return <Zap className="w-5 h-5" />;
+      case 'premium':
+        return <Star className="w-5 h-5" />;
+      case 'pro':
+        return <Crown className="w-5 h-5" />;
+      default:
+        return <Zap className="w-5 h-5" />;
+    }
+  };
 
-  const renderAccountDetails = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold">Create Your Account</h2>
-        <p className="text-muted-foreground">
-          Selected: {selectedPlanDetails?.name} - ${selectedPlanDetails?.price}/{selectedPlanDetails?.interval}
-        </p>
-      </div>
-
-      <div className="grid gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="preferredName">Preferred Name *</Label>
-          <Input
-            id="preferredName"
-            value={formData.preferredName}
-            onChange={(e) => handleInputChange('preferredName', e.target.value)}
-            placeholder="What should your AI companion call you?"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email">Email Address *</Label>
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="your@email.com"
-            autoComplete="email"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password">Password *</Label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
-              placeholder="Choose a secure password"
-              autoComplete="new-password"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="age">Age</Label>
-          <Input
-            id="age"
-            value={formData.age}
-            onChange={(e) => handleInputChange('age', e.target.value)}
-            placeholder="18+"
-          />
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="agreeTerms"
-            checked={formData.agreeTerms}
-            onChange={(e) => handleInputChange('agreeTerms', e.target.checked)}
-            className="rounded"
-          />
-          <Label htmlFor="agreeTerms" className="text-sm">
-            I agree to the Terms of Service and Privacy Policy
-          </Label>
-        </div>
-      </div>
-
-      <div className="flex gap-3">
-        <Button 
-          variant="outline" 
-          onClick={() => setStep('plan')}
-          className="flex-1"
-        >
-          Back to Plans
-        </Button>
-        <Button 
-          onClick={handleAccountCreation}
-          disabled={isLoading}
-          className="flex-1"
-        >
-          {selectedPlan === 'free' ? 'Create Free Account' : 'Continue to Payment'}
-        </Button>
-      </div>
-    </div>
-  );
-
-  const renderProcessing = () => (
-    <div className="text-center space-y-6 py-8">
-      <div className="animate-pulse">
-        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Crown className="h-8 w-8 text-purple-600" />
-        </div>
-      </div>
-      <h2 className="text-2xl font-bold">Processing Your Payment...</h2>
-      <p className="text-muted-foreground">
-        Please wait while we set up your {selectedPlanDetails?.name} account.
-      </p>
-    </div>
-  );
+  const getPlanColor = (planId: string) => {
+    switch (planId) {
+      case 'free':
+        return 'border-gray-200 hover:border-gray-300';
+      case 'premium':
+        return 'border-pink-200 hover:border-pink-300 bg-pink-50';
+      case 'pro':
+        return 'border-yellow-200 hover:border-yellow-300 bg-yellow-50';
+      default:
+        return 'border-gray-200 hover:border-gray-300';
+    }
+  };
 
   return (
-    <Elements stripe={stripePromise}>
-      <div className="w-full" ref={containerRef}>
-        {step === 'plan' ? (
-          <div className="w-full">
-            {renderPlanSelection()}
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold font-display text-gray-900 mb-2">
+            {isSignUp ? 'Join LoveAI' : 'Welcome Back'}
+          </h1>
+          <p className="text-xl text-gray-600">
+            {isSignUp 
+              ? 'Create your account and start your AI journey' 
+              : 'Sign in to continue your AI journey'
+            }
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Plan Selection */}
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-900">Choose Your Plan</h2>
+            
+            <div className="space-y-4">
+              {Object.entries(SUBSCRIPTION_PLANS).map(([key, plan]) => (
+                <Card
+                  key={key}
+                  className={`cursor-pointer transition-all ${
+                    selectedPlan === key 
+                      ? `ring-2 ring-pink-500 ${getPlanColor(key)}` 
+                      : getPlanColor(key)
+                  }`}
+                  onClick={() => setSelectedPlan(key)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {getPlanIcon(key)}
+                        <div>
+                          <CardTitle className="text-lg">{plan.name}</CardTitle>
+                          <CardDescription>
+                            {plan.price === 0 ? 'Free' : `$${plan.price / 100}/month`}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      {selectedPlan === key && (
+                        <CheckCircle className="w-6 h-6 text-pink-500" />
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <ul className="space-y-2 text-sm">
+                      {plan.features.slice(0, 3).map((feature, index) => (
+                        <li key={index} className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          {feature}
+                        </li>
+                      ))}
+                      {plan.features.length > 3 && (
+                        <li className="text-gray-500 text-xs">
+                          +{plan.features.length - 3} more features
+                        </li>
+                      )}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        ) : (
-          <Card className="w-full max-w-2xl mx-auto">
-            <CardContent className="p-8">
-              {step === 'details' && renderAccountDetails()}
-              {step === 'payment' && (
-                <PaymentForm
-                  selectedPlan={selectedPlan}
-                  selectedPlanDetails={selectedPlanDetails}
-                  formData={formData}
-                  handleInputChange={handleInputChange}
-                  showPassword={showPassword}
-                  setShowPassword={setShowPassword}
-                  isLoading={isLoading}
-                  setIsLoading={setIsLoading}
-                  setStep={setStep}
-                  createAccount={createAccount}
-                  toast={toast}
-                  navigate={navigate}
-                />
-              )}
-              {step === 'processing' && renderProcessing()}
+
+          {/* Auth Form */}
+          <Card>
+            <CardHeader>
+              <Tabs value={isSignUp ? 'signup' : 'signin'} onValueChange={(value) => setIsSignUp(value === 'signup')}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                  <TabsTrigger value="signin">Sign In</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </CardHeader>
+            
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                {isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="fullName"
+                        type="text"
+                        value={formData.fullName}
+                        onChange={(e) => handleInputChange('fullName', e.target.value)}
+                        placeholder="Enter your full name"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      placeholder="Enter your email"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={(e) => handleInputChange('password', e.target.value)}
+                      placeholder="Enter your password"
+                      className="pl-10 pr-10"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="confirmPassword"
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.confirmPassword}
+                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                        placeholder="Confirm your password"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full bg-pink-400 hover:bg-pink-500 text-white"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {isSignUp ? 'Creating Account...' : 'Signing In...'}
+                    </>
+                  ) : (
+                    isSignUp ? 'Create Account' : 'Sign In'
+                  )}
+                </Button>
+              </form>
             </CardContent>
           </Card>
-        )}
+        </div>
       </div>
-    </Elements>
+    </div>
   );
 };

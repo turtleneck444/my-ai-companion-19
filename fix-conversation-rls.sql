@@ -70,8 +70,20 @@ CREATE POLICY "Users can delete their own messages" ON messages
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
--- Grant necessary permissions
+-- Grant necessary permissions (without specific sequence names)
 GRANT ALL ON conversations TO authenticated;
 GRANT ALL ON messages TO authenticated;
-GRANT USAGE ON SEQUENCE conversations_id_seq TO authenticated;
-GRANT USAGE ON SEQUENCE messages_id_seq TO authenticated;
+
+-- Grant sequence permissions if they exist
+DO $$ 
+BEGIN
+    -- Check if conversations sequence exists and grant permissions
+    IF EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename LIKE '%conversations%id%') THEN
+        EXECUTE 'GRANT USAGE ON SEQUENCE ' || (SELECT sequencename FROM pg_sequences WHERE sequencename LIKE '%conversations%id%' LIMIT 1) || ' TO authenticated';
+    END IF;
+    
+    -- Check if messages sequence exists and grant permissions
+    IF EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename LIKE '%messages%id%') THEN
+        EXECUTE 'GRANT USAGE ON SEQUENCE ' || (SELECT sequencename FROM pg_sequences WHERE sequencename LIKE '%messages%id%' LIMIT 1) || ' TO authenticated';
+    END IF;
+END $$;
