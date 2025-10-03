@@ -195,9 +195,14 @@ export const useEnhancedUsageTracking = () => {
 
   // Create planLimits object for compatibility with chat components
   const planLimits = {
-    messages_per_day: PLAN_LIMITS[usageData.plan as keyof typeof PLAN_LIMITS]?.messages || 5,
-    voice_calls_per_day: PLAN_LIMITS[usageData.plan as keyof typeof PLAN_LIMITS]?.voiceCalls || 1
+    messages_per_day: usageData.plan === 'pro' ? 999999 : (PLAN_LIMITS[usageData.plan as keyof typeof PLAN_LIMITS]?.messages || 5),
+    voice_calls_per_day: usageData.plan === 'pro' ? 999999 : (PLAN_LIMITS[usageData.plan as keyof typeof PLAN_LIMITS]?.voiceCalls || 1)
   };
+
+  console.log('🔍 Debug: Plan limits for chat components:', planLimits);
+  console.log('🔍 Debug: Current plan:', usageData.plan);
+  console.log('🔍 Debug: Messages today:', usageData.messages_today);
+  console.log('🔍 Debug: Voice calls today:', usageData.voice_calls_today);
 
   return {
     ...usageData,
