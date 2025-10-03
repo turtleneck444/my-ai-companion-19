@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { speakText, stopAllSpeech } from '@/lib/voice';
 
 interface PreviewCharacter {
   id: string;
@@ -124,8 +125,11 @@ export const InteractivePreview: React.FC = () => {
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [voiceCallCount, setVoiceCallCount] = useState(0);
   const [showVoiceUpgradePrompt, setShowVoiceUpgradePrompt] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Auto-scroll to bottom only within chat container
   useEffect(() => {
@@ -278,15 +282,29 @@ export const InteractivePreview: React.FC = () => {
         description: `Now talking with ${selectedCharacter.name}`,
       });
 
+      // Start listening for user input
+      startVoiceRecognition();
+
       // Simulate AI speaking
-      setTimeout(() => {
-        const voiceMessage: PreviewMessage = {
+      setTimeout(async () => {
+        const voiceMessage = `Hi! I'm ${selectedCharacter.name}. It's so nice to hear your voice! How are you doing today?`;
+        const aiMessage: PreviewMessage = {
           id: Date.now().toString(),
-          content: `Hi! I'm ${selectedCharacter.name}. It's so nice to hear your voice! How are you doing today?`,
+          content: voiceMessage,
           sender: 'ai',
           timestamp: new Date()
         };
-        setMessages(prev => [...prev, voiceMessage]);
+        setMessages(prev => [...prev, aiMessage]);
+        
+        // Use real voice synthesis
+        setIsSpeaking(true);
+        try {
+          await speakText(voiceMessage, selectedCharacter.voiceId);
+        } catch (error) {
+          console.error('Voice synthesis error:', error);
+        } finally {
+          setIsSpeaking(false);
+        }
       }, 1000);
 
       // Show upgrade prompt after a few seconds
@@ -298,10 +316,111 @@ export const InteractivePreview: React.FC = () => {
     } else {
       // End voice call
       setIsCallActive(false);
+      setIsListening(false);
+      stopAllSpeech();
+      
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      
       toast({
         title: "Call ended",
         description: "Thanks for the great conversation!",
       });
+    }
+  };
+
+  const startVoiceRecognition = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Voice recognition not supported",
+        description: "Your browser doesn't support speech recognition.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognitionRef.current.onresult = async (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      
+      if (transcript.trim()) {
+        const userMessage: PreviewMessage = {
+          id: Date.now().toString(),
+          content: transcript,
+          sender: 'user',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Generate AI response
+        try {
+          const response = await fetch('/.netlify/functions/openai-chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: transcript,
+              character: {
+                name: selectedCharacter.name,
+                personality: selectedCharacter.personality,
+                bio: selectedCharacter.bio
+              },
+              isPreview: true
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const aiResponse = data.response || "I'm having trouble responding right now. Please try again!";
+            
+            const aiMessage: PreviewMessage = {
+              id: (Date.now() + 1).toString(),
+              content: aiResponse,
+              sender: 'ai',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMessage]);
+            
+            // Speak the response
+            setIsSpeaking(true);
+            try {
+              await speakText(aiResponse, selectedCharacter.voiceId);
+            } catch (error) {
+              console.error('Voice synthesis error:', error);
+            } finally {
+              setIsSpeaking(false);
+            }
+          }
+        } catch (error) {
+          console.error('Error getting AI response:', error);
+        }
+      }
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    recognitionRef.current.onend = () => {
+      setIsListening(false);
+    };
+
+    try {
+      recognitionRef.current.start();
+    } catch (error) {
+      console.error('Error starting speech recognition:', error);
     }
   };
 
@@ -423,6 +542,16 @@ export const InteractivePreview: React.FC = () => {
                 </Button>
               </div>
             </div>
+            
+            {/* Voice Call Status */}
+            {isCallActive && (
+              <div className="px-4 py-2 bg-green-50 border-b border-green-200/30">
+                <div className="flex items-center gap-2 text-green-700 text-sm">
+                  <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                  <span>{isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : 'Voice call active'}</span>
+                </div>
+              </div>
+            )}
             
             {/* Messages Area - Fixed height and scrollable */}
             <div 

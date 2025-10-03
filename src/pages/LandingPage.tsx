@@ -38,7 +38,8 @@ import {
   MoreHorizontal,
   Camera,
   Image,
-  Gift
+  Gift,
+  LogOut
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,7 +52,7 @@ import { InteractivePreview } from '@/components/InteractivePreview';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -179,6 +180,15 @@ export const LandingPage: React.FC = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
@@ -239,9 +249,15 @@ export const LandingPage: React.FC = () => {
             <div className="hidden md:block">
               <div className="ml-4 flex items-center space-x-4">
                 {user ? (
-                  <Button onClick={() => navigate('/app')} className="bg-pink-400 hover:bg-pink-500 text-white">
-                    Go to App
-                  </Button>
+                  <>
+                    <Button onClick={() => navigate('/app')} className="bg-pink-400 hover:bg-pink-500 text-white">
+                      Go to App
+                    </Button>
+                    <Button onClick={handleSignOut} variant="outline" size="sm">
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button variant="ghost" onClick={() => navigate('/auth')}>
@@ -287,9 +303,15 @@ export const LandingPage: React.FC = () => {
               </a>
               <div className="pt-4 pb-3 border-t border-pink-200/30">
                 {user ? (
-                  <Button onClick={() => navigate('/app')} className="w-full bg-pink-400 hover:bg-pink-500 text-white">
-                    Go to App
-                  </Button>
+                  <div className="space-y-2">
+                    <Button onClick={() => navigate('/app')} className="w-full bg-pink-400 hover:bg-pink-500 text-white">
+                      Go to App
+                    </Button>
+                    <Button onClick={handleSignOut} variant="outline" className="w-full">
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <Button variant="ghost" onClick={() => navigate('/auth')} className="w-full">
@@ -306,26 +328,41 @@ export const LandingPage: React.FC = () => {
         )}
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="max-w-7xl mx-auto">
+      {/* Enhanced Hero Section */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-200/30 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200/30 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-100/20 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div className="relative max-w-7xl mx-auto">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold font-display mb-6">
+            {/* Enhanced Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-pink-100/80 backdrop-blur-sm border border-pink-200/50 rounded-full text-pink-700 text-sm font-medium mb-8">
+              <Sparkles className="w-4 h-4" />
+              <span>Join 10,000+ users worldwide</span>
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold font-display mb-6 leading-tight">
               Your AI Companion for
-              <span className="text-pink-400">
-                {' '}Meaningful Conversations
+              <span className="text-pink-400 block mt-2">
+                Meaningful Conversations
               </span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            
+            <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-4xl mx-auto leading-relaxed">
               Experience the future of AI companionship. Engage in natural conversations, 
               voice interactions, and build meaningful relationships with AI companions 
               designed to understand and care.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
               <Button 
                 onClick={handleGetStarted}
                 size="lg"
-                className="bg-pink-400 hover:bg-pink-500 text-white px-8 py-4 text-lg"
+                className="bg-pink-400 hover:bg-pink-500 text-white px-10 py-6 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               >
                 Start Your Journey
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -334,11 +371,27 @@ export const LandingPage: React.FC = () => {
                 variant="outline" 
                 size="lg"
                 onClick={() => document.getElementById('preview')?.scrollIntoView({ behavior: 'smooth' })}
-                className="px-8 py-4 text-lg border-pink-400 text-pink-400 hover:bg-pink-400 hover:text-white"
+                className="px-10 py-6 text-lg font-semibold border-2 border-pink-400 text-pink-400 hover:bg-pink-400 hover:text-white transition-all duration-300 hover:scale-105"
               >
                 <Play className="mr-2 h-5 w-5" />
                 See It In Action
               </Button>
+            </div>
+            
+            {/* Trust Indicators */}
+            <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-green-500" />
+                <span>Secure & Private</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-yellow-500" />
+                <span>Real-time Responses</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Heart className="w-4 h-4 text-pink-500" />
+                <span>Emotional Intelligence</span>
+              </div>
             </div>
           </div>
         </div>
@@ -490,20 +543,26 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* CTA Section - Improved design */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-pink-400">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold font-display text-white mb-6">
+      {/* Enhanced CTA Section */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-pink-400 relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/20 to-transparent"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div className="relative max-w-4xl mx-auto text-center">
+          <h2 className="text-4xl md:text-5xl font-bold font-display text-white mb-6">
             Ready to Start Your AI Journey?
           </h2>
-          <p className="text-xl text-pink-100 mb-8">
+          <p className="text-xl text-pink-100 mb-10 max-w-2xl mx-auto">
             Join thousands of users who have found meaningful connections with their AI companions.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
               onClick={handleGetStarted}
               size="lg"
-              className="bg-white text-pink-400 hover:bg-gray-100 px-8 py-4 text-lg font-semibold"
+              className="bg-white text-pink-400 hover:bg-gray-100 px-10 py-6 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
             >
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
@@ -512,7 +571,7 @@ export const LandingPage: React.FC = () => {
               variant="outline" 
               size="lg"
               onClick={() => document.getElementById('preview')?.scrollIntoView({ behavior: 'smooth' })}
-              className="border-white text-white hover:bg-white hover:text-pink-400 px-8 py-4 text-lg font-semibold"
+              className="border-2 border-white text-white hover:bg-white hover:text-pink-400 px-10 py-6 text-lg font-semibold transition-all duration-300 hover:scale-105"
             >
               <Play className="mr-2 h-5 w-5" />
               Try Demo
