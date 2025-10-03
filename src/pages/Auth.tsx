@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UnifiedSignupFlow } from '@/components/UnifiedSignupFlow';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Auth() {
