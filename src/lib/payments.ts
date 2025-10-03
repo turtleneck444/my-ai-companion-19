@@ -9,13 +9,13 @@ export const SUBSCRIPTION_PLANS = {
     features: [
       '5 messages per day',
       '1 voice call per day',
-      'Basic AI companions',
+      '2 AI companions',
       'Community support'
     ],
     limits: {
       messages: 5,
       voiceCalls: 1,
-      companions: 1
+      companions: 2
     }
   },
   premium: {
@@ -27,7 +27,7 @@ export const SUBSCRIPTION_PLANS = {
     features: [
       '50 messages per day',
       '5 voice calls per day',
-      'Up to 3 AI companions',
+      'Up to 10 AI companions',
       'Custom personality creation',
       'Advanced voice features',
       'Priority support'
@@ -35,7 +35,7 @@ export const SUBSCRIPTION_PLANS = {
     limits: {
       messages: 50,
       voiceCalls: 5,
-      companions: 3
+      companions: 10
     }
   },
   pro: {
@@ -47,7 +47,7 @@ export const SUBSCRIPTION_PLANS = {
     features: [
       'Unlimited messages',
       'Unlimited voice calls',
-      'Up to 10 AI companions',
+      'Unlimited AI companions',
       'Advanced customization',
       'API access',
       'White-label options'
@@ -55,7 +55,7 @@ export const SUBSCRIPTION_PLANS = {
     limits: {
       messages: -1, // -1 means unlimited
       voiceCalls: -1,
-      companions: 10
+      companions: -1 // -1 means unlimited
     }
   }
 };
