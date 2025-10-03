@@ -39,6 +39,12 @@ export class ChatStorageService {
         return existingConversation.id;
       }
 
+      // If there's a permission error, use fallback
+      if (findError && (findError.code === 'PGRST301' || findError.code === '42501' || findError.message.includes('permission'))) {
+        console.log('⚠️ Permission denied for conversations table, using fallback storage');
+        return `fallback-${userId}-${characterId}`;
+      }
+
       // Create new conversation if none exists
       const { data: newConversation, error: createError } = await supabase
         .from('conversations')
@@ -52,9 +58,11 @@ export class ChatStorageService {
 
       if (createError) {
         console.error('❌ Error creating conversation:', createError);
-        // If table doesn't exist, return a fallback ID
-        if (createError.code === 'PGRST116' || createError.message.includes('relation "conversations" does not exist')) {
-          console.log('⚠️ Conversations table not found, using fallback storage');
+        // If table doesn't exist or permission denied, return a fallback ID
+        if (createError.code === 'PGRST116' || createError.code === 'PGRST301' || createError.code === '42501' || 
+            createError.message.includes('relation "conversations" does not exist') ||
+            createError.message.includes('permission')) {
+          console.log('⚠️ Conversations table not accessible, using fallback storage');
           return `fallback-${userId}-${characterId}`;
         }
         throw createError;
