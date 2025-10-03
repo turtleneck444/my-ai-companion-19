@@ -193,19 +193,25 @@ export const InteractivePreview: React.FC = () => {
 
     try {
       // Call OpenAI API for real responses
-      const response = await fetch('/.netlify/functions/openai-chat', {
+      const response = await fetch('http://localhost:3000/api/openai-chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: messageText,
-          character: {
-            name: selectedCharacter.name,
-            personality: selectedCharacter.personality,
-            bio: selectedCharacter.bio
-          },
-          isPreview: true // Flag to indicate this is a preview conversation
+          messages: [
+            {
+              role: 'system',
+              content: `You are ${selectedCharacter.name}, ${selectedCharacter.personality}. ${selectedCharacter.bio}. Respond in character as a friendly, engaging AI companion. Keep responses conversational and under 100 words.`
+            },
+            {
+              role: 'user',
+              content: messageText
+            }
+          ],
+          model: 'gpt-4o-mini',
+          temperature: 0.8,
+          max_tokens: 150
         }),
       });
 
@@ -217,7 +223,7 @@ export const InteractivePreview: React.FC = () => {
       
       const aiMessage: PreviewMessage = {
         id: (Date.now() + 1).toString(),
-        content: data.response || "I'm having trouble responding right now. Please try again!",
+        content: data.message || data.response || "I'm having trouble responding right now. Please try again!",
         sender: 'ai',
         timestamp: new Date()
       };
@@ -259,17 +265,26 @@ export const InteractivePreview: React.FC = () => {
   };
 
   const handleCharacterChange = (character: PreviewCharacter) => {
-    setSelectedCharacter(character);
-    setMessages([]);
-    setMessageCount(0);
-    setVoiceCallCount(0);
-    setShowSignupPrompt(false);
-    setShowVoiceUpgradePrompt(false);
-    setShowCharacterSelect(false);
-    toast({
-      title: `Switched to ${character.name}`,
-      description: "Starting a new conversation!",
-    });
+    try {
+      setSelectedCharacter(character);
+      setMessages([]);
+      setMessageCount(0);
+      setVoiceCallCount(0);
+      setShowSignupPrompt(false);
+      setShowVoiceUpgradePrompt(false);
+      setShowCharacterSelect(false);
+      toast({
+        title: `Switched to ${character.name}`,
+        description: "Starting a new conversation!",
+      });
+    } catch (error) {
+      console.error('Error changing character:', error);
+      toast({
+        title: "Error",
+        description: "Failed to switch character. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleVoiceCall = async () => {
