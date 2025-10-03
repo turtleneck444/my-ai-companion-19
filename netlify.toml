@@ -4,7 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "18.20.4"
-  SECRETS_SCAN_ENABLED = false
+  SECRETS_SCAN_ENABLED = "false"
   SECRETS_SCAN_OMIT_KEYS = "VITE_PAYMENT_PROVIDER,VITE_PAYMENT_ENVIRONMENT"
 
 [build.processing]
