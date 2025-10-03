@@ -101,8 +101,8 @@ export const useEnhancedUsageTracking = () => {
       const remainingMessages = limits.messages === -1 ? 9999 : Math.max(0, limits.messages - messagesUsed);
       const remainingVoiceCalls = limits.voiceCalls === -1 ? 9999 : Math.max(0, limits.voiceCalls - voiceCallsUsed);
       
-      const canSendMessage = limits.messages === -1 || messagesUsed < limits.messages;
-      const canMakeVoiceCall = limits.voiceCalls === -1 || voiceCallsUsed < limits.voiceCalls;
+      const canSendMessage = plan === 'pro' || (limits.messages !== -1 && messagesUsed < limits.messages);
+      const canMakeVoiceCall = plan === 'pro' || (limits.voiceCalls !== -1 && voiceCallsUsed < limits.voiceCalls);
 
       const newUsageData = {
         messagesUsed,

@@ -88,6 +88,16 @@ export const SimpleChatInterface = ({
   const canMakeVoiceCall = !usageLoading && usageData && 
     (usageData.plan === 'pro' || (planLimits && usageData.voice_calls_today < planLimits.voice_calls_per_day));
 
+  // Debug logging for chat component
+  console.log('🔍 SimpleChatInterface Debug:');
+  console.log('  - usageLoading:', usageLoading);
+  console.log('  - usageData:', usageData);
+  console.log('  - planLimits:', planLimits);
+  console.log('  - canSendMessage:', canSendMessage);
+  console.log('  - canMakeVoiceCall:', canMakeVoiceCall);
+  console.log('  - Plan check:', usageData?.plan === 'pro');
+  console.log('  - Messages check:', planLimits && usageData?.messages_today < planLimits.messages_per_day);
+
   // Load messages when component mounts
   useEffect(() => {
     loadMessages();
