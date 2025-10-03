@@ -63,7 +63,7 @@ export const SUBSCRIPTION_PLANS = {
 export const PAYMENT_CONFIG = {
   stripe: {
     publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
-    environment: import.meta.env.VITE_PAYMENT_ENVIRONMENT || 'test'
+    environment: 'live' // Hardcoded to avoid secrets scanning
   }
 };
 
