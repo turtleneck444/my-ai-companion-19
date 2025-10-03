@@ -34,7 +34,7 @@ const aiLimiter = rateLimit({
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-// Mount real payments API (Stripe/Square)
+// Mount real payments API (Stripe only)
 app.use('/api/payments', paymentsRouter);
 
 // OpenAI Chat endpoint with rate limiting

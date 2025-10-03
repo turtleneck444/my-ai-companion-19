@@ -8,7 +8,7 @@ A modern AI companion platform built with React, TypeScript, and Vite.
 - **UI**: shadcn/ui, Tailwind CSS
 - **Backend**: Supabase, Netlify Functions
 - **AI**: OpenAI GPT-4, ElevenLabs TTS
-- **Payments**: Stripe, Square integration
+- **Payments**: Stripe integration
 
 ## Features
 
