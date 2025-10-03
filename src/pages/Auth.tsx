@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2, Crown, Heart, Star, Zap, ArrowLeft, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { PaymentModal } from '@/components/PaymentModal';
 
 // Signup Form Component
 const SignupForm: React.FC<{ preselectedPlan?: string }> = ({ preselectedPlan }) => {
@@ -20,6 +21,8 @@ const SignupForm: React.FC<{ preselectedPlan?: string }> = ({ preselectedPlan })
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [userCreated, setUserCreated] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -58,18 +61,31 @@ const SignupForm: React.FC<{ preselectedPlan?: string }> = ({ preselectedPlan })
         return;
       }
 
+      // Create the account first
       await signUp(formData.email, formData.password, {
         full_name: formData.fullName,
         selected_plan: preselectedPlan || 'free'
       });
       
-      toast({
-        title: "Account Created!",
-        description: "Please check your email to verify your account.",
-        variant: "default"
-      });
+      setUserCreated(true);
       
-      navigate('/app');
+      // If it's a paid plan, show payment modal
+      if (preselectedPlan && preselectedPlan !== 'free') {
+        setShowPaymentModal(true);
+        toast({
+          title: "Account Created!",
+          description: "Please complete your payment to activate your plan.",
+          variant: "default"
+        });
+      } else {
+        // Free plan - go directly to app
+        toast({
+          title: "Account Created!",
+          description: "Welcome to LoveAI! Please check your email to verify your account.",
+          variant: "default"
+        });
+        navigate('/app');
+      }
     } catch (error: any) {
       toast({
         title: "Signup Failed",
@@ -81,8 +97,25 @@ const SignupForm: React.FC<{ preselectedPlan?: string }> = ({ preselectedPlan })
     }
   };
 
+  const handlePaymentSuccess = (plan: string) => {
+    setShowPaymentModal(false);
+    toast({
+      title: "Payment Successful!",
+      description: `Welcome to LoveAI ${plan}! Your account is now active.`,
+      variant: "default"
+    });
+    navigate('/app');
+  };
+
+  const handlePaymentClose = () => {
+    setShowPaymentModal(false);
+    // If user closes payment modal, still take them to app with free plan
+    navigate('/app');
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
         <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
           Full Name
@@ -193,11 +226,25 @@ const SignupForm: React.FC<{ preselectedPlan?: string }> = ({ preselectedPlan })
         ) : (
           <>
             <User className="w-5 h-5 mr-2" />
-            Create Account
+            {preselectedPlan && preselectedPlan !== 'free' 
+              ? `Create Account & Pay for ${preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}`
+              : 'Create Account'
+            }
           </>
         )}
       </Button>
     </form>
+
+    {/* Payment Modal */}
+    {showPaymentModal && preselectedPlan && preselectedPlan !== 'free' && (
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={handlePaymentClose}
+        onSuccess={handlePaymentSuccess}
+        plan={preselectedPlan}
+      />
+    )}
+  </>
   );
 };
 

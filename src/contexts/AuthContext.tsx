@@ -101,6 +101,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('❌ Supabase signup error:', error);
       } else {
         console.log('✅ Supabase signup successful:', data);
+        
+        // Create user profile after successful signup
+        if (data.user) {
+          try {
+            const { error: profileError } = await supabase
+              .from('user_profiles')
+              .insert({
+                user_id: data.user.id,
+                email: data.user.email,
+                plan: userData?.selected_plan || 'free',
+                messages_used: 0,
+                voice_calls_used: 0,
+                subscription_status: 'active',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+
+            if (profileError) {
+              console.error('❌ Error creating user profile:', profileError);
+            } else {
+              console.log('✅ User profile created successfully');
+            }
+          } catch (profileErr) {
+            console.error('❌ Unexpected error creating profile:', profileErr);
+          }
+        }
       }
       
       return { error };
