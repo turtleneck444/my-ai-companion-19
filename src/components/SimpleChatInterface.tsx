@@ -99,8 +99,15 @@ export const SimpleChatInterface = ({
 
   const loadMessages = async () => {
     try {
+      // Get the current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No user found');
+        return;
+      }
+      
       const conversation = await ChatStorageService.getOrCreateConversation(
-        character.id, // Using character ID as user ID for now
+        user.id, // Use actual user ID
         character.id
       );
       setConversationId(conversation);
@@ -121,12 +128,24 @@ export const SimpleChatInterface = ({
     if (!conversationId) return;
     
     try {
+      // Get the current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No user found for saving message');
+        return;
+      }
+      
       await ChatStorageService.saveMessage(
         conversationId,
         character.id,
-        character.id, // Using character ID as user ID for now
-        content,
-        sender
+        user.id, // Use actual user ID
+        {
+          id: Date.now().toString(),
+          content,
+          sender,
+          timestamp: new Date(),
+          metadata: {}
+        }
       );
     } catch (error) {
       console.error('Error saving message:', error);

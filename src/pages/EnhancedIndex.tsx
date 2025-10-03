@@ -163,7 +163,7 @@ const EnhancedIndex = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation() as any;
-  const { currentPlan, remainingMessages, remainingVoiceCalls } = useSupabaseUsageTracking();
+  const { plan, remainingMessages, remainingVoiceCalls } = useEnhancedUsageTracking();
   
   // Core state - minimal and stable
   const [currentView, setCurrentView] = useState<View>('home');
@@ -636,8 +636,8 @@ const EnhancedIndex = () => {
                     <div className="text-center bg-white/8 backdrop-blur-sm rounded-xl p-4 border border-pink-400/30">
                       <p className="text-white text-[11px] font-semibold uppercase tracking-wide">Usage Today</p>
                       <div className="mt-2 space-y-1">
-                        <div className="text-[11px] text-pink-100">Messages left: {remainingMessages === -1 ? '∞' : remainingMessages}</div>
-                        <div className="text-[11px] text-pink-100">Calls left: {typeof remainingVoiceCalls === 'number' ? remainingVoiceCalls : '∞'}</div>
+                        <div className="text-[11px] text-pink-100">Messages left: {plan === 'pro' ? 'Unlimited' : (remainingMessages === -1 ? '∞' : remainingMessages)}</div>
+                        <div className="text-[11px] text-pink-100">Calls left: {plan === 'pro' ? 'Unlimited' : (typeof remainingVoiceCalls === 'number' ? remainingVoiceCalls : '∞')}</div>
                       </div>
                     </div>
                   </div>
