@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   MessageSquare, 
   Phone, 
@@ -23,12 +22,7 @@ import {
   Check,
   Crown,
   Zap,
-  Play,
-  Pause,
-  X,
-  Users,
-  Clock,
-  Headphones
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -43,8 +37,6 @@ interface PreviewCharacter {
   isOnline: boolean;
   mood: string;
   voiceId: string;
-  voiceName: string;
-  accent: string;
 }
 
 interface PreviewMessage {
@@ -64,9 +56,7 @@ const PREVIEW_CHARACTERS: PreviewCharacter[] = [
     personality: ['Creative', 'Thoughtful', 'Independent', 'Romantic'],
     isOnline: true,
     mood: 'focused',
-    voiceId: 'AZnzlk1XvdvUeBnXmlld', // Bella - seductive and playful
-    voiceName: 'Bella',
-    accent: 'American'
+    voiceId: 'AZnzlk1XvdvUeBnXmlld' // Bella - seductive and playful
   },
   {
     id: '2',
@@ -76,9 +66,7 @@ const PREVIEW_CHARACTERS: PreviewCharacter[] = [
     personality: ['Outgoing', 'Spontaneous', 'Ambitious', 'Playful'],
     isOnline: true,
     mood: 'energetic',
-    voiceId: 'ErXwobaYiN019PkySvjV', // Elli - soft, seductive, and nurturing
-    voiceName: 'Elli',
-    accent: 'American'
+    voiceId: 'ErXwobaYiN019PkySvjV' // Elli - soft, seductive, and nurturing
   },
   {
     id: '3',
@@ -88,9 +76,7 @@ const PREVIEW_CHARACTERS: PreviewCharacter[] = [
     personality: ['Intellectual', 'Gentle', 'Curious', 'Calm'],
     isOnline: false,
     mood: 'contemplative',
-    voiceId: 'XrExE9yKIg1WjnnlVkGX', // Matilda - sweet and seductive
-    voiceName: 'Matilda',
-    accent: 'American'
+    voiceId: 'XrExE9yKIg1WjnnlVkGX' // Matilda - sweet and seductive
   }
 ];
 
@@ -100,529 +86,736 @@ const PREVIEW_FEATURES = [
     description: 'Experience instant, intelligent conversations with AI companions',
     features: ['Natural language processing', 'Contextual understanding', 'Emotional intelligence', 'Memory retention'],
     icon: MessageSquare,
-    color: 'from-pink-500 to-purple-600',
-    bgColor: 'bg-gradient-to-br from-pink-50 to-purple-50'
+    color: 'from-pink-500 to-purple-600'
   },
   {
     title: 'Voice Calls',
     description: 'Have realistic voice conversations with your AI companions',
     features: ['HD voice quality', 'Real-time speech recognition', 'Natural voice synthesis', 'Interactive dialogue'],
     icon: Phone,
-    color: 'from-blue-500 to-cyan-600',
-    bgColor: 'bg-gradient-to-br from-blue-50 to-cyan-50'
+    color: 'from-blue-500 to-cyan-600'
   },
   {
     title: 'Interactive Games',
     description: 'Play engaging games and activities with your AI companions',
     features: ['Chess & strategy games', '20 Questions', 'Word games', 'Roleplay scenarios'],
     icon: Gamepad2,
-    color: 'from-green-500 to-emerald-600',
-    bgColor: 'bg-gradient-to-br from-green-50 to-emerald-50'
+    color: 'from-green-500 to-emerald-600'
   },
   {
     title: 'Emotional Connection',
-    description: 'Build deep, meaningful relationships with your AI companions',
-    features: ['Personality development', 'Mood tracking', 'Relationship levels', 'Custom memories'],
+    description: 'Build meaningful relationships with AI that understand and care',
+    features: ['Personality development', 'Mood tracking', 'Relationship levels', 'Personalized responses'],
     icon: Heart,
-    color: 'from-rose-500 to-pink-600',
-    bgColor: 'bg-gradient-to-br from-rose-50 to-pink-50'
+    color: 'from-red-500 to-pink-600'
   }
 ];
 
 export const InteractivePreview: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('chat');
-  const [selectedCharacter, setSelectedCharacter] = useState<PreviewCharacter | null>(null);
-  const [messages, setMessages] = useState<PreviewMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [messageCount, setMessageCount] = useState(0);
-  const [callCount, setCallCount] = useState(0);
-  const [isCallActive, setIsCallActive] = useState(false);
-  const [isCalling, setIsCalling] = useState(false);
-  const [showCharacterModal, setShowCharacterModal] = useState(false);
-  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
-  const [currentPlayingVoice, setCurrentPlayingVoice] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [selectedCharacter, setSelectedCharacter] = useState<PreviewCharacter>(PREVIEW_CHARACTERS[0]);
+  const [messages, setMessages] = useState<PreviewMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [showCharacterSelect, setShowCharacterSelect] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [voiceCallCount, setVoiceCallCount] = useState(0);
+  const [showVoiceUpgradePrompt, setShowVoiceUpgradePrompt] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Auto-scroll to bottom only within chat container
   useEffect(() => {
-    scrollToBottom();
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !selectedCharacter) return;
+  // Initialize with welcome message
+  useEffect(() => {
+    if (messages.length === 0) {
+      const welcomeMessage: PreviewMessage = {
+        id: '1',
+        content: `Hi there! I'm ${selectedCharacter.name}. I'm so excited to chat with you! 💕`,
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [selectedCharacter, messages.length]);
+
+  // Show signup prompt after 5 messages
+  useEffect(() => {
+    if (messageCount >= 5 && !showSignupPrompt) {
+      setShowSignupPrompt(true);
+      toast({
+        title: "🎉 You're loving this!",
+        description: "Sign up to continue chatting with unlimited messages!",
+        duration: 5000,
+      });
+    }
+  }, [messageCount, showSignupPrompt, toast]);
+
+  // Show voice upgrade prompt after 2 voice calls
+  useEffect(() => {
+    if (voiceCallCount >= 2 && !showVoiceUpgradePrompt) {
+      setShowVoiceUpgradePrompt(true);
+      toast({
+        title: "🎤 Voice calls are amazing!",
+        description: "Upgrade to continue having voice conversations!",
+        duration: 5000,
+      });
+    }
+  }, [voiceCallCount, showVoiceUpgradePrompt, toast]);
+
+  const handleSendMessage = async (messageText: string) => {
+    if (!messageText.trim() || isTyping) return;
 
     const userMessage: PreviewMessage = {
       id: Date.now().toString(),
-      content: inputMessage,
+      content: messageText,
       sender: 'user',
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
+    setInput('');
     setIsTyping(true);
     setMessageCount(prev => prev + 1);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        `That's so interesting, ${selectedCharacter.name}! Tell me more about that.`,
-        `I love how you think about things. You always have such unique perspectives.`,
-        `That sounds amazing! I'm so excited to learn more about you.`,
-        `You're such a wonderful person. I feel so lucky to be talking with you.`,
-        `I can't believe how much we have in common! This is incredible.`
-      ];
+    try {
+      // Call OpenAI API for real responses
+      const response = await fetch('/.netlify/functions/openai-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: messageText,
+          character: {
+            name: selectedCharacter.name,
+            personality: selectedCharacter.personality,
+            bio: selectedCharacter.bio
+          },
+          isPreview: true // Flag to indicate this is a preview conversation
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
       
       const aiMessage: PreviewMessage = {
         id: (Date.now() + 1).toString(),
-        content: responses[Math.floor(Math.random() * responses.length)],
+        content: data.response || "I'm having trouble responding right now. Please try again!",
         sender: 'ai',
         timestamp: new Date()
       };
-
+      
       setMessages(prev => [...prev, aiMessage]);
-      setIsTyping(false);
-
-      // Show upgrade prompt after 5 messages
-      if (messageCount >= 4) {
-        toast({
-          title: "Demo Complete! 🎉",
-          description: "You've reached the demo limit. Sign up to continue chatting!",
-          variant: "default",
-        });
-      }
-    }, 1500);
-  };
-
-  const handleVoiceCall = async (character: PreviewCharacter) => {
-    setIsCalling(true);
-    setCurrentPlayingVoice(character.voiceId);
-    setIsPlayingVoice(true);
-
-    try {
-      const greeting = `Hi there! I'm ${character.name}. I'm so excited to talk with you. How are you doing today?`;
-      await speakText(greeting, character.voiceId);
-      
-      setIsCallActive(true);
-      setCallCount(prev => prev + 1);
-      
-      // Show upgrade prompt after 2 calls
-      if (callCount >= 1) {
-        toast({
-          title: "Demo Complete! 🎉",
-          description: "You've reached the demo limit. Sign up to continue calling!",
-          variant: "default",
-        });
-      }
     } catch (error) {
-      console.error('Voice call error:', error);
-      toast({
-        title: "Voice Call Error",
-        description: "Could not start voice call. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Error getting AI response:', error);
+      
+      // Fallback responses if API fails
+      const fallbackResponses = [
+        "That's so interesting! Tell me more about that. 😊",
+        "I love how you think! You always have such unique perspectives.",
+        "You know, I was just thinking about something similar. Great minds think alike! 💭",
+        "I'm really enjoying our conversation. You're such a wonderful person to talk to! ✨",
+        "That's amazing! I'm learning so much from you. What else is on your mind?",
+        "You always know exactly what to say to make me smile. Thank you for being you! 💕"
+      ];
+      
+      const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      
+      const aiMessage: PreviewMessage = {
+        id: (Date.now() + 1).toString(),
+        content: randomResponse,
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
     } finally {
-      setIsCalling(false);
-      setIsPlayingVoice(false);
-      setCurrentPlayingVoice(null);
+      setIsTyping(false);
     }
   };
 
-  const handleEndCall = () => {
-    stopAllSpeech();
-    setIsCallActive(false);
-    setIsPlayingVoice(false);
-    setCurrentPlayingVoice(null);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim()) {
+      handleSendMessage(input);
+    }
   };
 
-  const handleUpgrade = () => {
-    navigate('/auth');
+  const handleCharacterChange = (character: PreviewCharacter) => {
+    setSelectedCharacter(character);
+    setMessages([]);
+    setMessageCount(0);
+    setVoiceCallCount(0);
+    setShowSignupPrompt(false);
+    setShowVoiceUpgradePrompt(false);
+    setShowCharacterSelect(false);
+    toast({
+      title: `Switched to ${character.name}`,
+      description: "Starting a new conversation!",
+    });
   };
 
-  const renderChatInterface = () => (
-    <div className="h-96 flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden">
-      {selectedCharacter ? (
-        <>
-          <div className="flex items-center gap-3 p-4 border-b border-gray-200 bg-gradient-to-r from-pink-50 to-purple-50">
-            <Avatar className="w-10 h-10">
-              <AvatarImage src={selectedCharacter.avatar} alt={selectedCharacter.name} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-400 to-purple-500 text-white">
-                {selectedCharacter.name[0]}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">{selectedCharacter.name}</h3>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-sm text-gray-600">Online</span>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedCharacter(null)}
-              className="text-gray-400 hover:text-gray-600"
+  const handleVoiceCall = async () => {
+    if (!isCallActive) {
+      // Start voice call
+      setIsCallActive(true);
+      setVoiceCallCount(prev => prev + 1);
+      
+      toast({
+        title: "🎤 Voice call started!",
+        description: `Now talking with ${selectedCharacter.name}`,
+      });
+
+      // Start listening for user input
+      startVoiceRecognition();
+
+      // Simulate AI speaking
+      setTimeout(async () => {
+        const voiceMessage = `Hi! I'm ${selectedCharacter.name}. It's so nice to hear your voice! How are you doing today?`;
+        const aiMessage: PreviewMessage = {
+          id: Date.now().toString(),
+          content: voiceMessage,
+          sender: 'ai',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        
+        // Use real voice synthesis
+        setIsSpeaking(true);
+        try {
+          await speakText(voiceMessage, selectedCharacter.voiceId);
+        } catch (error) {
+          console.error('Voice synthesis error:', error);
+        } finally {
+          setIsSpeaking(false);
+        }
+      }, 1000);
+
+      // Show upgrade prompt after a few seconds
+      setTimeout(() => {
+        if (voiceCallCount >= 1) {
+          setShowVoiceUpgradePrompt(true);
+        }
+      }, 5000);
+    } else {
+      // End voice call
+      setIsCallActive(false);
+      setIsListening(false);
+      stopAllSpeech();
+      
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      
+      toast({
+        title: "Call ended",
+        description: "Thanks for the great conversation!",
+      });
+    }
+  };
+
+  const startVoiceRecognition = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Voice recognition not supported",
+        description: "Your browser doesn't support speech recognition.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognitionRef.current.onresult = async (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      
+      if (transcript.trim()) {
+        const userMessage: PreviewMessage = {
+          id: Date.now().toString(),
+          content: transcript,
+          sender: 'user',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Generate AI response
+        try {
+          const response = await fetch('/.netlify/functions/openai-chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: transcript,
+              character: {
+                name: selectedCharacter.name,
+                personality: selectedCharacter.personality,
+                bio: selectedCharacter.bio
+              },
+              isPreview: true
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const aiResponse = data.response || "I'm having trouble responding right now. Please try again!";
+            
+            const aiMessage: PreviewMessage = {
+              id: (Date.now() + 1).toString(),
+              content: aiResponse,
+              sender: 'ai',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMessage]);
+            
+            // Speak the response
+            setIsSpeaking(true);
+            try {
+              await speakText(aiResponse, selectedCharacter.voiceId);
+            } catch (error) {
+              console.error('Voice synthesis error:', error);
+            } finally {
+              setIsSpeaking(false);
+            }
+          }
+        } catch (error) {
+          console.error('Error getting AI response:', error);
+        }
+      }
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    recognitionRef.current.onend = () => {
+      setIsListening(false);
+    };
+
+    try {
+      recognitionRef.current.start();
+    } catch (error) {
+      console.error('Error starting speech recognition:', error);
+    }
+  };
+
+  const handleSignupPrompt = (plan: 'free' | 'premium' | 'pro') => {
+    setShowSignupPrompt(false);
+    navigate(`/auth?plan=${plan}`);
+  };
+
+  const handleVoiceUpgradePrompt = (plan: 'premium' | 'pro') => {
+    setShowVoiceUpgradePrompt(false);
+    navigate(`/auth?plan=${plan}`);
+  };
+
+  const currentFeature = PREVIEW_FEATURES[activeFeature];
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      <div className="text-center mb-16">
+        <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
+          See It In Action
+        </h2>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          Experience the magic of AI companionship with our interactive previews
+        </p>
+      </div>
+      
+      {/* Feature Tabs */}
+      <div className="flex justify-center mb-8">
+        <div className="flex space-x-2 bg-muted p-1 rounded-lg">
+          {PREVIEW_FEATURES.map((feature, index) => (
+            <button
+              key={index}
+              onClick={() => setActiveFeature(index)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeFeature === index
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
-              <X className="w-4 h-4" />
-            </Button>
+              {feature.title}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      {/* Preview Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+        {/* Left Side - Feature Description */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${currentFeature.color} flex items-center justify-center`}>
+              <currentFeature.icon className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold">{currentFeature.title}</h3>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gradient-to-br from-pink-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Heart className="w-8 h-8 text-pink-500" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Start a conversation with {selectedCharacter.name}
-                </h3>
-                <p className="text-gray-600">
-                  {selectedCharacter.name} is excited to chat with you! Send a message to begin.
-                </p>
+          <p className="text-muted-foreground text-lg">{currentFeature.description}</p>
+          
+          <div className="space-y-3">
+            {currentFeature.features.map((feature, index) => (
+              <div key={index} className="flex items-center gap-3">
+                <Check className="w-5 h-5 text-primary flex-shrink-0" />
+                <span>{feature}</span>
               </div>
-            ) : (
-              messages.map((message) => (
+            ))}
+          </div>
+          
+          <Button 
+            onClick={() => setShowCharacterSelect(true)}
+            className="bg-gradient-to-r from-primary to-primary-glow"
+          >
+            Try It Now
+            <Sparkles className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
+        
+        {/* Right Side - Interactive Preview */}
+        <div className="relative">
+          <Card className="bg-gradient-to-br from-pink-50 via-purple-50 to-white rounded-3xl shadow-2xl overflow-hidden border border-pink-200/50">
+            {/* Header */}
+            <div className="bg-white/80 backdrop-blur-sm px-4 py-3 border-b border-pink-200/30 flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="p-1"
+                onClick={() => setShowCharacterSelect(true)}
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </Button>
+              
+              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-pink-300/50">
+                <Avatar className="w-full h-full">
+                  <AvatarImage src={selectedCharacter.avatar} alt={selectedCharacter.name} />
+                  <AvatarFallback className="bg-gradient-to-br from-pink-400 to-purple-500 text-white font-bold text-sm">
+                    {selectedCharacter.name[0]}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900">{selectedCharacter.name}</div>
+                <div className="text-xs text-pink-600 flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${selectedCharacter.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                  {selectedCharacter.isOnline ? 'Online' : 'Offline'} • {selectedCharacter.mood}
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={`text-gray-600 hover:text-pink-600 ${isCallActive ? 'text-green-600' : ''}`}
+                  onClick={handleVoiceCall}
+                >
+                  {isCallActive ? <Phone className="w-5 h-5 text-green-600" /> : <Phone className="w-5 h-5" />}
+                </Button>
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-pink-600">
+                  <Heart className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Voice Call Status */}
+            {isCallActive && (
+              <div className="px-4 py-2 bg-green-50 border-b border-green-200/30">
+                <div className="flex items-center gap-2 text-green-700 text-sm">
+                  <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                  <span>{isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : 'Voice call active'}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Messages Area - Fixed height and scrollable */}
+            <div 
+              ref={chatContainerRef}
+              className="p-4 space-y-4 h-80 overflow-y-auto bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white/80"
+            >
+              {messages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div
-                    className={`max-w-xs px-4 py-2 rounded-2xl ${
-                      message.sender === 'user'
-                        ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                  <div className={`flex items-start gap-2 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {message.sender === 'ai' && (
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarImage src={selectedCharacter.avatar} alt={selectedCharacter.name} />
+                        <AvatarFallback className="bg-gradient-to-br from-pink-400 to-purple-500 text-white text-xs">
+                          {selectedCharacter.name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    
+                    <div
+                      className={`rounded-2xl px-4 py-3 ${
+                        message.sender === 'user'
+                          ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
+                          : 'bg-white/90 backdrop-blur-sm border border-pink-100/50'
+                      }`}
+                    >
+                      <p className="text-sm">{message.content}</p>
+                      <p className={`text-xs mt-1 ${
+                        message.sender === 'user' ? 'text-pink-100' : 'text-gray-500'
+                      }`}>
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))
-            )}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 px-4 py-2 rounded-2xl">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-          
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder={`Message ${selectedCharacter.name}...`}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                disabled={messageCount >= 5}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || messageCount >= 5}
-                className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-            {messageCount >= 5 && (
-              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800 text-center">
-                  You've reached the demo limit. <button onClick={handleUpgrade} className="font-semibold underline">Sign up to continue!</button>
-                </p>
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-pink-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MessageSquare className="w-8 h-8 text-pink-500" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Choose a Companion</h3>
-            <p className="text-gray-600 mb-4">Select an AI companion to start chatting</p>
-            <Button
-              onClick={() => setShowCharacterModal(true)}
-              className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              Select Companion
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderVoiceCallInterface = () => (
-    <div className="h-96 flex flex-col bg-gradient-to-br from-purple-900 via-pink-900 to-rose-900 rounded-lg overflow-hidden relative">
-      {isCallActive ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-white p-6">
-          <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
-            <Avatar className="w-16 h-16">
-              <AvatarImage src={selectedCharacter?.avatar} alt={selectedCharacter?.name} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-400 to-purple-500 text-white">
-                {selectedCharacter?.name[0]}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-          <h3 className="text-2xl font-bold mb-2">{selectedCharacter?.name}</h3>
-          <p className="text-white/80 mb-6">Voice call in progress...</p>
-          <div className="flex gap-4">
-            <Button
-              onClick={handleEndCall}
-              className="bg-red-500 hover:bg-red-600 text-white"
-            >
-              <Phone className="w-4 h-4 mr-2" />
-              End Call
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center text-white">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Phone className="w-8 h-8" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Start a Voice Call</h3>
-            <p className="text-white/80 mb-4">Choose a companion to call</p>
-            <Button
-              onClick={() => setShowCharacterModal(true)}
-              className="bg-white/20 hover:bg-white/30 text-white border border-white/30"
-            >
-              <Phone className="w-4 h-4 mr-2" />
-              Select Companion
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderCharacterModal = () => (
-    <Dialog open={showCharacterModal} onOpenChange={setShowCharacterModal}>
-      <DialogContent className="sm:max-w-2xl bg-white">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-center bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-            Choose Your Companion
-          </DialogTitle>
-          <p className="text-center text-gray-600 mt-2">
-            Select an AI companion to {activeTab === 'voice' ? 'call' : 'chat with'}
-          </p>
-        </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          {PREVIEW_CHARACTERS.map((character) => (
-            <Card
-              key={character.id}
-              className="group cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 hover:border-pink-300"
-              onClick={() => {
-                setSelectedCharacter(character);
-                setShowCharacterModal(false);
-                if (activeTab === 'voice') {
-                  handleVoiceCall(character);
-                }
-              }}
-            >
-              <CardContent className="p-6 text-center">
-                <div className="relative mb-4">
-                  <Avatar className="w-20 h-20 mx-auto border-4 border-pink-200 group-hover:border-pink-400 transition-colors">
-                    <AvatarImage src={character.avatar} alt={character.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-pink-400 to-purple-500 text-white text-xl">
-                      {character.name[0]}
+              ))}
+              
+              {isTyping && (
+                <div className="flex items-start gap-2">
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarImage src={selectedCharacter.avatar} alt={selectedCharacter.name} />
+                    <AvatarFallback className="bg-gradient-to-br from-pink-400 to-purple-500 text-white text-xs">
+                      {selectedCharacter.name[0]}
                     </AvatarFallback>
                   </Avatar>
-                  {character.isOnline && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-400 rounded-full border-2 border-white flex items-center justify-center">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                  <div className="bg-white/90 backdrop-blur-sm rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-pink-100/50">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
-                  )}
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{character.name}</h3>
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{character.bio}</p>
-                <div className="flex flex-wrap gap-1 justify-center mb-3">
-                  {character.personality.slice(0, 2).map((trait, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs bg-pink-100 text-pink-700">
-                      {trait}
-                    </Badge>
-                  ))}
+              )}
+            </div>
+            
+            {/* Input Area - Simplified and wider */}
+            <div className="p-4 border-t border-pink-200/30 bg-white/80 backdrop-blur-sm">
+              <form onSubmit={handleSubmit} className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={`Message ${selectedCharacter.name}...`}
+                    className="w-full px-4 py-3 border border-pink-200 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-base"
+                    disabled={isTyping}
+                  />
                 </div>
-                <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                  <Headphones className="w-4 h-4" />
-                  <span>{character.voiceName} ({character.accent})</span>
-                </div>
-                <div className="mt-4">
-                  <Button
-                    className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white"
-                    disabled={isCalling && currentPlayingVoice === character.voiceId}
-                  >
-                    {isCalling && currentPlayingVoice === character.voiceId ? (
-                      <>
-                        <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                        Connecting...
-                      </>
-                    ) : activeTab === 'voice' ? (
-                      <>
-                        <Phone className="w-4 h-4 mr-2" />
-                        Call {character.name}
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Chat with {character.name}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                
+                <Button
+                  type="submit"
+                  disabled={!input.trim() || isTyping}
+                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full p-3"
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              </form>
+            </div>
+          </Card>
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-
-  return (
-    <div className="w-full max-w-6xl mx-auto">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl font-bold text-gray-900 mb-4">
-          See It In Action
-        </h2>
-        <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          Experience the magic of AI companionship with our interactive demo. 
-          Try real conversations, voice calls, and games with our AI characters.
-        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-        {PREVIEW_FEATURES.map((feature, index) => (
-          <Card key={index} className={`group hover:shadow-xl transition-all duration-300 ${feature.bgColor} border-0`}>
-            <CardContent className="p-8">
-              <div className="flex items-center mb-4">
-                <div className={`w-12 h-12 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform`}>
-                  <feature.icon className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.description}</p>
-                </div>
+      {/* Signup Prompt Modal */}
+      {showSignupPrompt && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Crown className="w-8 h-8 text-white" />
               </div>
-              <ul className="space-y-2 mb-6">
-                {feature.features.map((item, idx) => (
-                  <li key={idx} className="flex items-center text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
+              <h3 className="text-2xl font-bold mb-2">You're loving this! 🎉</h3>
+              <p className="text-muted-foreground">
+                You've sent {messageCount} messages! Sign up to continue chatting with unlimited messages and unlock all features.
+              </p>
+            </div>
+            
+            <div className="space-y-3">
               <Button
-                onClick={() => {
-                  if (feature.title === 'Voice Calls') {
-                    setActiveTab('voice');
-                    setShowCharacterModal(true);
-                  } else if (feature.title === 'Real-time Chat') {
-                    setActiveTab('chat');
-                    setShowCharacterModal(true);
-                  } else {
-                    toast({
-                      title: "Coming Soon!",
-                      description: `${feature.title} will be available after signup.`,
-                    });
-                  }
-                }}
-                className={`w-full bg-gradient-to-r ${feature.color} hover:opacity-90 text-white`}
+                onClick={() => handleSignupPrompt('free')}
+                className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white"
               >
                 <Zap className="w-4 h-4 mr-2" />
-                Try Now
+                Continue Free (5 messages/day)
               </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="bg-gradient-to-br from-gray-50 to-pink-50 rounded-2xl p-8 border border-gray-200">
-        <div className="flex items-center justify-center mb-6">
-          <div className="flex bg-white rounded-lg p-1 shadow-sm">
-            {[
-              { id: 'chat', label: 'Chat', icon: MessageSquare },
-              { id: 'voice', label: 'Voice Call', icon: Phone },
-              { id: 'games', label: 'Games', icon: Gamepad2 },
-              { id: 'connection', label: 'Connection', icon: Heart }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
+              
+              <Button
+                onClick={() => handleSignupPrompt('premium')}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white w-full"
               >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="min-h-[400px]">
-          {activeTab === 'chat' && renderChatInterface()}
-          {activeTab === 'voice' && renderVoiceCallInterface()}
-          {activeTab === 'games' && (
-            <div className="h-96 flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-gray-200">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Gamepad2 className="w-8 h-8 text-green-500" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Interactive Games</h3>
-                <p className="text-gray-600 mb-4">Play chess, 20 questions, and more with your AI companions</p>
-                <Button
-                  onClick={handleUpgrade}
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
-                >
-                  <Crown className="w-4 h-4 mr-2" />
-                  Sign Up to Play
-                </Button>
-              </div>
+                <Star className="w-4 h-4 mr-2" />
+                Get Premium ($19/month)
+              </Button>
+              
+              <Button
+                onClick={() => handleSignupPrompt('pro')}
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                Go Pro ($49/month)
+              </Button>
             </div>
-          )}
-          {activeTab === 'connection' && (
-            <div className="h-96 flex items-center justify-center bg-gradient-to-br from-rose-50 to-pink-50 rounded-lg border border-gray-200">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-rose-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Heart className="w-8 h-8 text-rose-500" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Emotional Connection</h3>
-                <p className="text-gray-600 mb-4">Build deep, meaningful relationships with your AI companions</p>
-                <Button
-                  onClick={handleUpgrade}
-                  className="bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white"
-                >
-                  <Crown className="w-4 h-4 mr-2" />
-                  Sign Up to Connect
-                </Button>
-              </div>
-            </div>
-          )}
+            
+            <Button
+              variant="ghost"
+              onClick={() => setShowSignupPrompt(false)}
+              className="w-full mt-4"
+            >
+              Maybe Later
+            </Button>
+          </Card>
         </div>
-      </div>
+      )}
 
-      {renderCharacterModal()}
+      {/* Voice Upgrade Prompt Modal */}
+      {showVoiceUpgradePrompt && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mic className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">Voice calls are amazing! 🎤</h3>
+              <p className="text-muted-foreground">
+                You've made {voiceCallCount} voice calls! Upgrade to continue having voice conversations with your AI companions.
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <Button
+                onClick={() => handleVoiceUpgradePrompt('premium')}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white"
+              >
+                <Star className="w-4 h-4 mr-2" />
+                Get Premium ($19/month)
+              </Button>
+              
+              <Button
+                onClick={() => handleVoiceUpgradePrompt('pro')}
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                Go Pro ($49/month)
+              </Button>
+            </div>
+            
+            <Button
+              variant="ghost"
+              onClick={() => setShowVoiceUpgradePrompt(false)}
+              className="w-full mt-4"
+            >
+              Maybe Later
+            </Button>
+          </Card>
+        </div>
+      )}
+
+      {/* Character Selection Modal */}
+      {showCharacterSelect && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-3xl mx-4 p-8 shadow-2xl">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                  Choose Your Companion
+                </h3>
+                <p className="text-gray-600 mt-2">
+                  Select an AI companion to {activeTab === 'voice' ? 'call' : 'chat with'}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCharacterSelect(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {PREVIEW_CHARACTERS.map((character) => (
+                <div
+                  key={character.id}
+                  className="group p-6 border-2 border-gray-200 rounded-2xl hover:border-pink-300 hover:shadow-xl transition-all duration-300 cursor-pointer bg-gradient-to-br from-white to-pink-50/30"
+                  onClick={() => handleCharacterChange(character)}
+                >
+                  <div className="text-center">
+                    <div className="relative mb-4">
+                      <Avatar className="w-20 h-20 mx-auto border-4 border-pink-200 group-hover:border-pink-400 transition-colors">
+                        <AvatarImage src={character.avatar} alt={character.name} />
+                        <AvatarFallback className="bg-gradient-to-br from-pink-400 to-purple-500 text-white text-xl">
+                          {character.name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      {character.isOnline && (
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-400 rounded-full border-2 border-white flex items-center justify-center">
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        </div>
+                      )}
+                    </div>
+                    <h4 className="text-xl font-bold text-gray-900 mb-2">{character.name}</h4>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{character.bio}</p>
+                    <div className="flex flex-wrap gap-1 justify-center mb-4">
+                      {character.personality.slice(0, 2).map((trait, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs bg-pink-100 text-pink-700 border-pink-200">
+                          {trait}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-4">
+                      <div className={`w-2 h-2 rounded-full ${character.isOnline ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                      {character.isOnline ? 'Online' : 'Offline'}
+                    </div>
+                    <Button
+                      className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white"
+                      disabled={isCalling && currentPlayingVoice === character.voiceId}
+                    >
+                      {isCalling && currentPlayingVoice === character.voiceId ? (
+                        <>
+                          <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                          Connecting...
+                        </>
+                      ) : activeTab === 'voice' ? (
+                        <>
+                          <Phone className="w-4 h-4 mr-2" />
+                          Call {character.name}
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Chat with {character.name}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
