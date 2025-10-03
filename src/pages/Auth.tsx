@@ -8,13 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UnifiedSignupFlow } from '@/components/UnifiedSignupFlow';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2, Crown, Heart, Star, Zap } from "lucide-react";
+import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2, Crown, Heart, Star, Zap, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
   const { user, signIn } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const preselectedPlan = useMemo(() => searchParams.get('plan') || undefined, [searchParams]);
   
   // Sign-in form state
@@ -70,73 +72,105 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-rose-50 flex items-center justify-center p-4">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-40 left-1/2 w-80 h-80 bg-rose-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" style={{ animationDelay: '4s' }}></div>
-      </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      {/* Back to Home Button */}
+      <Button
+        variant="ghost"
+        onClick={() => navigate('/')}
+        className="absolute top-6 left-6 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+      >
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back to Home
+      </Button>
 
-      <div className="max-w-6xl mx-auto px-4 py-14 relative z-10">
-        <Card className="border-0 shadow-2xl backdrop-blur-xl bg-white/80 rounded-3xl overflow-hidden">
-          <CardHeader className="space-y-6 text-center bg-gradient-to-r from-pink-500 via-purple-500 to-rose-500 p-8 text-white">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <Heart className="w-8 h-8 text-white" />
+      <div className="w-full max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          
+          {/* Left Side - Branding and Info */}
+          <div className="text-center lg:text-left space-y-8">
+            <div className="space-y-4">
+              <div className="flex items-center justify-center lg:justify-start gap-3">
+                <div className="w-12 h-12 bg-pink-500 rounded-xl flex items-center justify-center">
+                  <Heart className="w-6 h-6 text-white" />
+                </div>
+                <h1 className="text-3xl font-bold text-gray-900">LoveAI</h1>
+              </div>
+              <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+                Your AI Companion
+                <span className="block text-pink-500">Awaits</span>
+              </h2>
+              <p className="text-xl text-gray-600 max-w-md mx-auto lg:mx-0">
+                Connect with intelligent AI companions designed to understand, support, and engage with you in meaningful conversations.
+              </p>
+            </div>
+
+            {/* Features List */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-gray-700">
+                <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
+                  <Heart className="w-4 h-4 text-pink-500" />
+                </div>
+                <span className="font-medium">Emotional Intelligence</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-700">
+                <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-pink-500" />
+                </div>
+                <span className="font-medium">Real-time Conversations</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-700">
+                <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-pink-500" />
+                </div>
+                <span className="font-medium">Privacy & Security</span>
               </div>
             </div>
-            <CardTitle className="text-4xl font-extrabold tracking-tight">
-              LoveAI Companion
-            </CardTitle>
-            <CardDescription className="text-pink-100 text-lg">
-              {preselectedPlan ? (
-                <>
-                  Complete your signup to get started with the <span className="font-semibold text-white">{preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span> plan.
-                </>
-              ) : (
-                "Sign in or create your account to start meaningful AI connections."
-              )}
-            </CardDescription>
+
+            {/* Preselected Plan Indicator */}
             {preselectedPlan && (
-              <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 mt-4">
-                <div className="flex items-center justify-center gap-3 text-white">
-                  <Crown className="w-6 h-6" />
-                  <span className="font-semibold text-lg">Selected Plan: {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span>
-                  <Star className="w-5 h-5" />
+              <div className="bg-pink-50 border border-pink-200 rounded-xl p-4">
+                <div className="flex items-center justify-center lg:justify-start gap-2 text-pink-700">
+                  <Crown className="w-5 h-5" />
+                  <span className="font-semibold">Selected Plan: {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span>
                 </div>
               </div>
             )}
-          </CardHeader>
-          <CardContent className="p-8">
-            <Tabs defaultValue={preselectedPlan ? "signup" : "signin"} className="w-full">
-              <div className="flex justify-center mb-8">
-                <TabsList className="grid grid-cols-2 w-full max-w-sm rounded-full bg-gray-100 p-1">
-                  <TabsTrigger 
-                    className="rounded-full data-[state=active]:bg-pink-500 data-[state=active]:text-white transition-all duration-300" 
-                    value="signin"
-                  >
-                    Sign In
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    className="rounded-full data-[state=active]:bg-pink-500 data-[state=active]:text-white transition-all duration-300" 
-                    value="signup"
-                  >
-                    Sign Up
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+          </div>
 
-              <TabsContent value="signin" className="space-y-8 pt-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-                  {/* Sign In Form */}
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h3>
-                      <p className="text-gray-600">Sign in to continue your AI journey</p>
-                    </div>
-                    
-                    <form onSubmit={handleSignIn} className="space-y-6">
+          {/* Right Side - Auth Form */}
+          <div className="w-full max-w-md mx-auto">
+            <Card className="shadow-xl border-0 bg-white">
+              <CardHeader className="text-center pb-6">
+                <CardTitle className="text-2xl font-bold text-gray-900">
+                  {preselectedPlan ? 'Complete Your Signup' : 'Welcome Back'}
+                </CardTitle>
+                <CardDescription className="text-gray-600">
+                  {preselectedPlan 
+                    ? `Get started with the ${preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)} plan`
+                    : 'Sign in to continue your journey'
+                  }
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="px-8 pb-8">
+                <Tabs defaultValue={preselectedPlan ? "signup" : "signin"} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6 bg-gray-100">
+                    <TabsTrigger 
+                      value="signin"
+                      className="data-[state=active]:bg-pink-500 data-[state=active]:text-white"
+                    >
+                      Sign In
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="signup"
+                      className="data-[state=active]:bg-pink-500 data-[state=active]:text-white"
+                    >
+                      Sign Up
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="signin" className="space-y-6">
+                    <form onSubmit={handleSignIn} className="space-y-5">
                       <div className="space-y-2">
                         <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                           Email Address
@@ -149,7 +183,7 @@ export default function Auth() {
                             placeholder="Enter your email"
                             value={signInData.email}
                             onChange={(e) => handleInputChange('email', e.target.value)}
-                            className="pl-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-xl"
+                            className="pl-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-lg"
                             required
                           />
                         </div>
@@ -167,7 +201,7 @@ export default function Auth() {
                             placeholder="Enter your password"
                             value={signInData.password}
                             onChange={(e) => handleInputChange('password', e.target.value)}
-                            className="pl-10 pr-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-xl"
+                            className="pl-10 pr-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-lg"
                             required
                           />
                           <button
@@ -183,7 +217,7 @@ export default function Auth() {
                       <Button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
+                        className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-lg transition-all duration-200"
                       >
                         {isLoading ? (
                           <>
@@ -197,64 +231,33 @@ export default function Auth() {
                           </>
                         )}
                       </Button>
-                      
-                      <p className="text-xs text-gray-500 text-center">
-                        By continuing, you agree to our <a className="text-pink-500 hover:text-pink-600 underline" href="/terms">Terms</a> and <a className="text-pink-500 hover:text-pink-600 underline" href="/privacy">Privacy Policy</a>.
-                      </p>
                     </form>
-                  </div>
+                  </TabsContent>
 
-                  {/* Benefits Section */}
-                  <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-8 space-y-6">
-                    <div className="text-center mb-6">
-                      <h4 className="text-xl font-bold text-gray-900 mb-2">Why Choose LoveAI?</h4>
-                      <p className="text-gray-600">Experience the future of AI companionship</p>
-                    </div>
-                    
-                    <div className="space-y-6">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Shield className="w-6 h-6 text-pink-600" />
-                        </div>
-                        <div>
-                          <h5 className="font-semibold text-gray-900 mb-1">Secure & Private</h5>
-                          <p className="text-sm text-gray-600">Protected by modern authentication and encryption. Your chats remain private.</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-6 h-6 text-purple-600" />
-                        </div>
-                        <div>
-                          <h5 className="font-semibold text-gray-900 mb-1">Personalized Companions</h5>
-                          <p className="text-sm text-gray-600">Choose your style: sweet, sassy, or soulful. Build a connection that feels real.</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Zap className="w-6 h-6 text-rose-600" />
-                        </div>
-                        <div>
-                          <h5 className="font-semibold text-gray-900 mb-1">Real-time Responses</h5>
-                          <p className="text-sm text-gray-600">Get instant, intelligent responses that adapt to your mood and conversation style.</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <TabsContent value="signup" className="space-y-6">
+                    <UnifiedSignupFlow
+                      preselectedPlan={preselectedPlan}
+                      onClose={() => {}}
+                    />
+                  </TabsContent>
+                </Tabs>
+
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 text-center">
+                    By continuing, you agree to our{' '}
+                    <a href="/terms" className="text-pink-500 hover:text-pink-600 underline">
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a href="/privacy" className="text-pink-500 hover:text-pink-600 underline">
+                      Privacy Policy
+                    </a>
+                  </p>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="signup" className="space-y-6 pt-6">
-                <UnifiedSignupFlow
-                  preselectedPlan={preselectedPlan}
-                  onClose={() => {}}
-                />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
