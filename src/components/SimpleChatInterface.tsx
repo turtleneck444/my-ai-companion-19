@@ -27,7 +27,7 @@ import {
   Zap,
   ArrowLeft
 } from 'lucide-react';
-import { Character } from '@/types/character';
+import { Character, ChatContext } from '@/types/character';
 import { personalityAI } from '@/lib/ai-chat';
 import { useEnhancedUsageTracking } from '@/hooks/useEnhancedUsageTracking';
 import { useToast } from '@/hooks/use-toast';
@@ -184,14 +184,28 @@ export const SimpleChatInterface = ({
     setIsLoading(true);
 
     try {
-      const response = await personalityAI.sendMessage(
-        currentInput,
+      const chatContext: ChatContext = {
         character,
-        messages.map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.content
-        }))
-      );
+        userPreferences: {
+          preferredName: 'friend',
+          petName: 'sweetheart',
+          communicationStyle: 'warm',
+          interests: [],
+          relationshipLevel: 'close'
+        },
+        conversationHistory: messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.sender,
+          timestamp: msg.timestamp,
+          metadata: {}
+        })),
+        relationshipLevel: 80,
+        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening',
+        sessionMemory: {}
+      };
+
+      const response = await personalityAI.generateResponse(currentInput, chatContext);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

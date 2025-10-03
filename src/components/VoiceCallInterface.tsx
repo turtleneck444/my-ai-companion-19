@@ -454,11 +454,15 @@ export const VoiceCallInterface: React.FC<VoiceCallInterfaceProps> = ({
       };
       
       console.log('🎤 Speaking:', { characterName: character.name, voiceId });
+      console.log('🎤 Response text:', response.substring(0, 100) + '...');
+      console.log('🎤 Voice settings:', voiceSettings);
       
       // Stop all current speech to prevent overlapping
       stopAllSpeech();
       
+      console.log('🎤 About to call speakText...');
       await speakText(response, voiceId, voiceSettings);
+      console.log('🎤 speakText completed');
       
     } catch (error) {
       console.error('❌ Speech error:', error);
