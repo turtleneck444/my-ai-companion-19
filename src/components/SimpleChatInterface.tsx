@@ -35,6 +35,7 @@ import { EmojiPicker } from '@/components/EmojiPicker';
 import { InteractiveGames } from '@/components/InteractiveGames';
 import { VoiceCallInterface } from '@/components/VoiceCallInterface';
 import { ChatStorageService } from '@/lib/chat-storage';
+import { supabase } from '@/lib/supabase';
 
 interface Message {
   id: string;

@@ -28,8 +28,8 @@ export const useEnhancedUsageTracking = () => {
     plan: 'free',
     remainingMessages: 5,
     remainingVoiceCalls: 1,
-    canSendMessage: true,
-    canMakeVoiceCall: true,
+    canSendMessage: false, // Start as false until we load the actual plan
+    canMakeVoiceCall: false, // Start as false until we load the actual plan
     messages_today: 0,
     voice_calls_today: 0
   });
@@ -203,6 +203,8 @@ export const useEnhancedUsageTracking = () => {
   console.log('🔍 Debug: Current plan:', usageData.plan);
   console.log('🔍 Debug: Messages today:', usageData.messages_today);
   console.log('🔍 Debug: Voice calls today:', usageData.voice_calls_today);
+  console.log('🔍 Debug: Can send message check:', usageData.plan === 'pro', planLimits.messages_per_day, usageData.messages_today < planLimits.messages_per_day);
+  console.log('🔍 Debug: Can make voice call check:', usageData.plan === 'pro', planLimits.voice_calls_per_day, usageData.voice_calls_today < planLimits.voice_calls_per_day);
 
   return {
     ...usageData,
