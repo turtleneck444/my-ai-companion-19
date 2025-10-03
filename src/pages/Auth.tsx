@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UnifiedSignupFlow } from '@/components/UnifiedSignupFlow';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2, Crown } from "lucide-react";
+import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2, Crown, Heart, Star, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Auth() {
@@ -49,11 +49,12 @@ export default function Auth() {
       toast({
         title: "Welcome back!",
         description: "You've been signed in successfully.",
+        variant: "default"
       });
     } catch (error: any) {
       toast({
         title: "Sign-in failed",
-        description: error.message || "An unexpected error occurred",
+        description: error.message || "An unexpected error occurred.",
         variant: "destructive"
       });
     } finally {
@@ -61,140 +62,183 @@ export default function Auth() {
     }
   };
 
-  return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Brand gradient backdrop */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-purple-50 via-rose-50 to-pink-50" />
-      <div className="absolute -top-32 -left-32 h-80 w-80 bg-purple-300/20 rounded-full blur-3xl" />
-      <div className="absolute -bottom-32 -right-32 h-80 w-80 bg-pink-300/20 rounded-full blur-3xl" />
+  const handleInputChange = (field: string, value: string) => {
+    setSignInData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
-      <div className="max-w-6xl mx-auto px-4 py-14">
-        <Card className="border-0 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-background/70">
-          <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-purple-700 via-pink-600 to-rose-600 bg-clip-text text-transparent">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-rose-50 flex items-center justify-center p-4">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-40 left-1/2 w-80 h-80 bg-rose-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse" style={{ animationDelay: '4s' }}></div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-14 relative z-10">
+        <Card className="border-0 shadow-2xl backdrop-blur-xl bg-white/80 rounded-3xl overflow-hidden">
+          <CardHeader className="space-y-6 text-center bg-gradient-to-r from-pink-500 via-purple-500 to-rose-500 p-8 text-white">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <Heart className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            <CardTitle className="text-4xl font-extrabold tracking-tight">
               LoveAI Companion
             </CardTitle>
-            <CardDescription className="text-base md:text-lg text-muted-foreground">
+            <CardDescription className="text-pink-100 text-lg">
               {preselectedPlan ? (
                 <>
-                  Complete your signup to get started with the <span className="font-semibold text-pink-600 capitalize">{preselectedPlan}</span> plan.
+                  Complete your signup to get started with the <span className="font-semibold text-white">{preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span> plan.
                 </>
               ) : (
                 "Sign in or create your account to start meaningful AI connections."
               )}
             </CardDescription>
             {preselectedPlan && (
-              <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 mt-4">
-                <div className="flex items-center justify-center gap-2 text-pink-700">
-                  <Crown className="w-5 h-5" />
-                  <span className="font-semibold">Selected Plan: {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span>
+              <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 mt-4">
+                <div className="flex items-center justify-center gap-3 text-white">
+                  <Crown className="w-6 h-6" />
+                  <span className="font-semibold text-lg">Selected Plan: {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</span>
+                  <Star className="w-5 h-5" />
                 </div>
               </div>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-8">
             <Tabs defaultValue={preselectedPlan ? "signup" : "signin"} className="w-full">
-              <div className="flex justify-center">
-                <TabsList className="grid grid-cols-2 w-full max-w-sm rounded-full">
-                  <TabsTrigger className="rounded-full" value="signin">Sign In</TabsTrigger>
-                  <TabsTrigger className="rounded-full" value="signup">Sign Up</TabsTrigger>
+              <div className="flex justify-center mb-8">
+                <TabsList className="grid grid-cols-2 w-full max-w-sm rounded-full bg-gray-100 p-1">
+                  <TabsTrigger 
+                    className="rounded-full data-[state=active]:bg-pink-500 data-[state=active]:text-white transition-all duration-300" 
+                    value="signin"
+                  >
+                    Sign In
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    className="rounded-full data-[state=active]:bg-pink-500 data-[state=active]:text-white transition-all duration-300" 
+                    value="signup"
+                  >
+                    Sign Up
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
               <TabsContent value="signin" className="space-y-8 pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-stretch">
-                  {/* Form */}
-                  <div className="space-y-5">
-                    <form onSubmit={handleSignIn} className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                  {/* Sign In Form */}
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h3>
+                      <p className="text-gray-600">Sign in to continue your AI journey</p>
+                    </div>
+                    
+                    <form onSubmit={handleSignIn} className="space-y-6">
                       <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                          Email Address
+                        </Label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <Input
                             id="email"
-                            name="email"
                             type="email"
-                            placeholder="you@loveaicompanion.com"
+                            placeholder="Enter your email"
                             value={signInData.email}
-                            onChange={(e) => setSignInData(prev => ({ ...prev, email: e.target.value }))}
+                            onChange={(e) => handleInputChange('email', e.target.value)}
+                            className="pl-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-xl"
                             required
-                            className="pl-9 py-6 text-base"
                           />
                         </div>
                       </div>
-
+                      
                       <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
+                        <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                          Password
+                        </Label>
                         <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <Input
                             id="password"
-                            name="password"
                             type={showPassword ? "text" : "password"}
-                            placeholder="••••••••"
+                            placeholder="Enter your password"
                             value={signInData.password}
-                            onChange={(e) => setSignInData(prev => ({ ...prev, password: e.target.value }))}
+                            onChange={(e) => handleInputChange('password', e.target.value)}
+                            className="pl-10 pr-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-xl"
                             required
-                            className="pl-9 pr-10 py-6 text-base"
                           />
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-1/2 -translate-y-1/2 h-full px-3 py-0 hover:bg-transparent"
                             onClick={() => setShowPassword(!showPassword)}
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                           >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
                         </div>
                       </div>
 
-                      <Button type="submit" className="w-full py-6 text-lg" disabled={isLoading}>
+                      <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
+                      >
                         {isLoading ? (
                           <>
-                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Signing in...
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Signing In...
                           </>
                         ) : (
                           <>
-                            <LogIn className="mr-2 h-5 w-5" />
+                            <LogIn className="w-5 h-5 mr-2" />
                             Sign In
                           </>
                         )}
                       </Button>
-                      <p className="text-xs text-muted-foreground text-center">
-                        By continuing, you agree to our <a className="underline" href="/terms">Terms</a> and <a className="underline" href="/privacy">Privacy Policy</a>.
+                      
+                      <p className="text-xs text-gray-500 text-center">
+                        By continuing, you agree to our <a className="text-pink-500 hover:text-pink-600 underline" href="/terms">Terms</a> and <a className="text-pink-500 hover:text-pink-600 underline" href="/privacy">Privacy Policy</a>.
                       </p>
                     </form>
                   </div>
 
-                  {/* Brand / Benefits */}
-                  <div className="rounded-xl border bg-card p-6 md:p-8 shadow-sm">
-                    <div className="space-y-5">
-                      <div className="flex items-start gap-3">
-                        <Shield className="w-5 h-5 text-primary mt-1" />
+                  {/* Benefits Section */}
+                  <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-8 space-y-6">
+                    <div className="text-center mb-6">
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">Why Choose LoveAI?</h4>
+                      <p className="text-gray-600">Experience the future of AI companionship</p>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <Shield className="w-6 h-6 text-pink-600" />
+                        </div>
                         <div>
-                          <p className="font-semibold text-foreground">Secure & Private</p>
-                          <p className="text-sm text-muted-foreground">Protected by modern authentication and encryption. Your chats remain private.</p>
+                          <h5 className="font-semibold text-gray-900 mb-1">Secure & Private</h5>
+                          <p className="text-sm text-gray-600">Protected by modern authentication and encryption. Your chats remain private.</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <Sparkles className="w-5 h-5 text-primary mt-1" />
+                      
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-6 h-6 text-purple-600" />
+                        </div>
                         <div>
-                          <p className="font-semibold text-foreground">Personalized Companions</p>
-                          <p className="text-sm text-muted-foreground">Choose your style: sweet, sassy, or soulful. Build a connection that feels real.</p>
+                          <h5 className="font-semibold text-gray-900 mb-1">Personalized Companions</h5>
+                          <p className="text-sm text-gray-600">Choose your style: sweet, sassy, or soulful. Build a connection that feels real.</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <Mail className="w-5 h-5 text-primary mt-1" />
+                      
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <Zap className="w-6 h-6 text-rose-600" />
+                        </div>
                         <div>
-                          <p className="font-semibold text-foreground">Human Support</p>
-                          <p className="text-sm text-muted-foreground">Questions? Reach us anytime at support@loveaicompanion.com</p>
+                          <h5 className="font-semibold text-gray-900 mb-1">Real-time Responses</h5>
+                          <p className="text-sm text-gray-600">Get instant, intelligent responses that adapt to your mood and conversation style.</p>
                         </div>
                       </div>
                     </div>

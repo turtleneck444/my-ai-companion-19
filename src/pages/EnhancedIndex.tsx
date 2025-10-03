@@ -575,7 +575,7 @@ const EnhancedIndex = () => {
                 
                 <Button 
                   onClick={handleCreateNew}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 animate-fade-up"
+                  className="bg-pink-500 hover:bg-pink-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 animate-fade-up"
                   style={{ animationDelay: '0.6s' }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -683,7 +683,7 @@ const EnhancedIndex = () => {
                         
                         {/* Unread Count */}
                         {character.unreadCount && character.unreadCount > 0 && (
-                          <Badge className="absolute -bottom-2 -right-2 bg-gradient-to-r from-pink-500 to-red-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center animate-bounce">
+                          <Badge className="absolute -bottom-2 -right-2 bg-pink-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center animate-bounce">
                             {character.unreadCount}
                           </Badge>
                         )}
@@ -704,7 +704,7 @@ const EnhancedIndex = () => {
                             ))}
                           </div>
                           {character.relationshipLevel && character.relationshipLevel > 4 && (
-                            <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs">
+                            <Badge className="bg-pink-500 text-white text-xs">
                               Close Bond
                             </Badge>
                           )}
@@ -716,7 +716,7 @@ const EnhancedIndex = () => {
                             <Badge 
                               key={trait} 
                               variant="secondary" 
-                              className="text-xs bg-gradient-to-r from-primary/10 to-accent/10 hover:from-primary/20 hover:to-accent/20 transition-all duration-300"
+                              className="text-xs bg-pink-100 text-pink-700 hover:bg-pink-200 transition-all duration-300"
                             >
                               {trait}
                             </Badge>
@@ -738,7 +738,7 @@ const EnhancedIndex = () => {
                         <Button
                           variant="default"
                           size="sm"
-                          className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                          className="bg-pink-500 hover:bg-pink-600 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleStartCall(character);
@@ -776,7 +776,7 @@ const EnhancedIndex = () => {
                 </p>
                 <Button 
                   onClick={handleCreateNew}
-                  className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                  className="bg-pink-500 hover:bg-pink-600 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Get Started
