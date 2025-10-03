@@ -97,6 +97,9 @@ export const SimpleChatInterface = ({
   console.log('  - canMakeVoiceCall:', canMakeVoiceCall);
   console.log('  - Plan check:', usageData?.plan === 'pro');
   console.log('  - Messages check:', planLimits && usageData?.messages_today < planLimits.messages_per_day);
+  console.log('  - Full destructuring result:', { usageData, planLimits, usageLoading, refreshUsage });
+  console.log('  - Input disabled check:', isLoading || !canSendMessage);
+  console.log('  - Button disabled check:', !inputValue.trim() || isLoading || !canSendMessage);
 
   // Load messages when component mounts
   useEffect(() => {

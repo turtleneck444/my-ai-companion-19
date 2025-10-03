@@ -205,6 +205,18 @@ export const useEnhancedUsageTracking = () => {
   console.log('🔍 Debug: Voice calls today:', usageData.voice_calls_today);
   console.log('🔍 Debug: Can send message check:', usageData.plan === 'pro', planLimits.messages_per_day, usageData.messages_today < planLimits.messages_per_day);
   console.log('🔍 Debug: Can make voice call check:', usageData.plan === 'pro', planLimits.voice_calls_per_day, usageData.voice_calls_today < planLimits.voice_calls_per_day);
+  
+  const returnValue = {
+    ...usageData,
+    planLimits,
+    loading,
+    error,
+    refresh: loadUsageData,
+    incrementUsage,
+    resetUsage
+  };
+  
+  console.log('🔍 Debug: Hook returning:', returnValue);
 
   return {
     ...usageData,
