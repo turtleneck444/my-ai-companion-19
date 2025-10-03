@@ -85,9 +85,16 @@ export class ChatStorageService {
     message: ChatMessage
   ): Promise<void> {
     try {
-      // Skip database save if using fallback ID
+      // Use fallback storage if using fallback ID
       if (conversationId.startsWith('fallback-')) {
-        console.log('💾 Using fallback storage for message');
+        const key = `chat_${conversationId}`;
+        const existingMessages = JSON.parse(localStorage.getItem(key) || '[]');
+        existingMessages.push({
+          ...message,
+          timestamp: message.timestamp.toISOString()
+        });
+        localStorage.setItem(key, JSON.stringify(existingMessages));
+        console.log('💾 Message saved to fallback storage');
         return;
       }
 
@@ -131,10 +138,22 @@ export class ChatStorageService {
   // Load messages for a conversation
   static async loadMessages(conversationId: string): Promise<ChatMessage[]> {
     try {
-      // Return empty array if using fallback ID
+      // Load from fallback storage if using fallback ID
       if (conversationId.startsWith('fallback-')) {
-        console.log('📖 Using fallback storage, returning empty messages');
-        return [];
+        const key = `chat_${conversationId}`;
+        const storedMessages = JSON.parse(localStorage.getItem(key) || '[]');
+        console.log('📖 Loaded messages from fallback storage:', storedMessages.length);
+        
+        // Convert stored messages to ChatMessage format
+        const chatMessages: ChatMessage[] = storedMessages.map((msg: any) => ({
+          id: msg.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          content: msg.content,
+          sender: msg.sender,
+          timestamp: new Date(msg.timestamp),
+          metadata: msg.metadata || {}
+        }));
+        
+        return chatMessages;
       }
 
       const { data: messages, error } = await supabase
