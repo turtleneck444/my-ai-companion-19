@@ -84,6 +84,12 @@ export const getPlanById = (planId: string) => {
   return SUBSCRIPTION_PLANS[planId as keyof typeof SUBSCRIPTION_PLANS] || SUBSCRIPTION_PLANS.free;
 };
 
+// Helper function to format price
+export const formatPrice = (priceInCents: number) => {
+  if (priceInCents === 0) return 'Free';
+  return `$${(priceInCents / 100).toFixed(2)}`;
+};
+
 export const createPaymentIntent = async (planId: string): Promise<PaymentIntent> => {
   const response = await fetch('/.netlify/functions/payments', {
     method: 'POST',
