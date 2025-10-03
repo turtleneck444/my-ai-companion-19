@@ -12,6 +12,196 @@ import { Mail, Lock, LogIn, Shield, Sparkles, Eye, EyeOff, Loader2, Crown, Heart
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
+// Signup Form Component
+const SignupForm: React.FC<{ preselectedPlan?: string }> = ({ preselectedPlan }) => {
+  const { signUp } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    fullName: ''
+  });
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (formData.password !== formData.confirmPassword) {
+        toast({
+          title: "Password Mismatch",
+          description: "Passwords do not match.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (formData.password.length < 6) {
+        toast({
+          title: "Password Too Short",
+          description: "Password must be at least 6 characters.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      await signUp(formData.email, formData.password, {
+        full_name: formData.fullName,
+        selected_plan: preselectedPlan || 'free'
+      });
+      
+      toast({
+        title: "Account Created!",
+        description: "Please check your email to verify your account.",
+        variant: "default"
+      });
+      
+      navigate('/app');
+    } catch (error: any) {
+      toast({
+        title: "Signup Failed",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2">
+        <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
+          Full Name
+        </Label>
+        <div className="relative">
+          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            id="fullName"
+            type="text"
+            placeholder="Enter your full name"
+            value={formData.fullName}
+            onChange={(e) => handleInputChange('fullName', e.target.value)}
+            className="pl-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-lg"
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="signup-email" className="text-sm font-medium text-gray-700">
+          Email Address
+        </Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            id="signup-email"
+            type="email"
+            placeholder="Enter your email"
+            value={formData.email}
+            onChange={(e) => handleInputChange('email', e.target.value)}
+            className="pl-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-lg"
+            required
+          />
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="signup-password" className="text-sm font-medium text-gray-700">
+          Password
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            id="signup-password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Create a password"
+            value={formData.password}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            className="pl-10 pr-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-lg"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="confirm-password" className="text-sm font-medium text-gray-700">
+          Confirm Password
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            id="confirm-password"
+            type={showConfirmPassword ? "text" : "password"}
+            placeholder="Confirm your password"
+            value={formData.confirmPassword}
+            onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+            className="pl-10 pr-10 h-12 border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-lg"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+
+      {preselectedPlan && preselectedPlan !== 'free' && (
+        <div className="bg-pink-50 border border-pink-200 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-pink-700">
+            <Crown className="w-4 h-4" />
+            <span className="text-sm font-medium">
+              You'll be charged for the {preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)} plan after signup
+            </span>
+          </div>
+        </div>
+      )}
+
+      <Button
+        type="submit"
+        disabled={loading}
+        className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-lg transition-all duration-200"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            Creating Account...
+          </>
+        ) : (
+          <>
+            <User className="w-5 h-5 mr-2" />
+            Create Account
+          </>
+        )}
+      </Button>
+    </form>
+  );
+};
+
 export default function Auth() {
   const [searchParams] = useSearchParams();
   const { user, signIn } = useAuth();
@@ -73,15 +263,6 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      {/* Back to Home Button */}
-      <Button
-        variant="ghost"
-        onClick={() => navigate('/')}
-        className="absolute top-6 left-6 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Home
-      </Button>
 
       <div className="w-full max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
@@ -140,7 +321,15 @@ export default function Auth() {
           {/* Right Side - Auth Form */}
           <div className="w-full max-w-md mx-auto">
             <Card className="shadow-xl border-0 bg-white">
-              <CardHeader className="text-center pb-6">
+              <CardHeader className="text-center pb-6 relative">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/')}
+                  className="absolute left-0 top-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
                 <CardTitle className="text-2xl font-bold text-gray-900">
                   {preselectedPlan ? 'Complete Your Signup' : 'Welcome Back'}
                 </CardTitle>
@@ -235,10 +424,7 @@ export default function Auth() {
                   </TabsContent>
 
                   <TabsContent value="signup" className="space-y-6">
-                    <UnifiedSignupFlow
-                      preselectedPlan={preselectedPlan}
-                      onClose={() => {}}
-                    />
+                    <SignupForm preselectedPlan={preselectedPlan} />
                   </TabsContent>
                 </Tabs>
 
