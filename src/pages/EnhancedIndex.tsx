@@ -612,7 +612,7 @@ const EnhancedIndex = () => {
                       </p>
                     </div>
                     {/* Avatar removed per request for a cleaner card */}
-                    <Badge className="bg-white/15 text-white border-white/20">{currentPlan === 'free' ? 'Free' : currentPlan === 'premium' ? 'Premium' : 'Pro'}</Badge>
+                    <Badge className="bg-white/15 text-white border-white/20">{plan === 'free' ? 'Free' : plan === 'premium' ? 'Premium' : 'Pro'}</Badge>
                   </div>
                   
                   {/* Enhanced Quick Stats */}
